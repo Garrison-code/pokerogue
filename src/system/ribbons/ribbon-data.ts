@@ -143,7 +143,7 @@ export class RibbonData {
    */
   public static fromJSON(value: string): RibbonData {
     try {
-      return new RibbonData(Number.parseInt(value, 16));
+      return new RibbonData(BigInt(`0x${value}`));
     } catch {
       return new RibbonData(0);
     }

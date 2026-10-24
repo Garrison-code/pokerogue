@@ -111,6 +111,8 @@ export class GameData {
   public eggPity: number[];
   public unlockPity: number[];
 
+  public importHistory: SystemSaveData["importHistory"];
+
   public appliedMigrators: AppliedMigrators = {};
 
   /**
@@ -152,6 +154,7 @@ export class GameData {
 
   public getSystemSaveData(): SystemSaveData {
     return {
+      ...(this.importHistory ? { importHistory: this.importHistory } : {}),
       trainerId: this.trainerId,
       secretId: this.secretId,
       // TODO: save some settings (such as player gender) separately, outside of system data
@@ -345,6 +348,7 @@ export class GameData {
     applySystemVersionMigration(systemData);
 
     this.appliedMigrators = systemData.appliedMigrators;
+    this.importHistory = systemData.importHistory;
 
     this.trainerId = systemData.trainerId;
     this.secretId = systemData.secretId;
@@ -1317,6 +1321,160 @@ export class GameData {
     link.remove();
 
     return true;
+  }
+
+  private mergeDialogOpen = false;
+
+  public async mergeImportData(): Promise<void> {
+    if (this.mergeDialogOpen) {
+      return;
+    }
+    this.mergeDialogOpen = true;
+    const wasPaused = globalScene.scene.isPaused();
+    const username = loggedInUser?.username;
+    try {
+      const [{ showSystemMergeDialog }, merge, { getStarterValueFriendshipCap }] = await Promise.all([
+        import("#ui/system-merge-dialog"),
+        import("#system/system-data-merge"),
+        import("#balance/starters"),
+      ]);
+      let remoteRevision: string | undefined;
+      let remoteBase: SystemSaveData | undefined;
+      const checkAccount = () => {
+        if (loggedInUser?.username !== username) {
+          throw new Error("Account changed");
+        }
+      };
+      const readCurrent = async (): Promise<SystemSaveData> => {
+        checkAccount();
+        const local = merge.cloneSystemData(this.getSystemSaveData());
+        if (bypassLogin) {
+          return local;
+        }
+        const raw = await pokerogueApi.savedata.system.get({ clientSessionId });
+        if (typeof raw !== "string") {
+          throw new Error("Could not read current system data");
+        }
+        const remote = GameData.parseSystemData(raw);
+        const revision = merge.systemRevision(remote);
+        applySystemVersionMigration(remote, { silent: true });
+        const changed = remoteRevision !== undefined && remoteRevision !== revision;
+        remoteRevision = revision;
+        checkAccount();
+        // A different device may have saved while the preview was open.
+        if (changed) {
+          remoteBase = remote;
+        }
+        return remoteBase ? merge.cloneSystemData(remoteBase) : local;
+      };
+      if (!wasPaused) {
+        globalScene.scene.pause();
+      }
+      showSystemMergeDialog({
+        parse: text => {
+          const data = merge.decodeSystemImport(text, {
+            decrypt: value => AES.decrypt(value, saveKey).toString(enc.Utf8),
+            shortKeys: systemSaveShortKeyMap,
+            parse: GameData.parseSystemData,
+            migrate: data => applySystemVersionMigration(data, { silent: true }),
+            version,
+            compareVersions,
+          });
+          const species = new Set(speciesDataRegistry.getAllSpecies().map(s => s.speciesId));
+          const starters = new Set<number>(speciesDataRegistry.getAllStarters());
+          for (const id of Object.keys(data.dexData)) {
+            if (!species.has(Number(id))) {
+              throw new merge.MergeImportError("unsupported", `dexData.${id}`);
+            }
+          }
+          for (const id of Object.keys(data.starterData)) {
+            if (!starters.has(Number(id))) {
+              throw new merge.MergeImportError("unsupported", `starterData.${id}`);
+            }
+          }
+          for (const egg of data.eggs) {
+            if (egg.species && !species.has(egg.species)) {
+              throw new merge.MergeImportError("unsupported", "eggs.species");
+            }
+          }
+          if (!this.validateSystemData(data)) {
+            throw new merge.MergeImportError("invalid", "starterData");
+          }
+          for (const key of Object.keys(data.unlocks)) {
+            if (!Object.hasOwn(this.unlocks, key)) {
+              throw new merge.MergeImportError("unsupported", `unlocks.${key}`);
+            }
+          }
+          for (const key of Object.keys(data.achvUnlocks)) {
+            if (!Object.hasOwn(achvs, key)) {
+              throw new merge.MergeImportError("unsupported", `achvUnlocks.${key}`);
+            }
+          }
+          for (const key of Object.keys(data.voucherUnlocks)) {
+            if (!Object.hasOwn(vouchers, key)) {
+              throw new merge.MergeImportError("unsupported", `voucherUnlocks.${key}`);
+            }
+          }
+          for (const key of Object.keys(data.voucherCounts)) {
+            if (!Object.hasOwn(this.voucherCounts, key)) {
+              throw new merge.MergeImportError("unsupported", `voucherCounts.${key}`);
+            }
+          }
+          return data;
+        },
+        readCurrent,
+        save: async data => {
+          checkAccount();
+          const raw = merge.serializeSystemData(data);
+          const encrypted = encrypt(raw, bypassLogin);
+          if (!bypassLogin) {
+            const [success] = await updateUserInfo();
+            if (!success) {
+              throw new Error("Could not verify account");
+            }
+            checkAccount();
+            const error = await pokerogueApi.savedata.system.update(
+              { trainerId: this.trainerId, secretId: this.secretId, clientSessionId },
+              raw,
+            );
+            if (error) {
+              throw new Error(error);
+            }
+          }
+          // Do not install imported data or lineage locally until the server accepts it.
+          try {
+            localStorage.setItem(`data_${username}`, encrypted);
+          } catch (error) {
+            if (bypassLogin) {
+              throw error;
+            }
+            // The server has already committed. Reload from it even if the local cache is full.
+            console.warn("Merged data saved on server; local cache could not be updated", error);
+          }
+          this.initParsedSystem(data);
+        },
+        mergeOptions: () => ({
+          version,
+          now: Date.now(),
+          friendshipCap: id => getStarterValueFriendshipCap(speciesDataRegistry.getStarterCost(id)),
+        }),
+        speciesName: id => speciesDataRegistry.getSpecies(id).name,
+        onClose: () => {
+          this.mergeDialogOpen = false;
+          if (!wasPaused) {
+            globalScene.scene.resume();
+          }
+        },
+        onSuccess: () => window.location.reload(),
+      });
+    } catch (error) {
+      this.mergeDialogOpen = false;
+      if (!wasPaused && globalScene.scene.isPaused()) {
+        globalScene.scene.resume();
+      }
+      console.error(error);
+      globalScene.ui.showText(i18next.t("mergeImport:errors.failed"));
+    }
   }
 
   // TODO: Refactor this spaghetti monster

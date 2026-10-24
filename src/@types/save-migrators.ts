@@ -46,5 +46,5 @@ export interface SettingsSaveMigrator {
 export interface SystemSaveMigrator {
   name: string;
   version: string;
-  migrate: (data: SystemSaveData) => void;
+  migrate: (data: SystemSaveData, options?: { silent?: boolean }) => void;
 }
