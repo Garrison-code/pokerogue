@@ -111,6 +111,11 @@ export class InputsController {
   init(): void {
     this.events = globalScene.game.events;
 
+    this.events.on("type-chart/focus", this.focusHtmlTool, this);
+    globalScene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off("type-chart/focus", this.focusHtmlTool, this);
+    });
+
     globalScene.game.events.on(Phaser.Core.Events.BLUR, () => {
       this.loseFocus();
     });
@@ -181,6 +186,15 @@ export class InputsController {
   loseFocus(): void {
     this.deactivatePressedKey();
     this.touchControls.deactivatePressedKey();
+  }
+
+  /** Release hold-to-show information as well as repeat timers before HTML takes focus. */
+  private focusHtmlTool(): void {
+    for (const button of [...this.buttonLock]) {
+      this.events.emit("input_up", { controller_type: this.lastSource, button });
+    }
+    this.touchControls.releasePressedKeys();
+    this.loseFocus();
   }
 
   /**

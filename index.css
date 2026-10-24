@@ -11,8 +11,6 @@
   --color-dark: hsl(0, 0%, 10%);
 }
 
-html,
-body,
 #app,
 #touchControls {
   touch-action: none;
@@ -95,6 +93,7 @@ body {
   */
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
   padding-left: max(env(safe-area-inset-left), env(safe-area-inset-right));
   padding-right: max(env(safe-area-inset-left), env(safe-area-inset-right));
 }
@@ -131,11 +130,11 @@ body {
 
 @media (pointer: coarse) {
   /* hasTouchscreen() && !isTouchControlsEnabled */
-  body:has(> #touchControls.visible) #app {
+  body:has(#touchControls.visible) #app {
     align-items: start;
   }
 
-  body:has(> #touchControls.visible) #app > div:first-child {
+  body:has(#touchControls.visible) #app > div:first-child {
     transform-origin: top !important;
   }
 }

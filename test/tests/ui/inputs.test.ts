@@ -65,6 +65,18 @@ describe("Inputs", () => {
     expect(game.inputsHandler.log.length).toBe(5);
   });
 
+  it("releases a held keyboard key when an HTML tool gains focus and accepts later game input", async () => {
+    const keyCode = CFG_KEYBOARD_QWERTY.deviceMapping.KEY_ARROW_UP;
+    game.scene.input.keyboard?.emit("keydown", { keyCode });
+    expect(game.inputsHandler.log.length).toBe(1);
+    game.scene.game.events.emit("type-chart/focus");
+    expect(game.inputsHandler.logUp.length).toBe(1);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    expect(game.inputsHandler.log.length).toBe(1);
+    await game.inputsHandler.pressKeyboardKey(keyCode, 1);
+    expect(game.inputsHandler.log.length).toBe(2);
+  });
+
   it("gamepad - test input holding for 1ms - 1 input", async () => {
     await game.inputsHandler.pressGamepadButton(PAD_XBOX360.deviceMapping.RC_S, 1);
     expect(game.inputsHandler.log.length).toBe(1);
