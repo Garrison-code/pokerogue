@@ -8,6 +8,7 @@ import type {
   SessionSaveMigrator,
   SessionSaveMigratorIn,
   SettingsSaveMigrator,
+  SystemSaveMigrationOptions,
   SystemSaveMigrator,
 } from "#types/save-migrators";
 import { getDataTypeKey } from "#utils/data";
@@ -129,7 +130,7 @@ sortMigrators(settingsMigrators);
  * to the current version.
  * @param data - The {@linkcode SystemSaveData} to migrate
  */
-export function applySystemVersionMigration(data: SystemSaveData, options?: { silent?: boolean }): void {
+export function applySystemVersionMigration(data: SystemSaveData, options?: SystemSaveMigrationOptions): void {
   const prevVersion = data.gameVersion;
   const isCurrentVersionHigher = compareVersions(prevVersion, LATEST_VERSION) === -1;
 
@@ -222,9 +223,12 @@ function applyMigrators(
   migrators: readonly SaveMigrator[],
   data: SaveData,
   saveVersion: string,
-  options?: { silent?: boolean },
+  options?: SystemSaveMigrationOptions,
 ): void {
   for (const migrator of migrators) {
+    if (options?.dataOnly && "localOnly" in migrator && migrator.localOnly) {
+      continue;
+    }
     const isMigratorVersionHigher = compareVersions(saveVersion, migrator.version) === -1;
 
     if (isMigratorVersionHigher) {

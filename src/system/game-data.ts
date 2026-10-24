@@ -1357,7 +1357,7 @@ export class GameData {
         }
         const remote = GameData.parseSystemData(raw);
         const revision = merge.systemRevision(remote);
-        applySystemVersionMigration(remote, { silent: true });
+        applySystemVersionMigration(remote, { silent: true, dataOnly: true });
         const changed = remoteRevision !== undefined && remoteRevision !== revision;
         remoteRevision = revision;
         checkAccount();
@@ -1376,7 +1376,7 @@ export class GameData {
             decrypt: value => AES.decrypt(value, saveKey).toString(enc.Utf8),
             shortKeys: systemSaveShortKeyMap,
             parse: GameData.parseSystemData,
-            migrate: data => applySystemVersionMigration(data, { silent: true }),
+            migrate: data => applySystemVersionMigration(data, { silent: true, dataOnly: true }),
             version,
             compareVersions,
           });

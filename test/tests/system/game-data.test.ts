@@ -11,9 +11,10 @@ import { GameManager } from "#test/framework/game-manager";
 import type { SessionSaveData } from "#types/save-data";
 import type { SystemMergeDialogOptions } from "#ui/system-merge-dialog";
 import * as mergeDialog from "#ui/system-merge-dialog";
+import { loadStarterPreferences } from "#utils/data";
 import { compareVersions } from "#utils/migrator-utils";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("System - Game Data", () => {
   let phaserGame: Phaser.Game;
@@ -35,6 +36,11 @@ describe("System - Game Data", () => {
   });
 
   describe("merge import persistence", () => {
+    afterEach(() => {
+      if (document.getElementById("system-merge-dialog")) {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      }
+    });
     async function openDialog(): Promise<SystemMergeDialogOptions> {
       let captured: SystemMergeDialogOptions | undefined;
       Object.assign(game.scene.scene, { isPaused: vi.fn().mockReturnValue(false), pause: vi.fn(), resume: vi.fn() });
@@ -71,13 +77,90 @@ describe("System - Game Data", () => {
         decrypt: value => value,
         shortKeys: {},
         parse: GameData.parseSystemData,
-        migrate: value => applySystemVersionMigration(value, { silent: true }),
+        migrate: value => applySystemVersionMigration(value, { silent: true, dataOnly: true }),
         version,
         compareVersions,
       });
       expect(parsed.starterData[25].pity).toHaveLength(2);
       expect(parsed.dexData[25].ribbons.getRibbons()).toBe(0n);
       expect(parsed.gameVersion).toBe(version);
+    });
+
+    it.each(["valid", "invalid"])(
+      "preserves preferences when selecting and cancelling a %s pre-1.12.1 export",
+      async kind => {
+        const showDialog = mergeDialog.showSystemMergeDialog;
+        const options = await openDialog();
+        const current = cloneSystemData(game.scene.gameData.getSystemSaveData());
+        current.gameVersion = version;
+        vi.spyOn(pokerogueApi.savedata.system, "get").mockResolvedValue(serializeSystemData(current));
+        const incoming = cloneSystemData(current);
+        incoming.gameVersion = "1.12.0.10";
+        incoming.appliedMigrators = {};
+        incoming.starterData[25].candyCount = 5;
+        if (kind === "invalid") {
+          incoming.voucherCounts[0] = -1;
+        }
+        const key = `starterPrefs_${account.loggedInUser?.username}`;
+        const preferences = JSON.stringify({
+          25: { abilityIndex: 2, formIndex: 1, nickname: `preview ${kind} stays put` },
+        });
+        localStorage.setItem(key, preferences);
+        loadStarterPreferences();
+        const writes = vi.spyOn(localStorage, "setItem");
+        const removes = vi.spyOn(localStorage, "removeItem");
+        const parse = vi.spyOn(options, "parse");
+        showDialog(options);
+        const panel = document.getElementById("system-merge-dialog")!;
+        const input = panel.querySelector("input")!;
+        Object.defineProperty(input, "files", {
+          value: [{ name: "legacy.prsv", text: async () => serializeSystemData(incoming) }],
+          configurable: true,
+        });
+        await input.onchange!.call(input, new Event("change"));
+        const buttons = [...panel.querySelectorAll("button")];
+        expect(buttons.at(-1)!.disabled).toBe(kind === "invalid");
+        if (kind === "valid") {
+          const parsed = parse.mock.results[0].value;
+          expect(parsed.appliedMigrators).not.toHaveProperty("1.12.1.0-migrateStarterPreferences");
+          expect(parsed.appliedMigrators["1.12.2.0-addPityTracker"]).toBeTypeOf("number");
+        }
+        expect(writes).not.toHaveBeenCalled();
+        expect(removes).not.toHaveBeenCalled();
+        expect(localStorage.getItem(key)).toBe(preferences);
+        buttons.at(-2)!.click();
+        expect(document.getElementById("system-merge-dialog")).toBeNull();
+        expect(writes).not.toHaveBeenCalled();
+        expect(localStorage.getItem(key)).toBe(preferences);
+      },
+    );
+
+    it("does not migrate destination preferences while inspecting an older remote save", async () => {
+      const options = await openDialog();
+      const remote = cloneSystemData(game.scene.gameData.getSystemSaveData());
+      remote.gameVersion = "1.12.0.10";
+      vi.spyOn(pokerogueApi.savedata.system, "get").mockResolvedValue(serializeSystemData(remote));
+      const key = `starterPrefs_${account.loggedInUser?.username}`;
+      const preferences = JSON.stringify({ 25: { abilityIndex: 2, formIndex: 1, nickname: "remote stays put" } });
+      localStorage.setItem(key, preferences);
+      loadStarterPreferences();
+      const writes = vi.spyOn(localStorage, "setItem");
+      await options.readCurrent();
+      expect(writes).not.toHaveBeenCalled();
+      expect(localStorage.getItem(key)).toBe(preferences);
+      options.onClose();
+    });
+
+    it("still migrates legacy local preferences during normal save loading", () => {
+      const data = cloneSystemData(game.scene.gameData.getSystemSaveData());
+      data.gameVersion = "1.12.0.10";
+      const key = `starterPrefs_${account.loggedInUser?.username}`;
+      localStorage.setItem(key, JSON.stringify({ 25: { ability: 2, form: 1, nickname: "normal load" } }));
+      applySystemVersionMigration(data, { silent: true });
+      expect(JSON.parse(localStorage.getItem(key)!)).toEqual({
+        25: { abilityIndex: 2, formIndex: 1, nickname: "normal load" },
+      });
+      expect(data.appliedMigrators["1.12.1.0-migrateStarterPreferences"]).toBeTypeOf("number");
     });
 
     it("does not write locally until the server accepts the combined data and history", async () => {

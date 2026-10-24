@@ -33,6 +33,9 @@ a separate upstream locales submodule commit. Other languages fall back to Engli
   the existing gacha capacity checks still apply.
 - Keep the destination trainer/secret IDs, gender and migration metadata. Migrate
   each source independently without scheduling compensation popups during preview.
+  Source decoding and remote revision checks use the data-only migration mode, which skips destination-local
+  migrations (and their markers), including starter preferences. Normal save loading
+  still runs these migrations.
 
 ## Duplicate detection and persistence
 

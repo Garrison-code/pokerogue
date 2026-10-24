@@ -43,8 +43,17 @@ export interface SettingsSaveMigrator {
   migrate: (data: object) => void;
 }
 
+export interface SystemSaveMigrationOptions {
+  /** Suppress user-facing migration notifications. */
+  silent?: boolean;
+  /** Transform the supplied save without running destination-local migrations. */
+  dataOnly?: boolean;
+}
+
 export interface SystemSaveMigrator {
   name: string;
   version: string;
-  migrate: (data: SystemSaveData, options?: { silent?: boolean }) => void;
+  /** This migration changes destination-local state rather than the supplied save. */
+  localOnly?: boolean;
+  migrate: (data: SystemSaveData, options?: SystemSaveMigrationOptions) => void;
 }
