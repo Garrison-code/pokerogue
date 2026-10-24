@@ -22,7 +22,13 @@ import type { DexData } from "./dex-data";
 
 export type AppliedMigrators = { [key: string]: number };
 
+export interface ImportHistory {
+  version: 1;
+  fingerprints: string[];
+}
+
 export interface SystemSaveData {
+  importHistory?: ImportHistory;
   trainerId: number;
   secretId: number;
   gender: PlayerGender;

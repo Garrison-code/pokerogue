@@ -325,6 +325,15 @@ export class MenuUiHandler extends OptionSelectUiHandler {
       });
     }
     manageDataOptions.push({
+      label: i18next.t("mergeImport:title"),
+      handler: () => {
+        ui.revertMode();
+        void globalScene.gameData.mergeImportData();
+        return true;
+      },
+      keepOpen: true,
+    });
+    manageDataOptions.push({
       label: i18next.t("menuUiHandler:exportData"),
       handler: () => {
         globalScene.gameData.tryExportData(GameDataType.SYSTEM);
