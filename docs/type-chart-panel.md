@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Garrison-code
+
+SPDX-License-Identifier: CC-BY-NC-SA-4.0
+-->
+
 # Type matchup panel
 
 The **Type matchups** toolbar button opens a non-modal reference beside the game.
