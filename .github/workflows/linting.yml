@@ -5,12 +5,15 @@ on:
     branches:
       - main
       - beta
+      - develop
       - release
       - "hotfix*"
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     branches:
       - main
       - beta
+      - develop
       - release
       - "hotfix*"
   merge_group:
