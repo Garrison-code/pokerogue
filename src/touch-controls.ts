@@ -175,6 +175,14 @@ export class TouchControl {
     return true;
   }
 
+  /** Release hold-to-show actions before switching to an HTML tool. */
+  releasePressedKeys(): void {
+    for (const key of [...this.buttonLock]) {
+      this.simulateKeyboardEvent("keyup", key);
+    }
+    this.deactivatePressedKey();
+  }
+
   /** Deactivates all currently pressed keys. */
   deactivatePressedKey(): void {
     for (const key of Object.keys(this.inputInterval)) {
@@ -214,6 +222,10 @@ export function preventDoubleTapZoom(): void {
   document.addEventListener(
     "touchstart",
     (event: TouchEvent) => {
+      // Native buttons and scrolling in HTML tools must handle their own taps.
+      if (event.target instanceof Element && event.target.closest("[data-game-tool]")) {
+        return;
+      }
       const currentTouchTimeStamp = event.timeStamp;
       const timeStampDifference = currentTouchTimeStamp - lastTouchTimeStamp;
       lastTouchTimeStamp = currentTouchTimeStamp;

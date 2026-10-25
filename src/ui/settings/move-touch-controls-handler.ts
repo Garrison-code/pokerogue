@@ -47,9 +47,10 @@ export class MoveTouchControlsHandler {
   }
 
   public get screenSize(): { width: number; height: number } {
+    const bounds = this.touchControlsElements?.getBoundingClientRect();
     return {
-      width: window.innerWidth,
-      height: window.innerHeight,
+      width: bounds?.width || window.innerWidth,
+      height: bounds?.height || window.innerHeight,
     };
   }
 
@@ -98,6 +99,20 @@ export class MoveTouchControlsHandler {
   }
 
   public initListeners(): void {
+    const controls = this.touchControlsElements;
+    if (controls && typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        if (this.inConfigurationMode) {
+          for (const pos of this.getModifiedCurrentPositions()) {
+            this.setPosition(document.getElementById(pos.id)!, pos.x, pos.y);
+          }
+        } else {
+          this.setPositions(this.getSavedPositionsOfCurrentOrientation() ?? []);
+        }
+      });
+      observer.observe(controls);
+      globalScene.events.once("shutdown", () => observer.disconnect());
+    }
     globalScene.scale.on("orientationchange", () => {
       this.updateOrientation();
     });
@@ -239,11 +254,15 @@ export class MoveTouchControlsHandler {
       return;
     }
     const rect = this.draggingElement.getBoundingClientRect();
+    const bounds = this.touchControlsElements?.getBoundingClientRect();
+    const left = bounds?.left ?? 0;
+    const right = bounds?.right ?? window.innerWidth;
+    const bottom = bounds?.bottom ?? window.innerHeight;
     // Map the pointer position to the center of the dragged element.
     const xOffset = this.isLeft(this.draggingElement)
-      ? event.clientX - rect.width / 2
-      : window.innerWidth - event.clientX - rect.width / 2;
-    const yOffset = window.innerHeight - event.clientY - rect.height / 2;
+      ? event.clientX - left - rect.width / 2
+      : right - event.clientX - rect.width / 2;
+    const yOffset = bottom - event.clientY - rect.height / 2;
     this.setPosition(this.draggingElement, xOffset, yOffset);
   }
 
@@ -294,7 +313,9 @@ export class MoveTouchControlsHandler {
     this.resetPositions();
     return positions.forEach((pos: ControlPosition) => {
       const controlGroup = document.querySelector(`#${pos.id}`) as HTMLElement;
-      this.setPosition(controlGroup, pos.x, pos.y);
+      if (controlGroup) {
+        this.setPosition(controlGroup, pos.x, pos.y);
+      }
     });
   }
 
@@ -310,7 +331,7 @@ export class MoveTouchControlsHandler {
    */
   private setPosition(controlElement: HTMLElement, x: number, y: number) {
     const rect = controlElement.getBoundingClientRect();
-    const checkBound = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+    const checkBound = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
     const { height, width } = this.screenSize;
     x = checkBound(x, 0, width - rect.width);
     y = checkBound(y, 0, height - rect.height);
