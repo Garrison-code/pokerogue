@@ -172,6 +172,45 @@ class CoordinatorTests(unittest.TestCase):
             self.assertFalse(any("update" in path for path in calls))
             self.assertEqual(calls[-1], "/account/logout")
 
+    def test_smoke_session_update_includes_validated_trainer_and_secret_ids(self):
+        system = {"trainerId": 12345, "secretId": 54321, "timestamp": 1}
+        session = {"seed": "coolify-develop-smoke", "money": 3456,
+                   "waveIndex": 2, "timestamp": 1}
+        calls = []
+        def fake(path, token=None, form=None, payload=None):
+            calls.append(path)
+            route, _, query = path.partition("?")
+            if route == "/account/login":
+                return 200, {"token": "private-session-token"}
+            self.assertEqual(token, "private-session-token")
+            if route == "/account/info":
+                return 200, {"username": os.environ["DEV_SMOKE_USERNAME"]}
+            if route == "/account/logout":
+                return 200, None
+            params = d.urllib.parse.parse_qs(query)
+            self.assertEqual(params.get("clientSessionId"), ["c" * 32])
+            if route.startswith("/savedata/session/"):
+                self.assertEqual(params.get("slot"), ["0"])
+            if route == "/savedata/system/get":
+                return 200, dict(system)
+            if route == "/savedata/session/get":
+                return 200, dict(session)
+            if route == "/savedata/system/update":
+                system.update(payload)
+                return 204, None
+            if route == "/savedata/session/update":
+                self.assertEqual(params.get("trainerId"), [str(system["trainerId"])])
+                self.assertEqual(params.get("secretId"), [str(system["secretId"])])
+                session.update(payload)
+                return 200, None
+            self.fail("Unexpected API route")
+        with patch.object(d, "api", side_effect=fake), patch.object(d.time, "time", return_value=123):
+            d.smoke()
+        self.assertEqual(system["timestamp"], 123000)
+        self.assertEqual(session["timestamp"], 123000)
+        self.assertEqual(sum(path.startswith("/savedata/session/update?") for path in calls), 1)
+        self.assertEqual(calls[-1], "/account/logout")
+
     def test_database_version_must_be_fixed(self):
         data = {"applications": [
             {"name": "frontend", "image": IMAGES[0]["image"], "status": "running:healthy"},

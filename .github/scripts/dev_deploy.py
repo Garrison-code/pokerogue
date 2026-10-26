@@ -209,7 +209,11 @@ def smoke():
         system["timestamp"] = session["timestamp"] = stamp
         if api("/savedata/system/update" + query, token, payload=system)[0] != 204:
             raise Failure("System save update rejected")
-        if api("/savedata/session/update" + query + "&slot=0", token, payload=session)[0] != 200:
+        session_update_query = urllib.parse.urlencode({
+            "clientSessionId": client, "slot": 0,
+            "trainerId": system["trainerId"], "secretId": system["secretId"],
+        })
+        if api("/savedata/session/update?" + session_update_query, token, payload=session)[0] != 200:
             raise Failure("Session save update rejected")
         if (api(system_path, token)[1].get("timestamp") != stamp
                 or api(session_path, token)[1].get("timestamp") != stamp):
