@@ -309,6 +309,15 @@ describe("System data merge", () => {
     const b = decodeSystemImport(AES.encrypt(raw, "test").toString(), decoder);
     expect(systemFingerprint(a)).toBe(systemFingerprint(b));
     expect(decodeSystemImport(raw, decoder).starterData[25].candyCount).toBe(0);
+    const emptyRibbons = JSON.parse(raw);
+    emptyRibbons.dexData[25].ribbons = "";
+    const normalizedRibbons = decodeSystemImport(JSON.stringify(emptyRibbons), decoder);
+    expect(normalizedRibbons.dexData[25].ribbons.getRibbons()).toBe(0n);
+    expect(systemFingerprint(normalizedRibbons)).toBe(systemFingerprint(a));
+    emptyRibbons.gameVersion = "1.0.4";
+    expect(decodeSystemImport(JSON.stringify(emptyRibbons), decoder).dexData[25].ribbons.getRibbons()).toBe(0n);
+    emptyRibbons.dexData[25].ribbons = "not-hex";
+    expect(() => decodeSystemImport(JSON.stringify(emptyRibbons), decoder)).toThrow("invalid");
     decodeSystemImport(raw.replace(options.version, "1.12.1.0"), decoder);
     expect(decoder.migrate).toHaveBeenCalled();
     const serverRaw = JSON.parse(raw);
