@@ -14,7 +14,8 @@ import {
 } from "#system/system-data-merge";
 import type { SystemSaveData } from "#types/save-data";
 import { AES, enc } from "crypto-js";
-import { describe, expect, it, vi } from "vitest";
+import i18next from "i18next";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 function save(id = 1): SystemSaveData {
   return {
@@ -367,6 +368,12 @@ describe("System data merge", () => {
 });
 
 describe("Merge import dialog", () => {
+  beforeEach(async () => {
+    await i18next.changeLanguage("en");
+  });
+  afterEach(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  });
   async function open() {
     const { showSystemMergeDialog } = await import("#ui/system-merge-dialog");
     const base = save();
@@ -410,6 +417,63 @@ describe("Merge import dialog", () => {
     expect(ui.callbacks.save).toHaveBeenCalledOnce();
     expect(ui.callbacks.onSuccess).toHaveBeenCalledOnce();
     expect(document.getElementById("system-merge-dialog")).toBeNull();
+  });
+  it("keeps both action rows synchronized and prevents duplicate saves", async () => {
+    const ui = await open();
+    const confirms = [...ui.panel.querySelectorAll<HTMLButtonElement>('[data-action="confirm"]')];
+    const cancels = [...ui.panel.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')];
+    expect(confirms).toHaveLength(2);
+    expect(confirms.every(button => button.disabled)).toBe(true);
+    expect(confirms[0].closest("header")).not.toBeNull();
+    await ui.select([{ name: "good.prsv", text: async () => serializeSystemData(save(2)) }]);
+    expect(confirms.every(button => !button.disabled)).toBe(true);
+    let finish!: () => void;
+    ui.callbacks.save.mockImplementation(
+      () =>
+        new Promise<void>(resolve => {
+          finish = resolve;
+        }),
+    );
+    const saving = confirms[0].onclick!.call(confirms[0], new MouseEvent("click") as PointerEvent);
+    await Promise.resolve();
+    expect(confirms.every(button => button.disabled)).toBe(true);
+    expect(cancels.every(button => button.disabled)).toBe(true);
+    await confirms[1].onclick!.call(confirms[1], new MouseEvent("click") as PointerEvent);
+    expect(ui.callbacks.save).toHaveBeenCalledOnce();
+    finish();
+    await saving;
+    expect(ui.callbacks.onSuccess).toHaveBeenCalledOnce();
+  });
+  it("isolates keydown and keyup, traps focus and restores the background", async () => {
+    const background = document.createElement("div");
+    background.id = "app";
+    const previous = document.createElement("button");
+    background.append(previous);
+    document.body.append(background);
+    previous.focus();
+    const ui = await open();
+    const gameKey = vi.fn();
+    window.addEventListener("keydown", gameKey, true);
+    window.addEventListener("keyup", gameKey, true);
+    try {
+      expect(background.inert).toBe(true);
+      ui.input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      ui.input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+      expect(gameKey).not.toHaveBeenCalled();
+      const first = ui.panel.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
+      first.focus();
+      first.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }),
+      );
+      expect(document.activeElement).toBe(ui.panel.querySelectorAll('[data-action="cancel"]')[1]);
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      expect(background.inert).toBe(false);
+      expect(document.activeElement).toBe(previous);
+    } finally {
+      window.removeEventListener("keydown", gameKey, true);
+      window.removeEventListener("keyup", gameKey, true);
+      background.remove();
+    }
   });
   it("cancels without saving and closes accessibly with Escape", async () => {
     const ui = await open();

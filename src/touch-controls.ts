@@ -226,7 +226,7 @@ export function preventDoubleTapZoom(): void {
     "touchstart",
     (event: TouchEvent) => {
       // Native buttons and scrolling in HTML tools must handle their own taps.
-      if (event.target instanceof Element && event.target.closest("[data-game-tool]")) {
+      if (event.target instanceof Element && event.target.closest("[data-game-tool], #system-merge-dialog")) {
         return;
       }
       const currentTouchTimeStamp = event.timeStamp;
