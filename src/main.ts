@@ -14,7 +14,9 @@ import InputTextPlugin from "phaser3-rex-plugins/plugins/inputtext-plugin";
 import TransitionImagePackPlugin from "phaser3-rex-plugins/templates/transitionimagepack/transitionimagepack-plugin";
 import UIPlugin from "phaser3-rex-plugins/templates/ui/ui-plugin";
 
-if (isBeta || isDev) {
+if (import.meta.env.VITE_APP_TITLE) {
+  document.title = import.meta.env.VITE_APP_TITLE;
+} else if (isBeta || isDev) {
   document.title += " (Beta)";
 }
 
