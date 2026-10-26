@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Garrison-code
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
@@ -15,9 +16,17 @@ async function visit(directory) {
       await visit(full);
     } else if (entry.isFile()) {
       const name = `/${path.relative(root, full).split(path.sep).join("/")}`;
-      if (["/index.html", "/asset-manifest.json", "/manifest.json", "/service-worker.js", "/runtime-config.js"].includes(name)) continue;
+      if (
+        ["/index.html", "/asset-manifest.json", "/manifest.json", "/service-worker.js", "/runtime-config.js"].includes(
+          name,
+        )
+      ) {
+        continue;
+      }
       const hash = createHash("sha256");
-      for await (const chunk of createReadStream(full)) hash.update(chunk);
+      for await (const chunk of createReadStream(full)) {
+        hash.update(chunk);
+      }
       manifest[name] = hash.digest("hex");
     }
   }

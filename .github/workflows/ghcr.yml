@@ -77,7 +77,7 @@ jobs:
             -e VITE_SERVER_URL=/api -e VITE_BYPASS_LOGIN=0 \
             -e VITE_DISCORD_CLIENT_ID= -e VITE_GOOGLE_CLIENT_ID= pokerogue-static:check
           trap 'docker logs static-check; docker rm -f static-check' EXIT
-          python3 container/check-static.py http://127.0.0.1:18000
+          python3 container/check_static.py http://127.0.0.1:18000
 
       - name: Build and push image
         id: build

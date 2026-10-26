@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Garrison-code
 # SPDX-License-Identifier: AGPL-3.0-only
 set -eu
 output=/usr/share/nginx/html/runtime-config.js

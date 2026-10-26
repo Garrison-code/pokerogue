@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Garrison-code
 # SPDX-License-Identifier: AGPL-3.0-only
 """HTTP-only image check; also usable against the deployed dev hostname."""
 import json

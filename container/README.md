@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 Garrison-code -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+
 # Static frontend container
 
 `Dockerfile.static` builds the pinned assets/locales and Vite bundle, then serves
@@ -23,7 +26,7 @@ remain build-time settings. The native local Vite workflow is unchanged.
 - Text resources use gzip; missing resources return 404, never HTML fallback.
 - Health endpoint: `/healthz`; API routing remains managed by Coolify.
 
-Run `python3 container/check-static.py http://localhost:8000` against the image,
+Run `python3 container/check_static.py http://localhost:8000` against the image,
 or pass the deployed HTTPS origin. This checks HTTP serving, runtime settings,
 resource manifests, cache headers, conditional requests and missing resources;
 it does not operate a browser or validate gameplay.
