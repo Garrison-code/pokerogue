@@ -34,6 +34,8 @@ assert b'runtime-config.js' in html and b'asset-manifest.json' in html
 status, headers, config = get('/runtime-config.js')
 assert status == 200 and headers['Cache-Control'] == 'no-store'
 settings = json.loads(config.decode().split('Object.freeze(', 1)[1].rsplit(');', 1)[0])
+if len(sys.argv) > 2:
+    assert settings['VITE_APP_TITLE'] == sys.argv[2], settings['VITE_APP_TITLE']
 assert settings['VITE_SERVER_URL'] in ('/api', base + '/api')
 assert settings['VITE_BYPASS_LOGIN'] == '0'
 assert settings['VITE_GOOGLE_CLIENT_ID'] == settings['VITE_DISCORD_CLIENT_ID'] == ''

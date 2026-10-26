@@ -5,6 +5,7 @@ import baseConfig from "./vite.config";
 
 // Only these public settings are supplied by the container at startup.
 const runtimeKeys = [
+  "VITE_APP_TITLE",
   "VITE_SERVER_URL",
   "VITE_BYPASS_LOGIN",
   "VITE_BYPASS_TUTORIAL",

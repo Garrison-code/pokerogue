@@ -25,6 +25,7 @@ jobs:
     env:
       # Build records are unnecessary artifacts for this image-only workflow.
       DOCKER_BUILD_RECORD_UPLOAD: "false"
+      APP_TITLE: ${{ github.ref_name == 'develop' && 'PokéRogue (Garrix-dev)' || 'PokéRogue (Garrix)' }}
     steps:
       - name: Check out source and pinned submodules
         uses: actions/checkout@v4
@@ -59,7 +60,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build static image for validation
-        if: github.ref_name == 'develop'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -67,24 +67,34 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: pokerogue-static:check
+          build-args: |
+            VITE_APP_TITLE=${{ env.APP_TITLE }}
           cache-from: type=gha,scope=container-${{ github.ref_name }}
 
       - name: Validate static serving, runtime settings and caching
-        if: github.ref_name == 'develop'
         shell: bash
         run: |
           docker run -d --name static-check -p 127.0.0.1:18000:8000 \
             -e VITE_SERVER_URL=/api -e VITE_BYPASS_LOGIN=0 \
             -e VITE_DISCORD_CLIENT_ID= -e VITE_GOOGLE_CLIENT_ID= pokerogue-static:check
           trap 'docker logs static-check; docker rm -f static-check' EXIT
-          python3 container/check_static.py http://127.0.0.1:18000
+          python3 container/check_static.py http://127.0.0.1:18000 "$APP_TITLE"
+
+          docker rm -f static-check
+          docker run -d --name static-check -p 127.0.0.1:18000:8000 \
+            -e VITE_SERVER_URL=/api -e VITE_BYPASS_LOGIN=0 \
+            -e VITE_DISCORD_CLIENT_ID= -e VITE_GOOGLE_CLIENT_ID= \
+            -e 'VITE_APP_TITLE=Custom "Garrix" title' pokerogue-static:check
+          python3 container/check_static.py http://127.0.0.1:18000 'Custom "Garrix" title'
 
       - name: Build and push image
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ github.ref_name == 'develop' && './Dockerfile.static' || './Dockerfile' }}
+          file: ./Dockerfile.static
+          build-args: |
+            VITE_APP_TITLE=${{ env.APP_TITLE }}
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
