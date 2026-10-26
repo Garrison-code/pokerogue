@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """HTTP-only image check; also usable against the deployed dev hostname."""
 import json
+import os
 import re
 import sys
 import time
@@ -28,6 +29,12 @@ for attempt in range(30):
 else:
     raise RuntimeError('Static server did not become ready')
 
+status, headers, info = get('/build-info.json')
+assert status == 200 and headers['Cache-Control'] == 'no-store'
+build = json.loads(info)
+for key, variable in [('revision', 'EXPECTED_REVISION'), ('build_id', 'EXPECTED_BUILD_ID')]:
+    if os.environ.get(variable):
+        assert build[key] == os.environ[variable], key
 status, headers, html = get('/')
 assert status == 200 and b'/@vite/client' not in html and b'/src/main.ts' not in html
 assert b'runtime-config.js' in html and b'asset-manifest.json' in html
