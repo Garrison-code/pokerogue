@@ -1,5 +1,6 @@
 import { LoadingScene } from "#app/loading-scene";
 import { BattleType } from "#enums/battle-type";
+import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
 import { GameManager } from "#test/framework/game-manager";
@@ -22,6 +23,18 @@ describe("BattleScene", () => {
   it("should remove LoadingScene on create", () => {
     // `BattleScene.create()` is called during the `new GameManager()` call
     expect(game.scene.scene.remove).toHaveBeenCalledWith(LoadingScene.KEY);
+  });
+
+  it("starts each new adventure with 9999 Master Balls and keeps other starting balls", () => {
+    game.scene.pokeballCounts[PokeballType.MASTER_BALL] = 2;
+    game.scene.reset();
+    expect(game.scene.pokeballCounts).toEqual({
+      [PokeballType.POKEBALL]: 5,
+      [PokeballType.GREAT_BALL]: 0,
+      [PokeballType.ULTRA_BALL]: 0,
+      [PokeballType.ROGUE_BALL]: 0,
+      [PokeballType.MASTER_BALL]: 9999,
+    });
   });
 
   it("should also reset RNG on reset", () => {
