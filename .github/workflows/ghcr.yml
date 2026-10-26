@@ -58,12 +58,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build static image for validation
+        if: github.ref_name == 'develop'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.static
+          platforms: linux/amd64
+          load: true
+          tags: pokerogue-static:check
+          cache-from: type=gha,scope=container-${{ github.ref_name }}
+
+      - name: Validate static serving, runtime settings and caching
+        if: github.ref_name == 'develop'
+        shell: bash
+        run: |
+          docker run -d --name static-check -p 127.0.0.1:18000:8000 \
+            -e VITE_SERVER_URL=/api -e VITE_BYPASS_LOGIN=0 \
+            -e VITE_DISCORD_CLIENT_ID= -e VITE_GOOGLE_CLIENT_ID= pokerogue-static:check
+          trap 'docker logs static-check; docker rm -f static-check' EXIT
+          python3 container/check-static.py http://127.0.0.1:18000
+
       - name: Build and push image
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ${{ github.ref_name == 'develop' && './Dockerfile.static' || './Dockerfile' }}
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
