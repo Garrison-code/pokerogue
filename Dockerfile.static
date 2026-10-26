@@ -11,6 +11,9 @@ RUN --mount=type=cache,id=pokerogue-pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
 ARG BUILD_MODE=development
+ARG BUILD_REVISION=unknown
+ARG BUILD_ID=unknown
+ENV BUILD_REVISION=${BUILD_REVISION} BUILD_ID=${BUILD_ID}
 ENV CI=true NODE_OPTIONS=--max-old-space-size=6144
 RUN pnpm exec vite build --mode "$BUILD_MODE" --config vite.container.config.ts \
     && node container/asset-manifest.mjs

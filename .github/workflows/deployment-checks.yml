@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Garrison-code
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Deployment checks
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test registry gates, dispatch, failure latch and verification
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+      - name: Validate workflow syntax and shell commands
+        run: >-
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7
+          .github/workflows/ghcr.yml .github/workflows/deployment-checks.yml
+
+  static-image:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_REVISION: ${{ github.sha }}
+      EXPECTED_BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Build and validate the static runtime before merge
+        run: |
+          docker build -f Dockerfile.static -t pokerogue-static:pr \
+            --build-arg "BUILD_REVISION=$EXPECTED_REVISION" \
+            --build-arg "BUILD_ID=$EXPECTED_BUILD_ID" \
+            --build-arg 'VITE_APP_TITLE=PokéRogue (Garrix-dev)' .
+          docker run -d --name static-check -p 127.0.0.1:18000:8000 pokerogue-static:pr
+          trap 'docker logs static-check; docker rm -f static-check' EXIT
+          python3 container/check_static.py http://127.0.0.1:18000 'PokéRogue (Garrix-dev)'

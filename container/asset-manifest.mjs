@@ -9,6 +9,10 @@ import path from "node:path";
 // Content hashes keep unchanged resources cached across image rebuilds.
 const root = path.resolve("dist");
 const manifest = {};
+await writeFile(
+  path.join(root, "build-info.json"),
+  JSON.stringify({ revision: process.env.BUILD_REVISION ?? "unknown", build_id: process.env.BUILD_ID ?? "unknown" }),
+);
 async function visit(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const full = path.join(directory, entry.name);
@@ -17,9 +21,14 @@ async function visit(directory) {
     } else if (entry.isFile()) {
       const name = `/${path.relative(root, full).split(path.sep).join("/")}`;
       if (
-        ["/index.html", "/asset-manifest.json", "/manifest.json", "/service-worker.js", "/runtime-config.js"].includes(
-          name,
-        )
+        [
+          "/index.html",
+          "/asset-manifest.json",
+          "/manifest.json",
+          "/service-worker.js",
+          "/runtime-config.js",
+          "/build-info.json",
+        ].includes(name)
       ) {
         continue;
       }
