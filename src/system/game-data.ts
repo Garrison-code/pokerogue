@@ -1332,7 +1332,11 @@ export class GameData {
     this.mergeDialogOpen = true;
     const wasPaused = globalScene.scene.isPaused();
     const username = loggedInUser?.username;
+    const restoreInput = globalScene.inputController.suspendGameplayInput();
     try {
+      if (!wasPaused) {
+        globalScene.scene.pause();
+      }
       const [{ showSystemMergeDialog }, merge, { getStarterValueFriendshipCap }] = await Promise.all([
         import("#ui/system-merge-dialog"),
         import("#system/system-data-merge"),
@@ -1367,9 +1371,6 @@ export class GameData {
         }
         return remoteBase ? merge.cloneSystemData(remoteBase) : local;
       };
-      if (!wasPaused) {
-        globalScene.scene.pause();
-      }
       showSystemMergeDialog({
         parse: text => {
           const data = merge.decodeSystemImport(text, {
@@ -1460,6 +1461,7 @@ export class GameData {
         }),
         speciesName: id => speciesDataRegistry.getSpecies(id).name,
         onClose: () => {
+          restoreInput();
           this.mergeDialogOpen = false;
           if (!wasPaused) {
             globalScene.scene.resume();
@@ -1468,6 +1470,7 @@ export class GameData {
         onSuccess: () => window.location.reload(),
       });
     } catch (error) {
+      restoreInput();
       this.mergeDialogOpen = false;
       if (!wasPaused && globalScene.scene.isPaused()) {
         globalScene.scene.resume();

@@ -74,6 +74,11 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
   panel.append(label, status, filesView, preview, actions);
   overlay.append(panel);
   document.body.append(overlay);
+  const background = document.getElementById("game-layout") ?? document.getElementById("app");
+  const wasInert = background?.inert ?? false;
+  if (background) {
+    background.inert = true;
+  }
   const files: ImportFile[] = [];
   let base: SystemSaveData | undefined;
   let result: MergeResult | undefined;
@@ -88,12 +93,19 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
     }
     closed = true;
     window.removeEventListener("keydown", keyboard, true);
+    window.removeEventListener("keyup", keyboard, true);
+    if (background) {
+      background.inert = wasInert;
+    }
     overlay.remove();
     options.onClose();
     previousFocus?.focus();
   };
   const keyboard = (event: KeyboardEvent) => {
-    event.stopPropagation();
+    event.stopImmediatePropagation();
+    if (event.type === "keyup") {
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       close();
@@ -112,6 +124,7 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
     }
   };
   window.addEventListener("keydown", keyboard, true);
+  window.addEventListener("keyup", keyboard, true);
   cancel.onclick = close;
   input.focus();
 

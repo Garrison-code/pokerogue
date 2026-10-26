@@ -54,6 +54,21 @@ describe("System - Game Data", () => {
       return captured!;
     }
 
+    it("isolates input while open and restores it on close or opening failure", async () => {
+      const options = await openDialog();
+      expect(game.scene.inputController.gameplayInputSuspended).toBe(true);
+      expect(game.scene.scene.pause).toHaveBeenCalledOnce();
+      options.onClose();
+      expect(game.scene.inputController.gameplayInputSuspended).toBe(false);
+      expect(game.scene.scene.resume).toHaveBeenCalledOnce();
+      vi.spyOn(mergeDialog, "showSystemMergeDialog").mockImplementation(() => {
+        throw new Error("dialog failed");
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await game.scene.gameData.mergeImportData();
+      expect(game.scene.inputController.gameplayInputSuspended).toBe(false);
+    });
+
     it("retains history through normal serialization and loading, including high ribbon bits", () => {
       const history = { version: 1 as const, fingerprints: ["a".repeat(64)] };
       game.scene.gameData.importHistory = history;

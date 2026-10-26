@@ -53,6 +53,9 @@ export class UiInputs {
     this.events.on(
       "input_down",
       event => {
+        if (this.inputsController.gameplayInputSuspended) {
+          return;
+        }
         this.detectInputMethod(event);
 
         const actions = this.getActionsKeyDown();
@@ -67,6 +70,9 @@ export class UiInputs {
     this.events.on(
       "input_up",
       event => {
+        if (this.inputsController.gameplayInputSuspended) {
+          return;
+        }
         const actions = this.getActionsKeyUp();
         if (!Object.hasOwn(actions, event.button)) {
           return;
