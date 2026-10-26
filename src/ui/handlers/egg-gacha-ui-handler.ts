@@ -221,31 +221,30 @@ export class EggGachaUiHandler extends MessageUiHandler {
       .add(this.eggGachaOptionSelectBg);
     this.eggGachaContainer.add(this.eggGachaOptionsContainer);
 
-    const multiplierOne = "x1";
-    const multiplierTen = "x10";
+    const multiplierFree = "x0";
     const pullOptions = [
       {
-        multiplier: multiplierOne,
+        multiplier: multiplierFree,
         description: `1 ${i18next.t("egg:pull")}`,
         icon: getVoucherTypeIcon(VoucherType.REGULAR),
       },
       {
-        multiplier: multiplierTen,
+        multiplier: multiplierFree,
         description: `10 ${i18next.t("egg:pulls")}`,
         icon: getVoucherTypeIcon(VoucherType.REGULAR),
       },
       {
-        multiplier: multiplierOne,
+        multiplier: multiplierFree,
         description: `5 ${i18next.t("egg:pulls")}`,
         icon: getVoucherTypeIcon(VoucherType.PLUS),
       },
       {
-        multiplier: multiplierOne,
+        multiplier: multiplierFree,
         description: `10 ${i18next.t("egg:pulls")}`,
         icon: getVoucherTypeIcon(VoucherType.PREMIUM),
       },
       {
-        multiplier: multiplierOne,
+        multiplier: multiplierFree,
         description: `25 ${i18next.t("egg:pulls")}`,
         icon: getVoucherTypeIcon(VoucherType.GOLDEN),
       },
@@ -257,9 +256,6 @@ export class EggGachaUiHandler extends MessageUiHandler {
         const desc = option.description.split(" ");
         if (desc[0].length < 2) {
           desc[0] += ["zh", "ko"].includes(resolvedLanguage.slice(0, 2)) ? " " : "  ";
-        }
-        if (option.multiplier === multiplierOne) {
-          desc[0] += " ";
         }
         return `     ${option.multiplier.padEnd(5)}${desc.join(" ")}`;
       })
@@ -714,15 +710,15 @@ export class EggGachaUiHandler extends MessageUiHandler {
   private static cursorToVoucher(cursor: number): [VoucherType, number, number] | undefined {
     switch (cursor) {
       case 0:
-        return [VoucherType.REGULAR, 1, 1];
+        return [VoucherType.REGULAR, 0, 1];
       case 1:
-        return [VoucherType.REGULAR, 10, 10];
+        return [VoucherType.REGULAR, 0, 10];
       case 2:
-        return [VoucherType.PLUS, 1, 5];
+        return [VoucherType.PLUS, 0, 5];
       case 3:
-        return [VoucherType.PREMIUM, 1, 10];
+        return [VoucherType.PREMIUM, 0, 10];
       case 4:
-        return [VoucherType.GOLDEN, 1, 25];
+        return [VoucherType.GOLDEN, 0, 25];
     }
   }
 
@@ -747,24 +743,10 @@ export class EggGachaUiHandler extends MessageUiHandler {
       ui.revertMode();
       return true;
     }
-    const [voucherType, vouchersConsumed, pulls] = voucher;
-
-    let errorKey: string | undefined;
-    const freePulls = activeOverrides.EGG_FREE_GACHA_PULLS_OVERRIDE;
-
-    if (!freePulls && globalScene.gameData.eggs.length + pulls > 99) {
-      errorKey = "egg:tooManyEggs";
-    } else if (!freePulls && globalScene.gameData.voucherCounts[voucherType] < vouchersConsumed) {
-      errorKey = "egg:notEnoughVouchers";
-    }
-
-    if (errorKey) {
-      this.showError(i18next.t(errorKey));
+    const [, , pulls] = voucher;
+    if (!activeOverrides.EGG_FREE_GACHA_PULLS_OVERRIDE && globalScene.gameData.eggs.length + pulls > 99) {
+      this.showError(i18next.t("egg:tooManyEggs"));
       return false;
-    }
-
-    if (!freePulls) {
-      this.consumeVouchers(voucherType, vouchersConsumed);
     }
 
     // TODO: Remove this dangling proimse if necessary when the UI's input event handling supports async functions

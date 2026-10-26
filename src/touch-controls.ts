@@ -116,6 +116,9 @@ export class TouchControl {
     if (!this.simulateKeyboardEvent("keydown", key)) {
       return;
     }
+    if (globalScene.inputController?.gameplayInputSuspended) {
+      return;
+    }
     clearInterval(this.inputInterval[key]);
     this.inputInterval[key] = setInterval(() => {
       if (!this.simulateKeyboardEvent("keydown", key)) {
@@ -151,7 +154,7 @@ export class TouchControl {
    * and emits the appropriate event ('input_down' or 'input_up') based on the event type.
    */
   simulateKeyboardEvent(eventType: string, key: string): boolean {
-    if (!Object.hasOwn(Button, key) || this.disabled) {
+    if (!Object.hasOwn(Button, key) || this.disabled || globalScene.inputController?.gameplayInputSuspended) {
       return false;
     }
     const button = Button[key];
@@ -223,7 +226,7 @@ export function preventDoubleTapZoom(): void {
     "touchstart",
     (event: TouchEvent) => {
       // Native buttons and scrolling in HTML tools must handle their own taps.
-      if (event.target instanceof Element && event.target.closest("[data-game-tool]")) {
+      if (event.target instanceof Element && event.target.closest("[data-game-tool], #system-merge-dialog")) {
         return;
       }
       const currentTouchTimeStamp = event.timeStamp;

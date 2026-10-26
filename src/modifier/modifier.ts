@@ -10,7 +10,7 @@ import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allMoves, modifierTypes } from "#data/data-lists";
 import { getLevelTotalExp } from "#data/exp";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
-import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
+import { getPokeballCapacity } from "#data/pokeball";
 import { getStatusEffectHealText } from "#data/status-effect";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BerryType } from "#enums/berry-type";
@@ -309,7 +309,7 @@ export class AddPokeballModifier extends ConsumableModifier {
     const pokeballCounts = globalScene.pokeballCounts;
     pokeballCounts[this.pokeballType] = Math.min(
       pokeballCounts[this.pokeballType] + this.count,
-      MAX_PER_TYPE_POKEBALLS,
+      getPokeballCapacity(this.pokeballType),
     );
 
     return true;

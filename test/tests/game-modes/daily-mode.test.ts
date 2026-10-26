@@ -3,6 +3,7 @@ import { AbilityId } from "#enums/ability-id";
 import { BiomeId } from "#enums/biome-id";
 import { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
+import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { MapModifier } from "#modifiers/modifier";
@@ -39,6 +40,7 @@ describe("Daily Mode", () => {
       expect(pkm.moveset.length).toBeGreaterThan(0);
     });
     expect(game.scene.getModifiers(MapModifier).length).toBe(1);
+    expect(game.scene.pokeballCounts[PokeballType.MASTER_BALL]).toBe(9999);
   });
 
   describe("Custom Seeds", () => {
