@@ -30,6 +30,10 @@ export class GameChallengesUiHandler extends UiHandler {
   private valuesContainer: Phaser.GameObjects.Container;
 
   private scrollCursor: number;
+  private pointerZones: Phaser.GameObjects.Zone[] = [];
+  private rowPointerZones: Phaser.GameObjects.Zone[] = [];
+  private arrowPointerZones: { left: Phaser.GameObjects.Zone; right: Phaser.GameObjects.Zone }[] = [];
+  private resetPointerBounds: Phaser.Geom.Rectangle;
 
   private optionsBg: Phaser.GameObjects.NineSlice;
 
@@ -94,8 +98,10 @@ export class GameChallengesUiHandler extends UiHandler {
     const categoryNames = this.challengeCategories.map(cat => this.getCategoryName(cat));
 
     this.tabMenu = new TabMenu(0, headerBg.height, canvasWidth, categoryNames, _newIndex => {
-      this.setCursor(0);
       this.setScrollCursor(0);
+      this.setCursor(0);
+      this.startCursor.setVisible(false);
+      this.updateChallengeArrowsTint(false);
       this.initLabels();
       this.updateText();
     });
@@ -163,6 +169,7 @@ export class GameChallengesUiHandler extends UiHandler {
 
     iconReset.setPositionRelative(headerBg, headerBg.width - resetGroupWidth - 8, 5);
     resetText.setPositionRelative(iconReset, 26, 0);
+    this.resetPointerBounds = new Phaser.Geom.Rectangle(iconReset.x, 0, resetGroupWidth, 24);
 
     this.valuesContainer = globalScene.add //
       .container(0, 0)
@@ -413,6 +420,7 @@ export class GameChallengesUiHandler extends UiHandler {
       .setPositionRelative(this.startBg, (this.startBg.width - this.startText.displayWidth) / 2, 4);
 
     this.challengesContainer.update();
+    this.updatePointerTargets();
   }
 
   public override show(args: any[]): boolean {
@@ -438,6 +446,7 @@ export class GameChallengesUiHandler extends UiHandler {
     this.getUi().moveTo(this.challengesContainer, this.getUi().length - 1);
 
     this.getUi().hideTooltip();
+    this.createPointerTargets();
 
     return true;
   }
@@ -648,6 +657,211 @@ export class GameChallengesUiHandler extends UiHandler {
     return success;
   }
 
+  private processPointerDown(pointer: Phaser.Input.Pointer, event: Phaser.Types.Input.EventData): boolean {
+    event.stopPropagation();
+    if (pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
+      return false;
+    }
+    if (pointer.rightButtonDown()) {
+      this.getUi().processInput(Button.CANCEL);
+      return false;
+    }
+    return pointer.leftButtonDown();
+  }
+
+  private onBackgroundPointerDown(
+    pointer: Phaser.Input.Pointer,
+    _x: number,
+    _y: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    this.processPointerDown(pointer, event);
+  }
+
+  private consumeWheel(
+    _pointer: Phaser.Input.Pointer,
+    _dx: number,
+    _dy: number,
+    _dz: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    event.stopPropagation();
+  }
+
+  private createPointerTargets(): void {
+    this.clearPointerTargets();
+    this.challengesContainer.on("pointerdown", this.onBackgroundPointerDown, this);
+    this.challengesContainer.on("wheel", this.consumeWheel, this);
+    const addTarget = (
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      action: () => void,
+      wheel = false,
+    ): Phaser.GameObjects.Zone => {
+      const zone = globalScene.add.zone(x, y, width, height).setOrigin(0).setInteractive();
+      zone.on(
+        "pointerdown",
+        (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+          if (this.processPointerDown(pointer, event)) {
+            action();
+          }
+        },
+      );
+      zone.on("wheel", wheel ? this.onPointerWheel : this.consumeWheel, this);
+      this.challengesContainer.add(zone);
+      this.pointerZones.push(zone);
+      return zone;
+    };
+    addTarget(this.optionsBg.x, this.optionsBg.y, this.optionsBg.width, this.optionsBg.height, () => {}, true);
+    for (let row = 0; row < MAX_ROWS_TO_DISPLAY; row++) {
+      this.rowPointerZones.push(
+        addTarget(
+          this.optionsBg.x + 4,
+          this.optionsBg.y + 4 + row * 16,
+          this.optionsBg.width - 8,
+          16,
+          () => {
+            if (this.selectPointerRow(row)) {
+              this.getUi().playSelect();
+            }
+          },
+          true,
+        ),
+      );
+      const adjust = (button: Button): void => {
+        if (!this.getFilteredChallenges()[this.scrollCursor + row]) {
+          return;
+        }
+        this.selectPointerRow(row);
+        this.getUi().processInput(button);
+      };
+      this.arrowPointerZones.push({
+        left: addTarget(
+          0,
+          0,
+          10,
+          16,
+          () => {
+            if (this.challengeLabels[row].leftArrow.visible) {
+              adjust(Button.LEFT);
+            }
+          },
+          true,
+        ),
+        right: addTarget(
+          0,
+          0,
+          10,
+          16,
+          () => {
+            if (this.challengeLabels[row].rightArrow.visible) {
+              adjust(Button.RIGHT);
+            }
+          },
+          true,
+        ),
+      });
+    }
+    addTarget(this.startBg.x, this.startBg.y, this.startBg.width, this.startBg.height, () => {
+      if (!this.hasSelectedChallenge) {
+        return;
+      }
+      if (this.startCursor.visible) {
+        this.getUi().processInput(Button.ACTION);
+      } else {
+        this.activateStartCursor();
+        this.getUi().playSelect();
+      }
+    });
+    const reset = this.resetPointerBounds;
+    addTarget(reset.x, reset.y, reset.width, reset.height, () => {
+      this.resetChallengesToDefault();
+      this.getUi().playSelect();
+    });
+    this.tabMenu.enablePointerNavigation(
+      () => this.getUi().canProcessPointerInput(this),
+      () => this.getUi().processInput(Button.CANCEL),
+    );
+    this.updatePointerTargets();
+  }
+
+  private selectPointerRow(row: number): boolean {
+    if (!this.getFilteredChallenges()[this.scrollCursor + row]) {
+      return false;
+    }
+    const changed = this.cursor !== row || this.startCursor.visible;
+    this.startCursor.setVisible(false);
+    this.setCursor(row);
+    this.updateChallengeArrowsTint(false);
+    this.updateText();
+    return changed;
+  }
+
+  private updatePointerTargets(): void {
+    const challenges = this.getFilteredChallenges();
+    const update = (zone: Phaser.GameObjects.Zone, visible: boolean): void => {
+      zone.setVisible(visible);
+      if (visible) {
+        zone.setInteractive();
+      } else {
+        zone.disableInteractive();
+      }
+    };
+    this.rowPointerZones.forEach((zone, row) => {
+      const exists = !!challenges[this.scrollCursor + row];
+      update(zone, exists);
+      const arrows = this.arrowPointerZones[row];
+      const label = this.challengeLabels[row];
+      for (const direction of ["left", "right"] as const) {
+        const image = direction === "left" ? label.leftArrow : label.rightArrow;
+        arrows[direction].setPosition(image.x - 2, label.label.y);
+        update(arrows[direction], exists && image.visible);
+      }
+    });
+  }
+
+  private onPointerWheel(
+    pointer: Phaser.Input.Pointer,
+    _dx: number,
+    dy: number,
+    _dz: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    event.stopPropagation();
+    if (pointer.wasTouch || !dy || !this.getUi().canProcessPointerInput(this)) {
+      return;
+    }
+    const challenges = this.getFilteredChallenges();
+    if (challenges.length === 0) {
+      return;
+    }
+    const previous = this.cursor + this.scrollCursor;
+    const next = Math.max(0, Math.min(challenges.length - 1, previous + Math.sign(dy)));
+    const wasStart = this.startCursor.visible;
+    if (next === previous && !wasStart) {
+      return;
+    }
+    const scroll = Math.max(next - MAX_ROWS_TO_DISPLAY + 1, Math.min(this.scrollCursor, next));
+    this.cursor = next - scroll;
+    this.setScrollCursor(scroll);
+    this.selectPointerRow(this.cursor);
+    this.getUi().playSelect();
+  }
+
+  private clearPointerTargets(): void {
+    this.challengesContainer.off("pointerdown", this.onBackgroundPointerDown, this);
+    this.challengesContainer.off("wheel", this.consumeWheel, this);
+    this.tabMenu.disablePointerNavigation();
+    for (const zone of this.pointerZones) {
+      zone.destroy();
+    }
+    this.pointerZones = [];
+    this.rowPointerZones = [];
+    this.arrowPointerZones = [];
+  }
+
   private onHomeDown(): void {
     if (!this.challengesContainer.visible) {
       return;
@@ -703,6 +917,7 @@ export class GameChallengesUiHandler extends UiHandler {
 
   public override clear(): void {
     super.clear();
+    this.clearPointerTargets();
     this.challengesContainer.setVisible(false);
     if (this.descriptionScrollTween) {
       this.descriptionScrollTween.remove();
@@ -712,6 +927,7 @@ export class GameChallengesUiHandler extends UiHandler {
   }
 
   public override destroy(): void {
+    this.clearPointerTargets();
     super.destroy();
 
     this.homeKey?.off("up", this.onHomeDown, this);
