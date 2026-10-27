@@ -3,6 +3,8 @@ import * as account from "#app/account";
 import * as appConstants from "#constants/app-constants";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
+import { PokeballType } from "#enums/pokeball";
+import { SpeciesId } from "#enums/species-id";
 import { version } from "#package.json";
 import { GameData } from "#system/game-data";
 import { cloneSystemData, decodeSystemImport, serializeSystemData } from "#system/system-data-merge";
@@ -53,6 +55,21 @@ describe("System - Game Data", () => {
       expect(captured).toBeDefined();
       return captured!;
     }
+
+    it("isolates input while open and restores it on close or opening failure", async () => {
+      const options = await openDialog();
+      expect(game.scene.inputController.gameplayInputSuspended).toBe(true);
+      expect(game.scene.scene.pause).toHaveBeenCalledOnce();
+      options.onClose();
+      expect(game.scene.inputController.gameplayInputSuspended).toBe(false);
+      expect(game.scene.scene.resume).toHaveBeenCalledOnce();
+      vi.spyOn(mergeDialog, "showSystemMergeDialog").mockImplementation(() => {
+        throw new Error("dialog failed");
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await game.scene.gameData.mergeImportData();
+      expect(game.scene.inputController.gameplayInputSuspended).toBe(false);
+    });
 
     it("retains history through normal serialization and loading, including high ribbon bits", () => {
       const history = { version: 1 as const, fingerprints: ["a".repeat(64)] };
@@ -244,6 +261,24 @@ describe("System - Game Data", () => {
       expect(game.scene.gameData.starterData[25].candyCount).toBe(3);
       options.onClose();
     });
+  });
+
+  it("saves remaining balls and refills only Master Balls whenever an adventure is loaded", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const data = game.scene.gameData;
+    game.scene.pokeballCounts[PokeballType.MASTER_BALL] = 123;
+    game.scene.pokeballCounts[PokeballType.GREAT_BALL] = 7;
+    const session = data.getSessionSaveData();
+    expect(session.pokeballCounts[PokeballType.MASTER_BALL]).toBe(123);
+    session.pokeballCounts = { ...session.pokeballCounts };
+    vi.spyOn(data, "getSession").mockResolvedValue(session);
+    expect(await data.loadSession(0)).toBe(true);
+    expect(game.scene.pokeballCounts[PokeballType.MASTER_BALL]).toBe(9999);
+    expect(game.scene.pokeballCounts[PokeballType.GREAT_BALL]).toBe(7);
+    expect(session.pokeballCounts[PokeballType.MASTER_BALL]).toBe(123);
+    game.scene.pokeballCounts[PokeballType.MASTER_BALL] = 500;
+    expect(await data.loadSession(0)).toBe(true);
+    expect(game.scene.pokeballCounts[PokeballType.MASTER_BALL]).toBe(9999);
   });
 
   describe("tryClearSession", () => {

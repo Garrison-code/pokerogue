@@ -59,6 +59,26 @@ export class InputsController {
   public events: Phaser.Events.EventEmitter;
 
   private buttonLock: Button[] = [];
+  private gameplayInputSuspensions = 0;
+
+  public get gameplayInputSuspended(): boolean {
+    return this.gameplayInputSuspensions > 0;
+  }
+
+  /** Give a modal exclusive input ownership until the returned cleanup is called. */
+  public suspendGameplayInput(): () => void {
+    this.focusHtmlTool();
+    this.gameplayInputSuspensions++;
+    let released = false;
+    return () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      this.loseFocus();
+      this.gameplayInputSuspensions--;
+    };
+  }
   private readonly interactions: Partial<Record<Button, Interaction>> = {};
   private configs: Record<string, InterfaceConfig> = {};
 
@@ -110,6 +130,11 @@ export class InputsController {
    */
   init(): void {
     this.events = globalScene.game.events;
+
+    this.events.on("type-chart/focus", this.focusHtmlTool, this);
+    globalScene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off("type-chart/focus", this.focusHtmlTool, this);
+    });
 
     globalScene.game.events.on(Phaser.Core.Events.BLUR, () => {
       this.loseFocus();
@@ -181,6 +206,15 @@ export class InputsController {
   loseFocus(): void {
     this.deactivatePressedKey();
     this.touchControls.deactivatePressedKey();
+  }
+
+  /** Release hold-to-show information as well as repeat timers before HTML takes focus. */
+  private focusHtmlTool(): void {
+    for (const button of [...this.buttonLock]) {
+      this.events.emit("input_up", { controller_type: this.lastSource, button });
+    }
+    this.touchControls.releasePressedKeys();
+    this.loseFocus();
   }
 
   /**
@@ -349,6 +383,9 @@ export class InputsController {
    * @param event The keyboard event.
    */
   keyboardKeyDown(event: KeyboardEvent): void {
+    if (this.gameplayInputSuspended || event.repeat) {
+      return;
+    }
     this.lastSource = "keyboard";
     this.ensureKeyboardIsInit();
     const buttonDown = getButtonWithKeycode(this.getActiveConfig(Device.KEYBOARD)!, event.keyCode);
@@ -360,6 +397,10 @@ export class InputsController {
         controller_type: "keyboard",
         button: buttonDown,
       });
+      // The action above may have opened a modal synchronously.
+      if (this.gameplayInputSuspended) {
+        return;
+      }
       clearInterval(this.inputInterval[buttonDown]);
       this.inputInterval[buttonDown] = setInterval(() => {
         this.events.emit("input_down", {
@@ -377,6 +418,9 @@ export class InputsController {
    * @param event The keyboard event.
    */
   keyboardKeyUp(event: KeyboardEvent): void {
+    if (this.gameplayInputSuspended) {
+      return;
+    }
     this.lastSource = "keyboard";
     // Bang is safe here; can't receive keyboard input if no active keyboard
     const buttonUp = getButtonWithKeycode(this.getActiveConfig(Device.KEYBOARD)!, event.keyCode);
@@ -386,7 +430,9 @@ export class InputsController {
         button: buttonUp,
       });
       const index = this.buttonLock.indexOf(buttonUp);
-      this.buttonLock.splice(index, 1);
+      if (index >= 0) {
+        this.buttonLock.splice(index, 1);
+      }
       clearInterval(this.inputInterval[buttonUp]);
     }
   }
@@ -401,6 +447,9 @@ export class InputsController {
    * @param value The intensity or value of the button press, if applicable.
    */
   gamepadButtonDown(pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button, _value: number): void {
+    if (this.gameplayInputSuspended) {
+      return;
+    }
     if (!this.configs[this.selectedDevice[Device.KEYBOARD]]?.padID) {
       this.setupKeyboard();
     }
@@ -428,6 +477,10 @@ export class InputsController {
         controller_type: "gamepad",
         button: buttonDown,
       });
+      // The action above may have opened a modal synchronously.
+      if (this.gameplayInputSuspended) {
+        return;
+      }
       clearInterval(this.inputInterval[buttonDown]);
       this.inputInterval[buttonDown] = setInterval(() => {
         if (!this.buttonLock.includes(buttonDown)) {
@@ -453,6 +506,9 @@ export class InputsController {
    * @param value The intensity or value of the button release, if applicable.
    */
   gamepadButtonUp(pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button, _value: number): void {
+    if (this.gameplayInputSuspended) {
+      return;
+    }
     if (!pad) {
       return;
     }
@@ -468,7 +524,9 @@ export class InputsController {
         button: buttonUp,
       });
       const index = this.buttonLock.indexOf(buttonUp);
-      this.buttonLock.splice(index, 1);
+      if (index >= 0) {
+        this.buttonLock.splice(index, 1);
+      }
       clearInterval(this.inputInterval[buttonUp]);
     }
   }

@@ -56,7 +56,10 @@ aggregate saves cannot be split into non-overlapping resources. Different legacy
 snapshots without lineage can still double-count progress; the preview warns
 about this. Source acceptance follows selection order.
 
-The dialog pauses the game scene, snapshots the base, and checks local/remote
+The dialog pauses the game scene and suspends keyboard, gamepad and touch input,
+clearing held inputs when it opens and closes. Its fixed header keeps confirmation
+available while scrolling the preview; both action rows share the same save state.
+The dialog uses the selected game window theme and font. It snapshots the base and checks local/remote
 revisions again before saving. Changed data requires a rebuilt preview and another
 confirmation. Logged-in saves write to the server before installing local data;
 offline saves install result and lineage in the same localStorage value. Neither
@@ -74,3 +77,14 @@ For browser review, select multiple files on desktop and mobile, expand a Pokém
 remove a corrupt source, add a duplicate, cancel, and confirm a valid preview.
 Check keyboard focus and a narrow viewport. Chromium desktop/mobile emulation was
 verified during implementation; physical iOS/Safari testing is still required.
+
+## Interface previews
+
+These previews use synthetic import data and the actual dialog on a standalone
+review page. Desktop previews show expanded changes; mobile previews show the end
+of a long list with the header actions still available.
+
+| Theme | Desktop | Mobile |
+| --- | --- | --- |
+| Default | [Preview](images/merge-import/merge-default-desktop.png) | [Preview](images/merge-import/merge-default-mobile.png) |
+| Legacy | [Preview](images/merge-import/merge-legacy-desktop.png) | [Preview](images/merge-import/merge-legacy-mobile.png) |

@@ -35,6 +35,7 @@ import { classicFinalBossDialogue } from "#data/dialogue";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
 import { SpeciesFormChangeManualTrigger, SpeciesFormChangeTimeOfDayTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
+import { MAX_MASTER_BALLS } from "#data/pokeball";
 import type { SpeciesFormChange } from "#data/pokemon-forms";
 import type { PokemonSpecies, PokemonSpeciesFilter } from "#data/pokemon-species";
 import { getTypeRgb } from "#data/type";
@@ -1125,6 +1126,7 @@ export class BattleScene extends SceneBase {
           .map(t => [t, 0]),
       );
       this.pokeballCounts[PokeballType.POKEBALL] = 5;
+      this.pokeballCounts[PokeballType.MASTER_BALL] = MAX_MASTER_BALLS;
     }
 
     this.modifiers = [];

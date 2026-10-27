@@ -2,7 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { modifierTypes } from "#data/data-lists";
-import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
+import { getPokeballCapacity } from "#data/pokeball";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
 import { ModifierTier } from "#enums/modifier-tier";
@@ -854,5 +854,5 @@ function lureWeightFunc(maxBattles: number, weight: number): WeightedModifierTyp
  * @returns boolean: true if the player has the maximum of a given ball type
  */
 function hasMaximumBalls(ballType: PokeballType): boolean {
-  return globalScene.gameMode.isClassic && globalScene.pokeballCounts[ballType] >= MAX_PER_TYPE_POKEBALLS;
+  return globalScene.gameMode.isClassic && globalScene.pokeballCounts[ballType] >= getPokeballCapacity(ballType);
 }

@@ -1,4 +1,7 @@
+import "./system-merge-dialog.css";
+import { settings } from "#app/global-settings-manager";
 import { getNatureName } from "#data/nature";
+import { TextStyle } from "#enums/text-style";
 import {
   cloneSystemData,
   commitSystemMerge,
@@ -10,6 +13,7 @@ import {
   systemChanges,
 } from "#system/system-data-merge";
 import type { SystemSaveData } from "#types/save-data";
+import { getTextColor } from "#ui/text";
 import i18next from "i18next";
 
 interface ImportFile {
@@ -43,37 +47,56 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
   const previousFocus = document.activeElement as HTMLElement | null;
   const overlay = element("div");
   overlay.id = "system-merge-dialog";
-  overlay.style.cssText =
-    "position:fixed;inset:0;z-index:10001;background:#000b;display:flex;align-items:center;justify-content:center;padding:12px;color:#eee;font:16px system-ui;box-sizing:border-box";
+  overlay.dataset.theme = settings.isLegacyTheme ? "legacy" : "default";
+  const windowPath = `images/ui/${settings.isLegacyTheme ? "legacy/" : ""}windows/window_${settings.display.uiWindowStyle}.png`;
+  overlay.style.setProperty("--merge-window", `url("${new URL(windowPath, document.baseURI).href}")`);
+  overlay.style.setProperty("--merge-window-slice", settings.isLegacyTheme ? "6" : "8");
+  overlay.style.setProperty("--merge-text", getTextColor(TextStyle.WINDOW));
+  overlay.style.setProperty("--merge-shadow", getTextColor(TextStyle.WINDOW, true));
   const panel = element("section");
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-modal", "true");
   panel.setAttribute("aria-labelledby", "system-merge-title");
-  panel.style.cssText =
-    "background:#192438;border:2px solid #8298bb;border-radius:10px;padding:20px;width:850px;max-width:100%;max-height:90dvh;overflow:auto;box-sizing:border-box";
+  panel.className = "system-merge-panel";
+  const header = element("header");
+  const content = element("div");
+  content.className = "system-merge-content";
   const title = element("h2", t("title"));
   title.id = "system-merge-title";
-  panel.append(title, element("p", t("description")), element("p", t("overlapWarning")));
+  header.append(title);
+  content.append(element("p", t("description")), element("p", t("overlapWarning")));
   const label = element("label", t("selectFiles"));
   const input = element("input");
   input.type = "file";
   input.multiple = true;
   input.accept = ".prsv,.json,.txt";
-  input.style.cssText = "display:block;margin:12px 0;max-width:100%";
+  input.id = "system-merge-files";
   label.append(input);
   const status = element("p");
   status.setAttribute("role", "status");
   const filesView = element("div");
   const preview = element("div");
   const actions = element("div");
-  actions.style.cssText = "display:flex;gap:12px;margin-top:16px;flex-wrap:wrap";
+  actions.className = "system-merge-actions";
   const cancel = element("button", t("cancel"));
   const confirm = element("button", t("confirm"));
   confirm.disabled = true;
+  cancel.dataset.action = "cancel";
+  confirm.dataset.action = "confirm";
   actions.append(cancel, confirm);
-  panel.append(label, status, filesView, preview, actions);
+  const topActions = actions.cloneNode(true) as HTMLDivElement;
+  const topCancel = topActions.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
+  const topConfirm = topActions.querySelector<HTMLButtonElement>('[data-action="confirm"]')!;
+  header.append(topActions, label, status);
+  content.append(filesView, preview, actions);
+  panel.append(header, content);
   overlay.append(panel);
   document.body.append(overlay);
+  const background = document.getElementById("game-layout") ?? document.getElementById("app");
+  const wasInert = background?.inert ?? false;
+  if (background) {
+    background.inert = true;
+  }
   const files: ImportFile[] = [];
   let base: SystemSaveData | undefined;
   let result: MergeResult | undefined;
@@ -88,12 +111,19 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
     }
     closed = true;
     window.removeEventListener("keydown", keyboard, true);
+    window.removeEventListener("keyup", keyboard, true);
+    if (background) {
+      background.inert = wasInert;
+    }
     overlay.remove();
     options.onClose();
     previousFocus?.focus();
   };
   const keyboard = (event: KeyboardEvent) => {
-    event.stopPropagation();
+    event.stopImmediatePropagation();
+    if (event.type === "keyup") {
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       close();
@@ -112,18 +142,22 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
     }
   };
   window.addEventListener("keydown", keyboard, true);
+  window.addEventListener("keyup", keyboard, true);
   cancel.onclick = close;
+  topCancel.onclick = close;
   input.focus();
 
   function setBusy(value: boolean): void {
     busy = value;
     input.disabled = value;
     cancel.disabled = value;
+    topCancel.disabled = value;
     filesView.querySelectorAll("button").forEach(button => {
       button.disabled = value;
     });
     confirm.disabled =
       value || !result || files.some(file => file.error) || !result.files.some(file => file.status === "accepted");
+    topConfirm.disabled = confirm.disabled;
   }
   function fieldName(field: string): string {
     const parts = field.split(".");
@@ -198,7 +232,7 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
   }
   function changeTable(changes: ReturnType<typeof systemChanges>): HTMLElement {
     const table = element("table");
-    table.style.cssText = "width:100%;border-collapse:collapse;overflow-wrap:anywhere;font-size:14px";
+    table.className = "system-merge-changes";
     const head = element("tr");
     for (const key of ["field", "before", "after", "increase"]) {
       head.append(element("th", t(key)));
@@ -218,7 +252,6 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
       ];
       for (const value of values) {
         const cell = element("td", value);
-        cell.style.cssText = "padding:6px;border-bottom:1px solid #52617a;text-align:left";
         row.append(cell);
       }
       table.append(row);
@@ -246,7 +279,7 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
     let validIndex = 0;
     files.forEach((file, index) => {
       const row = element("div");
-      row.style.cssText = "display:flex;align-items:center;gap:12px;margin:8px 0;overflow-wrap:anywhere";
+      row.className = "system-merge-file";
       const state = file.error ?? (file.data ? t(result?.files[validIndex++]?.status ?? "pending") : t("pending"));
       row.append(element("span", `${file.name}: ${state}`));
       const remove = element("button", t("remove"));
@@ -289,7 +322,6 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
       }
       for (const id of species) {
         const details = element("details");
-        details.style.cssText = "margin:12px 0;border:1px solid #52617a;padding:10px;border-radius:6px";
         details.append(element("summary", options.speciesName(Number(id))));
         details.append(
           changeTable(changes.filter(c => /^(dexData|starterData)\./.test(c.field) && c.field.split(".")[1] === id)),
@@ -343,4 +375,5 @@ export function showSystemMergeDialog(options: SystemMergeDialogOptions): void {
       setBusy(false);
     }
   };
+  topConfirm.onclick = confirm.onclick;
 }

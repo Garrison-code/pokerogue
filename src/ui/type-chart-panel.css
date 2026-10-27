@@ -1,0 +1,200 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Garrison-code
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/* Layout dimensions belong to the page; Phaser fits its existing canvas inside #app. */
+body {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+#game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  color: #f5f3f8;
+  font:
+    14px / 1.5 system-ui,
+    sans-serif;
+}
+
+#game-layout[data-chart-open="true"][data-wide="true"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+}
+
+#game-layout[data-chart-open="true"][data-wide="false"] {
+  grid-template-rows: minmax(0, 2fr) minmax(0, 3fr);
+}
+
+.game-shell {
+  display: grid;
+  grid-template-rows: 40px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.game-tools {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  background: #302b3a;
+}
+
+#game-viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#game-viewport #app {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#game-viewport #app:focus {
+  outline: none;
+}
+
+.type-chart-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  background: #302b3a;
+  padding: 12px;
+  border-right: 2px solid var(--color-base);
+  box-sizing: border-box;
+  scrollbar-gutter: stable;
+}
+
+.type-chart-panel[hidden] {
+  display: none;
+}
+
+#game-layout[data-wide="false"] .type-chart-panel {
+  border-right: 0;
+  border-bottom: 2px solid var(--color-base);
+}
+
+.type-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.type-chart-panel h2,
+.type-chart-panel h3,
+.type-chart-panel h4 {
+  margin: 0 0 8px;
+}
+
+.type-chart-panel h2 {
+  font-size: 20px;
+}
+
+.type-chart-panel h3 {
+  font-size: 16px;
+  margin-top: 16px;
+}
+
+.type-chart-scope,
+.type-chart-hint {
+  font-size: 13px;
+  color: #d6d1df;
+}
+
+.type-chart-grid,
+.type-chart-badges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 6px;
+}
+
+.type-chart-grid {
+  margin-bottom: 12px;
+}
+
+.type-chart-badges {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.type-chart-result {
+  margin: 12px 0;
+}
+
+[data-game-tool] button {
+  color: #fff;
+  background: #51465f;
+  border: 1px solid #998cab;
+  border-radius: 5px;
+  font: inherit;
+  padding: 5px 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+[data-game-tool] button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+[data-game-tool] .type-chart-type {
+  color: #fff;
+  background: #211d29;
+  border: 1px solid var(--type-color);
+  border-left: 6px solid var(--type-color);
+  border-radius: 5px;
+  padding: 6px 4px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+[data-game-tool] button[aria-pressed="true"] {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+  background: #51465f;
+}
+
+[data-game-tool] button[aria-disabled="true"],
+[data-game-tool] button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The existing offsets now refer to the game viewport, including custom positions. */
+#game-viewport #touchControls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --controls-size: min(calc(var(--game-height) * 0.1), calc(var(--game-width) * 0.12));
+  --text-shadow-size: calc(var(--controls-size) * 0.065);
+  --controls-padding: min(1rem, calc(var(--game-height) * 0.025));
+}
+
+@media (orientation: landscape) {
+  #game-viewport #touchControls {
+    --controls-size: min(calc(var(--game-height) * 0.2), calc(var(--game-width) * 0.12));
+  }
+}
+
+#game-viewport .control-group,
+#game-viewport #configToolbar {
+  position: absolute;
+  pointer-events: auto;
+}
+
+#game-viewport #configToolbar {
+  top: 8px;
+}

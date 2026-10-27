@@ -194,7 +194,8 @@ export function validateKnownSystemFields(data: unknown): void {
             throw new MergeImportError("invalid", `${id}.${attr}`);
           }
         }
-        if (e.ribbons !== undefined && (typeof e.ribbons !== "string" || !/^[0-9a-f]+$/i.test(e.ribbons))) {
+        // Historical exports use an empty string for no ribbons; normalize it before parsing.
+        if (e.ribbons !== undefined && (typeof e.ribbons !== "string" || !/^[0-9a-f]*$/i.test(e.ribbons))) {
           throw new MergeImportError("invalid", `${id}.ribbons`);
         }
       }
@@ -570,6 +571,11 @@ export function decodeSystemImport(text: string, decoder: ImportDecoder): System
       throw new MergeImportError("unsupported", "gameVersion");
     }
     validateKnownSystemFields(raw);
+    for (const entry of Object.values(raw.dexData) as Record<string, unknown>[]) {
+      if (entry.ribbons === "") {
+        entry.ribbons = "0";
+      }
+    }
     // Go's current API still emits the two retired maps as null.
     for (const field of ["starterMoveData", "starterEggMoveData"]) {
       const value = raw[field];
