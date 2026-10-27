@@ -34,9 +34,9 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 目前版本有部分登入／彈窗點擊、資訊 hover，以及虛擬觸控按鍵。
 這些局部支援不代表已完成整頁驗證，也沒有一個現成設定能開啟全遊戲的直接點選。
 
-## 已定案：一般選項、確認與選單內子選單
+## 已定案：一般選項、確認、選單內子選單與主畫面
 
-對應 UI-01 `OPTION_SELECT`、UI-02 `CONFIRM`、UI-04 `MENU_OPTION_SELECT`；是否完成仍以清單與完成紀錄為準。
+對應 UI-01 `OPTION_SELECT`、UI-02 `CONFIRM`、UI-04 `MENU_OPTION_SELECT`、UI-06 `TITLE`；是否完成仍以清單與完成紀錄為準。
 
 - 左鍵點不同項目只選取；點目前項目執行既有確認流程，包含開啟時已預選的項目。
 - 滑鼠移入不改變選取；不可選項目不執行回呼。
@@ -44,8 +44,10 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 滾輪到首／末項停止，不循環；鍵盤原有循環行為保留。水平滾輪不操作選單。
 - 選單外點擊及右鍵不觸發操作；取消使用既有取消項目或原本裝置的取消鍵。
 - 保留確認延遲、取消限制、回呼結果、音效與 `keepOpen` 行為；轉場、教學及上層介面阻擋背景選單輸入。
-- 目前僅對以上三種 UiMode 啟用共用選單的直接滑鼠操作，其他繼承相同基底的頁面仍按清單順序處理。
+- 目前僅對以上四種 UiMode 啟用共用選單的直接滑鼠操作，其他繼承相同基底的頁面仍按清單順序處理。
 - UI-04 包含資料管理、社群與存檔欄位的子選單；不擴充父頁、檔案選擇或後續介面的操作。
+- UI-06 包含繼續、新遊戲、讀取、紀錄及選單入口；只驗證尚未支援的後續頁面能正確開啟，不擴充其操作。主畫面保留既有取消限制，右鍵不取消。
+- 使用者決定 UI-06～UI-08 接續實作，EX-01 留待獨立一批；首次登入與後續教學仍需既有鍵盤／手把輸入。
 
 ## 已定案：訊息／對話推進
 
@@ -116,7 +118,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## Phase 1：從主畫面開始新遊戲
 
-- [ ] **UI-06** 主畫面／標題選單 — `TITLE`。
+- [x] **UI-06** 主畫面／標題選單 — `TITLE`。
 - [ ] **UI-07** 存檔欄位選擇 — `SAVE_SLOT`；涵蓋讀取、新遊戲儲存及覆蓋入口。
 - [ ] **UI-08** 挑戰條件選擇 — `CHALLENGE_SELECT`。
 - [ ] **UI-09** 新遊戲寶可夢選擇 — `STARTER_SELECT`；依本文件已定案的操作實作，包含頁內篩選、已選隊伍、隨機選擇與開始入口。
@@ -191,7 +193,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01、UI-02、UI-03、UI-04、UI-05；其餘 49 個項目保持待辦。
+目前已完成 UI-01、UI-02、UI-03、UI-04、UI-05、UI-06；其餘 48 個項目保持待辦。
 
 | 項目 ID | 完成日期 | Commit SHA 或唯一 subject | 驗證結果／限制 |
 | --- | --- | --- | --- |
@@ -200,6 +202,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-03 | 2026-10-27 | `feat(ui): advance messages with mouse clicks` | 新增 12 個訊息互動測試，含能力值兩階段與 IV 提示；連同選單及既有輸入測試共 43 項通過。typecheck、build:dev、修改檔案 Biome、diff check 通過。Chromium default／legacy 實測訊息框邊緣與留白、具名字框長對話、框外／非左鍵／滾輪無效、逐字顯示阻擋、提示及回呼延遲、多頁逐次推進、鍵盤交替、教學／轉場／上層確認選單阻擋與反覆重開通過。能力值／IV 以自動測試驗證；未測實體手把與觸控。 |
 | UI-04 | 2026-10-27 | `feat(ui): support mouse selection in menu submenus` | 將 10 個共用選單互動案例擴及 MENU_OPTION_SELECT；選單、訊息及既有輸入測試共 53 項通過。typecheck、build:dev、修改檔案 Biome 錯誤級檢查與 diff check 通過。Chromium default／legacy 實測長清單、圖示、長文字展寬、偏移、捲動索引、不可選項目、滾輪邊界、鍵盤交替、教學阻擋，及資料管理／社群／存檔子選單返回通過；社群連結攔截驗證，存檔使用替身欄位且未執行讀取或刪除。延遲、疊層、回呼失敗、keepOpen 與重開以自動測試回歸。未測實體手把與觸控。 |
 | UI-05 | 2026-10-27 | `feat(ui): dismiss ready alert modals with mouse clicks` | 新增 13 個提醒彈窗互動測試；連同選單、訊息及既有輸入測試共 66 項通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。Chromium default／legacy 實測文字與框內留白點擊、非左鍵／移入／滾輪無效、框外遮罩不關閉及阻擋背景、零／非零延遲、未提供延遲禁止關閉、鍵盤交替、上層確認選單／轉場阻擋、淡出期間阻擋、反覆開關、重開清除舊淡出、直接切換模式清理與沒有返回模式時保持顯示通過。使用本機提示情境，未執行真實存檔錯誤或補償遷移；未測實體手把與觸控。 |
+
+| UI-06 | 2026-10-28 | `feat(ui): support mouse navigation on the title screen` | 將 10 個共用選單互動案例擴及 TITLE；選單、訊息、彈窗及既有輸入測試共 76 項通過。typecheck、build:dev、修改檔案 Biome 錯誤級檢查與 diff check 通過。Chromium default／legacy 實測選取／確認分離、預選、圖示、長文字、偏移、長清單捲動、滾輪邊界、鍵盤交替與教學阻擋；實際繼續、新遊戲、讀取、紀錄及選單入口通過。繼續使用回呼替身，未讀取真實存檔；後續頁面只驗證開啟。MENU／AUTO_COMPLETE 未啟用，EX-01 保持待辦；未測實體手把與觸控。 |
 
 瀏覽器驗證使用本機開發版選單、訊息與提醒彈窗情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。

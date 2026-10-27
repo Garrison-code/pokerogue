@@ -44,7 +44,7 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   private inputDelayTimer: Phaser.Time.TimerEvent | null = null;
 
   protected get supportsPointerInput(): boolean {
-    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT].includes(this.mode);
+    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT, UiMode.TITLE].includes(this.mode);
   }
 
   protected fullyInitialized: boolean;

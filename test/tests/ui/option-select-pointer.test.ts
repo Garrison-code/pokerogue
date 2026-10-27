@@ -25,6 +25,9 @@ describe("UI - option selection with a mouse", () => {
   });
 
   async function open(options: OptionSelectItem[], config: Partial<OptionSelectModeConfig> = {}): Promise<void> {
+    if (handler["mode"] === UiMode.TITLE && game.scene.ui.mode === UiMode.TITLE) {
+      await game.scene.ui.setMode(UiMode.MESSAGE);
+    }
     await game.scene.ui.setOverlayMode(handler["mode"], { options, ...config });
   }
 
@@ -49,7 +52,7 @@ describe("UI - option selection with a mouse", () => {
     return handler.getCursor() + handler["scrollCursor"];
   }
 
-  describe.each([UiMode.OPTION_SELECT, UiMode.MENU_OPTION_SELECT])("option mode %i", mode => {
+  describe.each([UiMode.OPTION_SELECT, UiMode.MENU_OPTION_SELECT, UiMode.TITLE])("option mode %i", mode => {
     beforeEach(() => {
       handler = game.scene.ui.handlers[mode] as OptionSelectUiHandler;
     });
@@ -217,7 +220,7 @@ describe("UI - option selection with a mouse", () => {
     });
 
     it("does not enable other menus that inherit the same base", () => {
-      for (const unsupportedMode of [UiMode.TITLE, UiMode.MENU, UiMode.AUTO_COMPLETE]) {
+      for (const unsupportedMode of [UiMode.MENU, UiMode.AUTO_COMPLETE]) {
         const otherHandler = game.scene.ui.handlers[unsupportedMode] as OptionSelectUiHandler;
         expect(otherHandler["supportsPointerInput"]).toBe(false);
         expect(otherHandler["pointerRows"]).toHaveLength(0);
