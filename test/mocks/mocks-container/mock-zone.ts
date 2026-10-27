@@ -5,6 +5,12 @@ import Phaser from "phaser";
 export class MockZone extends Phaser.Events.EventEmitter implements MockGameObject {
   public name: string;
   public active = true;
+  public visible = true;
+
+  public setVisible(visible: boolean): this {
+    this.visible = visible;
+    return this;
+  }
 
   public setOrigin(_x: number): this {
     return this;

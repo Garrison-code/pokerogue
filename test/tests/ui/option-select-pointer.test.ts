@@ -26,7 +26,9 @@ describe("UI - option selection with a mouse", () => {
 
   async function open(options: OptionSelectItem[], config: Partial<OptionSelectModeConfig> = {}): Promise<void> {
     if (handler["mode"] === UiMode.TITLE && game.scene.ui.mode === UiMode.TITLE) {
-      await game.scene.ui.setMode(UiMode.MESSAGE);
+      await game.scene.ui.setMode(UiMode.OPTION_SELECT, {
+        options: [{ label: "Background", handler: () => true }],
+      });
     }
     await game.scene.ui.setOverlayMode(handler["mode"], { options, ...config });
   }
