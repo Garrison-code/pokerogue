@@ -1,7 +1,7 @@
 import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
-import type { OptionSelectItem, OptionSelectModeConfig } from "#types/ui-types";
+import type { ConfirmModeConfig, OptionSelectItem, OptionSelectModeConfig } from "#types/ui-types";
 import type { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,6 +26,11 @@ describe("UI - option selection with a mouse", () => {
 
   async function open(options: OptionSelectItem[], config: Partial<OptionSelectModeConfig> = {}): Promise<void> {
     await game.scene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, ...config });
+  }
+
+  async function openConfirm(config: ConfirmModeConfig): Promise<void> {
+    handler = game.scene.ui.handlers[UiMode.CONFIRM] as OptionSelectUiHandler;
+    await game.scene.ui.setOverlayMode(UiMode.CONFIRM, config);
   }
 
   function click(row: number): void {
@@ -207,10 +212,80 @@ describe("UI - option selection with a mouse", () => {
   });
 
   it("does not enable other menus that inherit the same base", () => {
-    for (const mode of [UiMode.TITLE, UiMode.MENU, UiMode.MENU_OPTION_SELECT, UiMode.AUTO_COMPLETE, UiMode.CONFIRM]) {
+    for (const mode of [UiMode.TITLE, UiMode.MENU, UiMode.MENU_OPTION_SELECT, UiMode.AUTO_COMPLETE]) {
       const otherHandler = game.scene.ui.handlers[mode] as OptionSelectUiHandler;
       expect(otherHandler["supportsPointerInput"]).toBe(false);
       expect(otherHandler["pointerRows"]).toHaveLength(0);
     }
+  });
+
+  it.each([0, 1])("confirms the existing preselected yes/no item %i", async index => {
+    const yesHandler = vi.fn();
+    const noHandler = vi.fn();
+    await openConfirm({ yesHandler, noHandler });
+    game.scene.ui.setCursor(index);
+    click(index);
+    expect(yesHandler).toHaveBeenCalledTimes(index === 0 ? 1 : 0);
+    expect(noHandler).toHaveBeenCalledTimes(index === 1 ? 1 : 0);
+    expect(handler.active).toBe(false);
+  });
+
+  it("selects No before confirming and never invokes Yes", async () => {
+    const yesHandler = vi.fn();
+    const noHandler = vi.fn();
+    await openConfirm({ yesHandler, noHandler });
+    click(1);
+    expect(handler.getCursor()).toBe(1);
+    expect(yesHandler).not.toHaveBeenCalled();
+    expect(noHandler).not.toHaveBeenCalled();
+    click(1);
+    expect(noHandler).toHaveBeenCalledOnce();
+    expect(yesHandler).not.toHaveBeenCalled();
+  });
+
+  it("clamps confirmation wheel navigation without confirming, then shares selection with the keyboard", async () => {
+    const yesHandler = vi.fn();
+    const noHandler = vi.fn();
+    await openConfirm({ yesHandler, noHandler });
+    wheel(-120);
+    expect(handler.getCursor()).toBe(0);
+    wheel(120);
+    wheel(120);
+    expect(handler.getCursor()).toBe(1);
+    expect(yesHandler).not.toHaveBeenCalled();
+    expect(noHandler).not.toHaveBeenCalled();
+    game.scene.ui.processInput(Button.UP);
+    click(0);
+    expect(yesHandler).toHaveBeenCalledOnce();
+    expect(noHandler).not.toHaveBeenCalled();
+  });
+
+  it("keeps confirmation delay blocking mouse input while retaining the explicit cancel bypass", async () => {
+    const yesHandler = vi.fn();
+    const noHandler = vi.fn();
+    await openConfirm({ yesHandler, noHandler, inputDelay: 100000, canBypassInputDelay: true });
+    const timer = handler["inputDelayTimer"]!;
+    click(0);
+    click(1);
+    click(1);
+    expect(yesHandler).not.toHaveBeenCalled();
+    expect(noHandler).not.toHaveBeenCalled();
+    game.scene.ui.processInput(Button.CANCEL);
+    expect(noHandler).toHaveBeenCalledOnce();
+    expect(timer.hasDispatched).toBe(true);
+    expect(handler["inputDelayTimer"]).toBeNull();
+  });
+
+  it("retains a blocked confirmation cancel shortcut but allows explicitly clicking No", async () => {
+    const yesHandler = vi.fn();
+    const noHandler = vi.fn();
+    await openConfirm({ yesHandler, noHandler, blockCancelButton: true });
+    game.scene.ui.processInput(Button.CANCEL);
+    expect(noHandler).not.toHaveBeenCalled();
+    click(1);
+    expect(noHandler).not.toHaveBeenCalled();
+    click(1);
+    expect(noHandler).toHaveBeenCalledOnce();
+    expect(yesHandler).not.toHaveBeenCalled();
   });
 });
