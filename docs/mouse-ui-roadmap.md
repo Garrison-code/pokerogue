@@ -34,9 +34,9 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 目前版本有部分登入／彈窗點擊、資訊 hover，以及虛擬觸控按鍵。
 這些局部支援不代表已完成整頁驗證，也沒有一個現成設定能開啟全遊戲的直接點選。
 
-## 已定案：一般選項與確認選單
+## 已定案：一般選項、確認與選單內子選單
 
-對應 UI-01 `OPTION_SELECT`、UI-02 `CONFIRM`；是否完成仍以清單與完成紀錄為準。
+對應 UI-01 `OPTION_SELECT`、UI-02 `CONFIRM`、UI-04 `MENU_OPTION_SELECT`；是否完成仍以清單與完成紀錄為準。
 
 - 左鍵點不同項目只選取；點目前項目執行既有確認流程，包含開啟時已預選的項目。
 - 滑鼠移入不改變選取；不可選項目不執行回呼。
@@ -44,7 +44,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 滾輪到首／末項停止，不循環；鍵盤原有循環行為保留。水平滾輪不操作選單。
 - 選單外點擊及右鍵不觸發操作；取消使用既有取消項目或原本裝置的取消鍵。
 - 保留確認延遲、取消限制、回呼結果、音效與 `keepOpen` 行為；轉場、教學及上層介面阻擋背景選單輸入。
-- 本批僅啟用以上兩種 UiMode，其他繼承相同基底的頁面仍按清單順序處理。
+- 目前僅對以上三種 UiMode 啟用共用選單的直接滑鼠操作，其他繼承相同基底的頁面仍按清單順序處理。
+- UI-04 包含資料管理、社群與存檔欄位的子選單；不擴充父頁、檔案選擇或後續介面的操作。
 
 ## 已定案：訊息／對話推進
 
@@ -95,7 +96,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-01** 一般選項選單 — `OPTION_SELECT`；包含模式選擇、生態域選擇等動態選單。
 - [x] **UI-02** 是／否與其他確認選單 — `CONFIRM`；包含覆蓋、放棄、切換等確認入口。
 - [x] **UI-03** 訊息／對話推進 — `MESSAGE`；包含戰鬥訊息、提示及共用對話流程。
-- [ ] **UI-04** 選單內子選單 — `MENU_OPTION_SELECT`；包含資料管理、社群等共用選項。
+- [x] **UI-04** 選單內子選單 — `MENU_OPTION_SELECT`；包含資料管理、社群等共用選項。
 - [ ] **UI-05** 提醒／錯誤彈窗 — `ALERT_MODAL`；現有 modal 點擊一併驗證。
 - [ ] **EX-01** 教學覆蓋層與教學提示；依附各頁，沒有獨立 UiMode。
 
@@ -180,13 +181,14 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01、UI-02、UI-03；其餘 51 個項目保持待辦。
+目前已完成 UI-01、UI-02、UI-03、UI-04；其餘 50 個項目保持待辦。
 
 | 項目 ID | 完成日期 | Commit SHA 或唯一 subject | 驗證結果／限制 |
 | --- | --- | --- | --- |
 | UI-01 | 2026-10-27 | `feat(ui): support mouse selection in option menus` | 新增 10 個互動邏輯測試與既有 15 個輸入測試通過；typecheck、build:dev、修改檔案 Biome、diff check 通過。Chromium default／legacy 實測短／長清單、圖示、長文字展寬、偏移、捲動索引、滑鼠／鍵盤交替、延遲、失敗回呼與重開／取消限制通過。手把與觸控以既有模擬輸入測試回歸，未測實體裝置。 |
 | UI-02 | 2026-10-27 | `feat(ui): support mouse selection in confirmation menus` | 新增 6 個確認選單測試；兩份相關測試共 31 項通過，typecheck、build:dev、修改檔案 Biome、diff check 通過。Chromium default／legacy 實測一般選單開啟確認視窗及返回、預選是／否、先選取再確認、滾輪邊界、鍵盤交替、偏移、確認延遲到期、取消限制／明確允許的取消略過延遲、轉場／教學阻擋及防止同次點擊穿透通過。未修改確認入口的業務邏輯或存檔。 |
 | UI-03 | 2026-10-27 | `feat(ui): advance messages with mouse clicks` | 新增 12 個訊息互動測試，含能力值兩階段與 IV 提示；連同選單及既有輸入測試共 43 項通過。typecheck、build:dev、修改檔案 Biome、diff check 通過。Chromium default／legacy 實測訊息框邊緣與留白、具名字框長對話、框外／非左鍵／滾輪無效、逐字顯示阻擋、提示及回呼延遲、多頁逐次推進、鍵盤交替、教學／轉場／上層確認選單阻擋與反覆重開通過。能力值／IV 以自動測試驗證；未測實體手把與觸控。 |
+| UI-04 | 2026-10-27 | `feat(ui): support mouse selection in menu submenus` | 將 10 個共用選單互動案例擴及 MENU_OPTION_SELECT；選單、訊息及既有輸入測試共 53 項通過。typecheck、build:dev、修改檔案 Biome 錯誤級檢查與 diff check 通過。Chromium default／legacy 實測長清單、圖示、長文字展寬、偏移、捲動索引、不可選項目、滾輪邊界、鍵盤交替、教學阻擋，及資料管理／社群／存檔子選單返回通過；社群連結攔截驗證，存檔使用替身欄位且未執行讀取或刪除。延遲、疊層、回呼失敗、keepOpen 與重開以自動測試回歸。未測實體手把與觸控。 |
 
 瀏覽器驗證使用本機開發版選單與訊息情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或修改 lockfile。
