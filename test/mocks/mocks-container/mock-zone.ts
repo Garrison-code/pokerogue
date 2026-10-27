@@ -32,6 +32,22 @@ export class MockZone extends Phaser.Events.EventEmitter implements MockGameObje
     return this;
   }
 
+  public addedToScene(): void {}
+
+  public removedFromScene(): void {}
+
+  public removeFromDisplayList(): this {
+    return this;
+  }
+
+  public addToDisplayList(): this {
+    return this;
+  }
+
+  public disableInteractive(): this {
+    return this;
+  }
+
   public destroy(): void {
     this.active = false;
     this.removeAllListeners();
