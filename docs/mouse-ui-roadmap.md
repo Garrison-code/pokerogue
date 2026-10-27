@@ -57,6 +57,16 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 右鍵、中鍵、移入與滾輪不操作訊息；觸控沿用既有路徑。
 - 轉場、教學與上層介面阻擋背景訊息輸入；事件消耗避免點擊穿透新頁或新選單。
 
+## 已定案：提醒／錯誤彈窗
+
+對應 UI-05 `ALERT_MODAL`；其他 modal 的按鈕與操作方式不在本項範圍。
+
+- 左鍵點彈窗本體關閉，包含文字與框內留白；點擊區域跟隨內容尺寸及位置更新，不新增按鈕或提示文字。
+- 保留既有 `closeDelay`；延遲到期前不能關閉，未提供延遲的錯誤提示持續禁止關閉。
+- 外側暗色遮罩只阻擋背景點擊與滾輪，不關閉彈窗；淡出期間繼續阻擋滑鼠。
+- 非左鍵、移入、滾輪不操作彈窗；觸控與鍵盤沿用既有路徑。上層介面與轉場阻擋背景彈窗輸入。
+- 一次操作最多返回一層；沒有可返回模式時保持顯示。重開、清除與銷毀會清理舊計時器、互動目標及遮罩，舊淡出不影響新彈窗。
+
 ## 已定案：新遊戲的寶可夢選擇頁
 
 對應 `STARTER_SELECT`，主要程式為 `src/ui/handlers/starter-select-ui-handler.ts`。
@@ -97,7 +107,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-02** 是／否與其他確認選單 — `CONFIRM`；包含覆蓋、放棄、切換等確認入口。
 - [x] **UI-03** 訊息／對話推進 — `MESSAGE`；包含戰鬥訊息、提示及共用對話流程。
 - [x] **UI-04** 選單內子選單 — `MENU_OPTION_SELECT`；包含資料管理、社群等共用選項。
-- [ ] **UI-05** 提醒／錯誤彈窗 — `ALERT_MODAL`；現有 modal 點擊一併驗證。
+- [x] **UI-05** 提醒／錯誤彈窗 — `ALERT_MODAL`；現有 modal 點擊一併驗證。
 - [ ] **EX-01** 教學覆蓋層與教學提示；依附各頁，沒有獨立 UiMode。
 
 對照：`base-option-select-ui-handler.ts`、`confirm-ui-handler.ts`、
@@ -181,7 +191,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01、UI-02、UI-03、UI-04；其餘 50 個項目保持待辦。
+目前已完成 UI-01、UI-02、UI-03、UI-04、UI-05；其餘 49 個項目保持待辦。
 
 | 項目 ID | 完成日期 | Commit SHA 或唯一 subject | 驗證結果／限制 |
 | --- | --- | --- | --- |
@@ -189,8 +199,10 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-02 | 2026-10-27 | `feat(ui): support mouse selection in confirmation menus` | 新增 6 個確認選單測試；兩份相關測試共 31 項通過，typecheck、build:dev、修改檔案 Biome、diff check 通過。Chromium default／legacy 實測一般選單開啟確認視窗及返回、預選是／否、先選取再確認、滾輪邊界、鍵盤交替、偏移、確認延遲到期、取消限制／明確允許的取消略過延遲、轉場／教學阻擋及防止同次點擊穿透通過。未修改確認入口的業務邏輯或存檔。 |
 | UI-03 | 2026-10-27 | `feat(ui): advance messages with mouse clicks` | 新增 12 個訊息互動測試，含能力值兩階段與 IV 提示；連同選單及既有輸入測試共 43 項通過。typecheck、build:dev、修改檔案 Biome、diff check 通過。Chromium default／legacy 實測訊息框邊緣與留白、具名字框長對話、框外／非左鍵／滾輪無效、逐字顯示阻擋、提示及回呼延遲、多頁逐次推進、鍵盤交替、教學／轉場／上層確認選單阻擋與反覆重開通過。能力值／IV 以自動測試驗證；未測實體手把與觸控。 |
 | UI-04 | 2026-10-27 | `feat(ui): support mouse selection in menu submenus` | 將 10 個共用選單互動案例擴及 MENU_OPTION_SELECT；選單、訊息及既有輸入測試共 53 項通過。typecheck、build:dev、修改檔案 Biome 錯誤級檢查與 diff check 通過。Chromium default／legacy 實測長清單、圖示、長文字展寬、偏移、捲動索引、不可選項目、滾輪邊界、鍵盤交替、教學阻擋，及資料管理／社群／存檔子選單返回通過；社群連結攔截驗證，存檔使用替身欄位且未執行讀取或刪除。延遲、疊層、回呼失敗、keepOpen 與重開以自動測試回歸。未測實體手把與觸控。 |
+| UI-05 | 2026-10-27 | `feat(ui): dismiss ready alert modals with mouse clicks` | 新增 13 個提醒彈窗互動測試；連同選單、訊息及既有輸入測試共 66 項通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。Chromium default／legacy 實測文字與框內留白點擊、非左鍵／移入／滾輪無效、框外遮罩不關閉及阻擋背景、零／非零延遲、未提供延遲禁止關閉、鍵盤交替、上層確認選單／轉場阻擋、淡出期間阻擋、反覆開關、重開清除舊淡出、直接切換模式清理與沒有返回模式時保持顯示通過。使用本機提示情境，未執行真實存檔錯誤或補償遷移；未測實體手把與觸控。 |
 
-瀏覽器驗證使用本機開發版選單與訊息情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
+瀏覽器驗證使用本機開發版選單、訊息與提醒彈窗情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
+UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。
 pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或修改 lockfile。
 
 新增紀錄時同步更新上方完成數量，避免文字與勾選狀態矛盾。
