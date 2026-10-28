@@ -25,6 +25,12 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 初始規劃 commit 不代表任何頁面的滑鼠操作已完成。
 - CI 驗證須包含 REUSE 授權檢查；新增文件也要提供 SPDX 版權與授權標記，不能只檢查 Biome。
 
+## 階段交付紀錄
+
+- 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
+- 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
+- 目前維持 9 項完成、45 項待辦；EX-01 與 UI-10 起的後續項目仍待個別規劃、實作與驗證。
+
 ## 已確認的方向
 
 - 保留現有鍵盤操作，分階段增加滑鼠操作。
