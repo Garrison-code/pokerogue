@@ -404,6 +404,11 @@ export class DropDown extends Phaser.GameObjects.Container {
     }
   }
 
+  /** Internal hit targets for pages that explicitly enable pointer input. */
+  public getPointerTargets() {
+    return { window: this.window, options: this.options, rowHeight: this.optionHeight + this.optionSpacing };
+  }
+
   getWidth(): number {
     return this.window ? this.window.width : this.width;
   }
