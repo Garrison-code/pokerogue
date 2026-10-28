@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 10 項完成、44 項待辦；EX-01 與 UI-11 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 11 項完成、43 項待辦；EX-01 與 UI-12 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -194,7 +194,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 ## Phase 2：戰鬥、隊伍與戰後流程
 
 - [x] **UI-10** 戰鬥指令 — `COMMAND`；戰鬥、精靈球、寶可夢、逃跑及太晶化入口。
-- [ ] **UI-11** 招式選擇 — `FIGHT`。
+- [x] **UI-11** 招式選擇 — `FIGHT`。
 - [ ] **UI-12** 精靈球選擇 — `BALL`。
 - [ ] **UI-13** 戰鬥目標選擇 — `TARGET_SELECT`；包含雙打與有效目標限制。
 - [ ] **UI-14** 隊伍頁 — `PARTY`；包含換人、查看、放生、道具管理、招式回憶等既有模式與子選單。
@@ -285,3 +285,5 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 新增紀錄時同步更新上方完成數量，避免文字與勾選狀態矛盾。
 
 | UI-10 | 2026-10-29 | `feat(ui): support mouse battle commands` | 新增 9 項互動測試通過；Chromium default／legacy 實測整格選取／確認、精靈球入口、逃跑替身回呼、右鍵 CANCEL、轉場阻擋及滾輪無作用通過。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過。雙出戰游標由替身測試驗證；太晶化可見／資格沿用原判定，未實測實體手把與觸控。新增美術及 UI-10～15 操作決策，其餘項目仍待個別完成。 |
+
+| UI-11 | 2026-10-29 | `feat(ui): support mouse move selection` | 新增 9 項互動測試通過，含太晶化來源、確認失敗、空格／隱藏招式、神秘事件取消限制及清理；Chromium default／legacy 實測兩階段選取、既有確認替身、右鍵返回與滾輪無作用通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。未新增資訊浮層操作，未測實體手把與觸控。 |
