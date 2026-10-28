@@ -17,10 +17,13 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 目標分支：`develop`。
 - 工作分支：`feat/mouse-ui-support`。
 - 起點：當次從遠端取得的最新 `develop`，commit `04c230cd564238ed80f39d27ce7120bdfa37b956`。
-- 後續沿用同一個工作分支與 draft PR，讓使用者逐次檢視。
+- 每個尚未合併的階段沿用同一個工作分支與 draft PR，讓使用者逐次檢視。
+- 使用者可先將目前已完成進度合入 `develop`；這是階段交付，不代表整份 roadmap 或滑鼠操作 UI 已完成，其他待辦維持 `[ ]`。
+- 階段 PR 合併後保留並繼續使用 `feat/mouse-ui-support`；後續開發前先同步合併後的 `develop`，再從此分支另開目標為 `develop` 的 draft PR，不重開已合併的 PR。
 - 每完成一個頁面／追蹤項目，就驗證、更新本文件、建立一個 commit 並 push。
 - 不把多個已完成頁面累積到最後才一起提交；共用前置工作可獨立成一個明確範圍的 commit。
 - 初始規劃 commit 不代表任何頁面的滑鼠操作已完成。
+- CI 驗證須包含 REUSE 授權檢查；新增文件也要提供 SPDX 版權與授權標記，不能只檢查 Biome。
 
 ## 已確認的方向
 
