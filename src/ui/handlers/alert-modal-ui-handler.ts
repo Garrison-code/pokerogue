@@ -160,8 +160,12 @@ export class AlertModalUiHandler extends ModalUiHandler {
   ): void {
     event.stopPropagation();
     const ui = this.getUi();
-    if (pointer.leftButtonDown() && !pointer.wasTouch && ui.canProcessPointerInput(this)) {
-      ui.processInput(Button.ACTION);
+    if (
+      (pointer.leftButtonDown() || pointer.rightButtonDown())
+      && !pointer.wasTouch
+      && ui.canProcessPointerInput(this)
+    ) {
+      ui.processInput(pointer.rightButtonDown() ? Button.CANCEL : Button.ACTION);
     }
   }
 

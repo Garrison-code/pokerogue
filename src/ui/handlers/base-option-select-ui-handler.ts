@@ -47,6 +47,10 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
     return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT, UiMode.TITLE].includes(this.mode);
   }
 
+  private get supportsPointerCancel(): boolean {
+    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT].includes(this.mode);
+  }
+
   protected fullyInitialized: boolean;
 
   /** Used to set the name of {@linkcode optionSelectContainer} */
@@ -427,6 +431,10 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
 
   private onPointerRowDown(row: number, pointer: Phaser.Input.Pointer, event: Phaser.Types.Input.EventData): void {
     event.stopPropagation();
+    if (pointer.rightButtonDown()) {
+      this.processPointerCancel(pointer);
+      return;
+    }
     if (!pointer.leftButtonDown() || pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
       return;
     }
@@ -442,12 +450,24 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   }
 
   private onBackgroundPointerDown(
-    _pointer: Phaser.Input.Pointer,
+    pointer: Phaser.Input.Pointer,
     _x: number,
     _y: number,
     event: Phaser.Types.Input.EventData,
   ): void {
     event.stopPropagation();
+    this.processPointerCancel(pointer);
+  }
+
+  private processPointerCancel(pointer: Phaser.Input.Pointer): void {
+    if (
+      pointer.rightButtonDown()
+      && !pointer.wasTouch
+      && this.supportsPointerCancel
+      && this.getUi().canProcessPointerInput(this)
+    ) {
+      this.getUi().processInput(Button.CANCEL);
+    }
   }
 
   private onPointerWheel(

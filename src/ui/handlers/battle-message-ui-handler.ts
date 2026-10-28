@@ -162,10 +162,15 @@ export class BattleMessageUiHandler extends MessageUiHandler {
     event: Phaser.Types.Input.EventData,
   ): void {
     event.stopPropagation();
+    if (pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
+      return;
+    }
+    if (pointer.rightButtonDown()) {
+      this.getUi().processInput(Button.CANCEL);
+      return;
+    }
     if (
       !pointer.leftButtonDown()
-      || pointer.wasTouch
-      || !this.getUi().canProcessPointerInput(this)
       || !this.pointerPromptReady
       || this.pendingPrompt
       || !this.awaitingActionInput

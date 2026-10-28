@@ -31,24 +31,29 @@ describe("UI - message advancement with a mouse", () => {
     expect(stopPropagation).toHaveBeenCalledOnce();
   }
 
-  it("confirms a ready prompt once through ACTION with the existing sound", () => {
-    const callback = vi.fn();
-    const process = vi.spyOn(game.scene.ui, "processInput");
-    const sound = vi.spyOn(game.scene.ui, "playSelect");
-    handler.showText("Ready", 0, callback, null, true);
-    click();
-    click();
-    expect(callback).toHaveBeenCalledOnce();
-    expect(process).toHaveBeenCalledExactlyOnceWith(Button.ACTION);
-    expect(sound).toHaveBeenCalledOnce();
-  });
+  it.each([1, 2])(
+    "confirms a ready prompt once through the existing input path with the existing sound (buttons %i)",
+    buttons => {
+      pointer.buttons = buttons;
+      const callback = vi.fn();
+      const process = vi.spyOn(game.scene.ui, "processInput");
+      const sound = vi.spyOn(game.scene.ui, "playSelect");
+      handler.showText("Ready", 0, callback, null, true);
+      click();
+      click();
+      expect(callback).toHaveBeenCalledOnce();
+      expect(process).toHaveBeenCalledWith(buttons === 2 ? Button.CANCEL : Button.ACTION);
+      expect(process).toHaveBeenCalledTimes(buttons === 2 ? 2 : 1);
+      expect(sound).toHaveBeenCalledOnce();
+    },
+  );
 
-  it("ignores hover, wheel, non-left buttons and touch", () => {
+  it("ignores hover, wheel, middle buttons and touch", () => {
     const callback = vi.fn();
     handler.showText("Ready", 0, callback, null, true);
     handler["messagePointerZone"].emit("pointerover", pointer);
     handler["messagePointerZone"].emit("wheel", pointer, 0, 120, 0);
-    for (const buttons of [0, 2, 4]) {
+    for (const buttons of [0, 4]) {
       pointer.buttons = buttons;
       click();
     }
@@ -77,7 +82,8 @@ describe("UI - message advancement with a mouse", () => {
     expect(callback).not.toHaveBeenCalled();
   });
 
-  it("preserves the callback delay and prevents repeated scheduling", () => {
+  it.each([1, 2])("preserves the callback delay and prevents repeated scheduling (buttons %i)", buttons => {
+    pointer.buttons = buttons;
     const callback = vi.fn();
     handler.showText("Ready", 0, callback, 500, true);
     const delayed = vi.spyOn(game.scene.time, "delayedCall");
@@ -89,7 +95,8 @@ describe("UI - message advancement with a mouse", () => {
     expect(callback).toHaveBeenCalledOnce();
   });
 
-  it("requires a separate click for a synchronously opened next prompt", () => {
+  it.each([1, 2])("requires a separate click for a synchronously opened next prompt (buttons %i)", buttons => {
+    pointer.buttons = buttons;
     const done = vi.fn();
     handler.showText("First", 0, () => handler.showText("Second", 0, done, null, true), null, true);
     click();
@@ -99,7 +106,8 @@ describe("UI - message advancement with a mouse", () => {
     expect(done).toHaveBeenCalledOnce();
   });
 
-  it("blocks overlays, transitions, tutorials and inactive handlers", async () => {
+  it.each([1, 2])("blocks overlays, transitions, tutorials and inactive handlers (buttons %i)", async buttons => {
+    pointer.buttons = buttons;
     const callback = vi.fn();
     handler.showText("Ready", 0, callback, null, true);
     game.scene.ui["overlayActive"] = true;
@@ -116,7 +124,8 @@ describe("UI - message advancement with a mouse", () => {
     expect(callback).not.toHaveBeenCalled();
   });
 
-  it("does not confirm a new selection opened by a message callback", () => {
+  it.each([1, 2])("does not confirm a new selection opened by a message callback (buttons %i)", buttons => {
+    pointer.buttons = buttons;
     const yes = vi.fn();
     handler.showText(
       "Question",
@@ -149,7 +158,8 @@ describe("UI - message advancement with a mouse", () => {
     }
   });
 
-  it("advances level-up values one stage per click", async () => {
+  it.each([1, 2])("advances level-up values one stage per click (buttons %i)", async buttons => {
+    pointer.buttons = buttons;
     settings.display.showStatsOnLevelUp = true;
     vi.spyOn(game.scene, "getPlayerParty").mockReturnValue([{ stats: [20, 10, 10, 10, 10, 10] }] as never);
     const done = vi.fn();
@@ -164,7 +174,8 @@ describe("UI - message advancement with a mouse", () => {
     expect(handler["levelUpStatsContainer"].visible).toBe(false);
   });
 
-  it("advances an IV prompt once", async () => {
+  it.each([1, 2])("advances an IV prompt once (buttons %i)", async buttons => {
+    pointer.buttons = buttons;
     vi.spyOn(handler, "getIvDescriptor").mockReturnValue("Good");
     const done = vi.fn();
     const result = handler.promptIvs(1, [10, 10, 10, 10, 10, 10]).then(done);
@@ -173,6 +184,21 @@ describe("UI - message advancement with a mouse", () => {
     await result;
     expect(done).toHaveBeenCalledOnce();
     expect(handler["levelUpStatsContainer"].visible).toBe(false);
+  });
+
+  it("delegates right clicks without imposing the left-click prompt readiness restrictions", () => {
+    const callback = vi.fn();
+    handler.showText("Ready", 0, callback, null, true);
+    handler["pointerPromptReady"] = false;
+    handler.pendingPrompt = true;
+    click();
+    expect(callback).not.toHaveBeenCalled();
+    pointer.buttons = 2;
+    const process = vi.spyOn(game.scene.ui, "processInput");
+    click();
+    click();
+    expect(process).toHaveBeenCalledWith(Button.CANCEL);
+    expect(callback).toHaveBeenCalledOnce();
   });
 
   it("removes its input listener on destruction", () => {

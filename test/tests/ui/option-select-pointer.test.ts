@@ -85,7 +85,7 @@ describe("UI - option selection with a mouse", () => {
       expect(selected).toHaveBeenCalledOnce();
     });
 
-    it("ignores hover, right click and unavailable items", async () => {
+    it("ignores hover, middle click and unavailable items", async () => {
       const unavailable = vi.fn();
       await open([
         { label: "First", handler: vi.fn() },
@@ -95,7 +95,7 @@ describe("UI - option selection with a mouse", () => {
       handler["pointerRows"][2].emit("pointerover", pointer);
       expect(handler.getCursor()).toBe(0);
       click(1);
-      pointer.buttons = 2;
+      pointer.buttons = 4;
       click(2);
       expect(handler.getCursor()).toBe(0);
       expect(unavailable).not.toHaveBeenCalled();
@@ -228,6 +228,128 @@ describe("UI - option selection with a mouse", () => {
         expect(otherHandler["pointerRows"]).toHaveLength(0);
       }
     });
+  });
+
+  describe.each([UiMode.OPTION_SELECT, UiMode.MENU_OPTION_SELECT, UiMode.CONFIRM])("right cancel mode %i", mode => {
+    beforeEach(() => {
+      handler = game.scene.ui.handlers[mode] as OptionSelectUiHandler;
+      pointer.buttons = 2;
+    });
+
+    async function openCancelable(config: Partial<OptionSelectModeConfig> = {}, cancelled = vi.fn(() => true)) {
+      if (mode === UiMode.CONFIRM) {
+        await openConfirm({ yesHandler: vi.fn(), noHandler: cancelled, ...config });
+      } else {
+        await open(
+          [
+            { label: "Unavailable", selectable: false, handler: vi.fn() },
+            { label: "Selected", handler: vi.fn() },
+            { label: "Cancel", handler: cancelled, keepOpen: true },
+          ],
+          config,
+        );
+      }
+      return cancelled;
+    }
+
+    it.each(["row", "background"])("routes a right click on the %s through CANCEL exactly once", async target => {
+      const cancelled = await openCancelable();
+      const process = vi.spyOn(game.scene.ui, "processInput");
+      const sound = vi.spyOn(game.scene.ui, "playSelect");
+      const stopPropagation = vi.fn();
+      if (target === "row") {
+        handler["pointerRows"][0].emit("pointerdown", pointer, 0, 0, { stopPropagation });
+      } else {
+        // The headless frame mock has no event emitter; browser tests cover its hit area.
+        handler["onBackgroundPointerDown"](pointer, 0, 0, { stopPropagation });
+      }
+      expect(stopPropagation).toHaveBeenCalledOnce();
+      expect(process).toHaveBeenCalledExactlyOnceWith(Button.CANCEL);
+      expect(cancelled).toHaveBeenCalledOnce();
+      expect(sound).toHaveBeenCalledOnce();
+      expect(absoluteCursor()).toBe(mode === UiMode.CONFIRM ? 1 : 2);
+    });
+
+    it.each([{ blockCancelButton: true }, { inputDelay: 100000 }])(
+      "retains the existing cancel restriction %j",
+      async config => {
+        const cancelled = await openCancelable(config);
+        click(0);
+        expect(cancelled).not.toHaveBeenCalled();
+        expect(handler.active).toBe(true);
+      },
+    );
+
+    it("retains the explicit cancel delay bypass", async () => {
+      const cancelled = await openCancelable({ inputDelay: 100000, canBypassInputDelay: true });
+      const timer = handler["inputDelayTimer"]!;
+      click(0);
+      expect(cancelled).toHaveBeenCalledOnce();
+      expect(timer.hasDispatched).toBe(true);
+      expect(handler["inputDelayTimer"]).toBeNull();
+    });
+
+    it("blocks right cancellation for tutorials, transitions, upper handlers and touch", async () => {
+      const cancelled = await openCancelable();
+      handler.tutorialActive = true;
+      click(0);
+      handler.tutorialActive = false;
+      game.scene.ui["overlayActive"] = true;
+      click(0);
+      game.scene.ui["overlayActive"] = false;
+      pointer.wasTouch = true;
+      click(0);
+      pointer.wasTouch = false;
+      if (mode === UiMode.OPTION_SELECT) {
+        await game.scene.ui.setOverlayMode(UiMode.CONFIRM, { yesHandler: vi.fn(), noHandler: vi.fn() });
+      } else {
+        await game.scene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+          options: [{ label: "Upper", handler: vi.fn() }],
+        });
+      }
+      click(0);
+      expect(cancelled).not.toHaveBeenCalled();
+    });
+  });
+
+  it("keeps TITLE right clicks inactive on rows and frame padding", async () => {
+    handler = game.scene.ui.handlers[UiMode.TITLE] as OptionSelectUiHandler;
+    const cancelled = vi.fn(() => true);
+    await open([{ label: "Last", handler: cancelled }]);
+    pointer.buttons = 2;
+    click(0);
+    handler["onBackgroundPointerDown"](pointer, 0, 0, { stopPropagation: vi.fn() });
+    expect(cancelled).not.toHaveBeenCalled();
+  });
+
+  it("retains failure, keepOpen, sound and scrolled cancel indices for right clicks", async () => {
+    const cancelled = vi.fn().mockReturnValueOnce(false).mockReturnValue(true);
+    await open(
+      [
+        ...Array.from({ length: 5 }, (_, i) => ({ label: `Option ${i}`, handler: vi.fn() })),
+        { label: "Cancel", handler: cancelled, keepOpen: true, noSoundEffects: true },
+      ],
+      { maxOptions: 2 },
+    );
+    pointer.buttons = 2;
+    const error = vi.spyOn(game.scene.ui, "playError");
+    const sound = vi.spyOn(game.scene.ui, "playSelect");
+    click(0);
+    expect(error).toHaveBeenCalledOnce();
+    expect(absoluteCursor()).toBe(5);
+    expect(handler["scrollCursor"]).toBe(4);
+    sound.mockClear();
+    click(0);
+    expect(cancelled).toHaveBeenCalledTimes(2);
+    expect(handler.active).toBe(true);
+    expect(sound).not.toHaveBeenCalled();
+    const oldRow = handler["pointerRows"][0];
+    await game.scene.ui.revertMode();
+    expect(oldRow.listenerCount("pointerdown")).toBe(0);
+    const reopened = vi.fn(() => true);
+    await open([{ label: "Cancel", handler: reopened }]);
+    click(0);
+    expect(reopened).toHaveBeenCalledOnce();
   });
 
   it.each([0, 1])("confirms the existing preselected yes/no item %i", async index => {

@@ -39,35 +39,40 @@ describe("UI - alert modals with a mouse", () => {
     expect(stopPropagation).toHaveBeenCalledOnce();
   }
 
-  it("uses ACTION to close a ready alert once and retains its overlay until the fade ends", async () => {
-    await open(0);
-    unlock();
-    const overlay = handler["overlay"]!;
-    const zone = handler["pointerZone"]!;
-    const action = vi.spyOn(game.scene.ui, "processInput");
-    const revert = vi.spyOn(game.scene.ui, "revertMode");
-    const sound = vi.spyOn(game.scene.ui, "playSelect");
-    const addTween = vi.spyOn(game.scene.tweens, "add");
-    click();
-    zone.emit("pointerdown", pointer, 0, 0, { stopPropagation: vi.fn() });
-    expect(handler.processInput()).toBe(false);
-    expect(action).toHaveBeenCalledExactlyOnceWith(Button.ACTION);
-    expect(revert).toHaveBeenCalledOnce();
-    expect(sound).not.toHaveBeenCalled();
-    expect(game.scene.ui.mode).toBe(UiMode.TITLE);
-    expect(overlay.active).toBe(true);
-    expect(handler["fadingOverlays"].has(overlay)).toBe(true);
-    await vi.waitFor(() =>
-      expect(addTween).toHaveBeenCalledWith(expect.objectContaining({ targets: overlay, alpha: 0 })),
-    );
-    const fade = addTween.mock.calls.at(-1)![0] as Phaser.Types.Tweens.TweenBuilderConfig;
-    (fade.onComplete as () => void)();
-    await vi.waitFor(() => expect(handler["fadingOverlays"].size).toBe(0));
-    expect(overlay.active).toBe(false);
-    expect(overlay.listenerCount("pointerdown")).toBe(0);
-  });
+  it.each([1, 2])(
+    "uses existing input to close a ready alert once and retains its overlay until the fade ends (buttons %i)",
+    async buttons => {
+      pointer.buttons = buttons;
+      await open(0);
+      unlock();
+      const overlay = handler["overlay"]!;
+      const zone = handler["pointerZone"]!;
+      const action = vi.spyOn(game.scene.ui, "processInput");
+      const revert = vi.spyOn(game.scene.ui, "revertMode");
+      const sound = vi.spyOn(game.scene.ui, "playSelect");
+      const addTween = vi.spyOn(game.scene.tweens, "add");
+      click();
+      zone.emit("pointerdown", pointer, 0, 0, { stopPropagation: vi.fn() });
+      expect(handler.processInput()).toBe(false);
+      expect(action).toHaveBeenCalledExactlyOnceWith(buttons === 2 ? Button.CANCEL : Button.ACTION);
+      expect(revert).toHaveBeenCalledOnce();
+      expect(sound).not.toHaveBeenCalled();
+      expect(game.scene.ui.mode).toBe(UiMode.TITLE);
+      expect(overlay.active).toBe(true);
+      expect(handler["fadingOverlays"].has(overlay)).toBe(true);
+      await vi.waitFor(() =>
+        expect(addTween).toHaveBeenCalledWith(expect.objectContaining({ targets: overlay, alpha: 0 })),
+      );
+      const fade = addTween.mock.calls.at(-1)![0] as Phaser.Types.Tweens.TweenBuilderConfig;
+      (fade.onComplete as () => void)();
+      await vi.waitFor(() => expect(handler["fadingOverlays"].size).toBe(0));
+      expect(overlay.active).toBe(false);
+      expect(overlay.listenerCount("pointerdown")).toBe(0);
+    },
+  );
 
-  it("does not bypass the close delay", async () => {
+  it.each([1, 2])("does not bypass the close delay (buttons %i)", async buttons => {
+    pointer.buttons = buttons;
     await open(5000);
     click();
     expect(game.scene.ui.mode).toBe(UiMode.ALERT_MODAL);
@@ -76,7 +81,8 @@ describe("UI - alert modals with a mouse", () => {
     expect(game.scene.ui.mode).toBe(UiMode.TITLE);
   });
 
-  it("keeps alerts without a close delay unclosable by mouse or keyboard", async () => {
+  it.each([1, 2])("keeps alerts without a close delay unclosable by mouse or keyboard (buttons %i)", async buttons => {
+    pointer.buttons = buttons;
     await open();
     click();
     expect(game.scene.ui.processInput(Button.ACTION)).toBe(false);
@@ -85,7 +91,7 @@ describe("UI - alert modals with a mouse", () => {
     expect(game.scene.ui.mode).toBe(UiMode.ALERT_MODAL);
   });
 
-  it("ignores hover, wheel, non-left buttons and touch", async () => {
+  it("ignores hover, wheel, middle buttons and touch", async () => {
     await open(0);
     unlock();
     const zone = handler["pointerZone"]!;
@@ -93,7 +99,7 @@ describe("UI - alert modals with a mouse", () => {
     zone.emit("pointerover", pointer);
     zone.emit("wheel", pointer, 0, 120, 0, { stopPropagation });
     expect(stopPropagation).toHaveBeenCalledOnce();
-    for (const buttons of [0, 2, 4]) {
+    for (const buttons of [0, 4]) {
       pointer.buttons = buttons;
       click();
     }
@@ -103,22 +109,27 @@ describe("UI - alert modals with a mouse", () => {
     expect(game.scene.ui.mode).toBe(UiMode.ALERT_MODAL);
   });
 
-  it("consumes outside clicks and wheel without closing, including during the closing fade", async () => {
-    await open(0);
-    unlock();
-    const overlay = handler["overlay"]!;
-    const stopPropagation = vi.fn();
-    overlay.emit("pointerdown", pointer, 0, 0, { stopPropagation });
-    overlay.emit("wheel", pointer, 0, 120, 0, { stopPropagation });
-    expect(stopPropagation).toHaveBeenCalledTimes(2);
-    expect(game.scene.ui.mode).toBe(UiMode.ALERT_MODAL);
-    click();
-    overlay.emit("pointerdown", pointer, 0, 0, { stopPropagation });
-    expect(stopPropagation).toHaveBeenCalledTimes(3);
-    expect(game.scene.ui.mode).toBe(UiMode.TITLE);
-  });
+  it.each([1, 2])(
+    "consumes outside clicks and wheel without closing, including during the closing fade (buttons %i)",
+    async buttons => {
+      pointer.buttons = buttons;
+      await open(0);
+      unlock();
+      const overlay = handler["overlay"]!;
+      const stopPropagation = vi.fn();
+      overlay.emit("pointerdown", pointer, 0, 0, { stopPropagation });
+      overlay.emit("wheel", pointer, 0, 120, 0, { stopPropagation });
+      expect(stopPropagation).toHaveBeenCalledTimes(2);
+      expect(game.scene.ui.mode).toBe(UiMode.ALERT_MODAL);
+      click();
+      overlay.emit("pointerdown", pointer, 0, 0, { stopPropagation });
+      expect(stopPropagation).toHaveBeenCalledTimes(3);
+      expect(game.scene.ui.mode).toBe(UiMode.TITLE);
+    },
+  );
 
-  it("blocks inactive handlers, transitions and upper overlays", async () => {
+  it.each([1, 2])("blocks inactive handlers, transitions and upper overlays (buttons %i)", async buttons => {
+    pointer.buttons = buttons;
     await open(0);
     unlock();
     handler.active = false;
@@ -135,7 +146,8 @@ describe("UI - alert modals with a mouse", () => {
     expect(game.scene.ui.mode).toBe(UiMode.TITLE);
   });
 
-  it("does not dismiss a standalone alert with no mode to return to", async () => {
+  it.each([1, 2])("does not dismiss a standalone alert with no mode to return to (buttons %i)", async buttons => {
+    pointer.buttons = buttons;
     game.scene.ui.resetModeChain();
     await game.scene.ui.setMode(UiMode.ALERT_MODAL, "Standalone", 0);
     unlock();
@@ -146,21 +158,25 @@ describe("UI - alert modals with a mouse", () => {
     expect(handler["overlay"]!.active).toBe(true);
   });
 
-  it("cancels old delays and ignores stale timer callbacks after reopening", async () => {
-    await open(5000);
-    const timer = handler["closeDelayTimer"]!;
-    const zone = handler["pointerZone"]!;
-    const overlay = handler["overlay"]!;
-    await game.scene.ui.revertMode();
-    expect(timer.hasDispatched).toBe(true);
-    expect(zone.listenerCount("pointerdown")).toBe(0);
-    expect(overlay.active).toBe(false);
-    await open();
-    timer.callback();
-    click();
-    expect(game.scene.ui.mode).toBe(UiMode.ALERT_MODAL);
-    expect(handler["allowClosing"]).toBe(false);
-  });
+  it.each([1, 2])(
+    "cancels old delays and ignores stale timer callbacks after reopening (buttons %i)",
+    async buttons => {
+      pointer.buttons = buttons;
+      await open(5000);
+      const timer = handler["closeDelayTimer"]!;
+      const zone = handler["pointerZone"]!;
+      const overlay = handler["overlay"]!;
+      await game.scene.ui.revertMode();
+      expect(timer.hasDispatched).toBe(true);
+      expect(zone.listenerCount("pointerdown")).toBe(0);
+      expect(overlay.active).toBe(false);
+      await open();
+      timer.callback();
+      click();
+      expect(game.scene.ui.mode).toBe(UiMode.ALERT_MODAL);
+      expect(handler["allowClosing"]).toBe(false);
+    },
+  );
 
   it("cleans up when switching directly to another mode", async () => {
     await open(5000);
@@ -193,16 +209,24 @@ describe("UI - alert modals with a mouse", () => {
     expect(game.scene.ui.mode).toBe(UiMode.ALERT_MODAL);
   });
 
-  it("supports keyboard closing and repeated reopen without accumulating handlers", async () => {
-    for (let index = 0; index < 3; index++) {
-      await open(0);
-      unlock();
-      expect(handler["pointerZone"]!.listenerCount("pointerdown")).toBe(1);
-      expect(game.scene.ui.processInput(Button.CANCEL)).toBe(true);
-      expect(handler["pointerZone"]).toBeNull();
-      expect(game.scene.ui.mode).toBe(UiMode.TITLE);
-    }
-  });
+  it.each([1, 2])(
+    "supports keyboard closing and repeated reopen without accumulating handlers (buttons %i)",
+    async buttons => {
+      pointer.buttons = buttons;
+      for (let index = 0; index < 3; index++) {
+        await open(0);
+        unlock();
+        expect(handler["pointerZone"]!.listenerCount("pointerdown")).toBe(1);
+        if (index % 2 === 0) {
+          click();
+        } else {
+          expect(game.scene.ui.processInput(Button.CANCEL)).toBe(true);
+        }
+        expect(handler["pointerZone"]).toBeNull();
+        expect(game.scene.ui.mode).toBe(UiMode.TITLE);
+      }
+    },
+  );
 
   it("destroys the pointer target, delay and overlay", async () => {
     await open(5000);
