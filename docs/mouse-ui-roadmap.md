@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 11 項完成、43 項待辦；EX-01 與 UI-12 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 12 項完成、42 項待辦；EX-01 與 UI-13 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -195,7 +195,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - [x] **UI-10** 戰鬥指令 — `COMMAND`；戰鬥、精靈球、寶可夢、逃跑及太晶化入口。
 - [x] **UI-11** 招式選擇 — `FIGHT`。
-- [ ] **UI-12** 精靈球選擇 — `BALL`。
+- [x] **UI-12** 精靈球選擇 — `BALL`。
 - [ ] **UI-13** 戰鬥目標選擇 — `TARGET_SELECT`；包含雙打與有效目標限制。
 - [ ] **UI-14** 隊伍頁 — `PARTY`；包含換人、查看、放生、道具管理、招式回憶等既有模式與子選單。
 - [ ] **UI-15** 寶可夢詳細資料 — `SUMMARY`；包含分頁與招式學習／替換等既有用途。
@@ -261,7 +261,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01、UI-02、UI-03、UI-04、UI-05、UI-06、UI-07、UI-08、UI-09；其餘 45 個項目保持待辦。
+目前已完成 UI-01～UI-12；其餘 42 個項目保持待辦。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -277,13 +277,12 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-08 | 2026-10-28 | `feat(ui): support mouse controls for challenge selection` | 新增 14 個挑戰互動測試；連同 UI-01～UI-07 及既有輸入回歸共 105 項通過。typecheck、build:dev、修改檔案 Biome 錯誤級檢查與 diff check 通過。Chromium default／legacy 實測列選取不確認、箭頭調整、單屬性圖示、分類與導覽圖示、重設、開始兩階段與禁用狀態、右鍵兩階段取消及瀏覽器選單阻擋、長清單逐列滾輪與邊界、鍵盤交替、上層確認／轉場阻擋及反覆開關通過。空分類、數值上下限、觸控忽略與銷毀由自動測試驗證；長列表與開始／返回使用替身，未啟動真實遊戲。未測實體手把與觸控；EX-01 未實作。 |
 | UI-01～05（右鍵補強） | 2026-10-28 | `feat(ui): map right clicks to existing cancel input` | 將右鍵完全沿用既有 CANCEL 定為適用所有現有／後續 UI 與 EX 項目的全域規則，並補齊 UI-01～05。新增 36 個右鍵與左右鍵共用案例，連同 UI-06～08 及鍵盤／模擬手把／觸控輸入回歸共 141 項測試通過；typecheck、build:dev、修改檔案 Biome 與 diff check 通過。Chromium default／legacy 實測選單列（含不可選列）／框內留白右鍵、框外無效、取消限制、延遲及明確允許的略過、鍵盤交替、上層介面／教學／轉場阻擋、確認選單否回呼、訊息逐頁推進與不套用左鍵提示限制、彈窗延遲／禁止關閉、遮罩阻擋、連點及反覆開關通過；UI-06 維持右鍵無作用。使用本機替身回呼，未操作真實存檔或資料；未測實體手把與觸控。原完成數與其餘 46 項待辦不變。 |
 | UI-09 | 2026-10-28 | `feat(ui): support mouse starter selection` | 新增 41 個互動測試，連同 UI-01～08 與鍵盤／模擬手把／觸控輸入回歸共 182 項通過；typecheck、build:dev、修改檔案 Biome 與 diff check 通過。Chromium default／legacy 實測格子兩階段點選、子選單返回、篩選展開／選取／背景關閉與滾輪隔離、長列表逐列連續捲動及物種身分、隊伍加入／選取、隨機加入、開始確認與取消、轉場／教學阻擋、IV 右鍵退出、最後隊員取消及重開清理通過；六個資料切換說明入口以替身輸入逐一驗證點擊範圍與路由。自動測試另涵蓋六隻上限、無合法隨機結果、挑戰限制、開始單次回呼、素材過期／失敗及輸入鎖定。存檔與啟動使用替身回呼，未操作真實資料；教學、重新命名及圖鑑詳細頁仍按後續項目處理，未測實體手把與觸控。 |
+| UI-10 | 2026-10-29 | `feat(ui): support mouse battle commands` | 新增 9 項互動測試通過；Chromium default／legacy 實測整格選取／確認、精靈球入口、逃跑替身回呼、右鍵 CANCEL、轉場阻擋及滾輪無作用通過。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過。雙出戰游標由替身測試驗證；太晶化可見／資格沿用原判定，未實測實體手把與觸控。新增美術及 UI-10～15 操作決策，其餘項目仍待個別完成。 |
+| UI-11 | 2026-10-29 | `feat(ui): support mouse move selection` | 新增 9 項互動測試通過，含太晶化來源、確認失敗、空格／隱藏招式、神秘事件取消限制及清理；Chromium default／legacy 實測兩階段選取、既有確認替身、右鍵返回與滾輪無作用通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。未新增資訊浮層操作，未測實體手把與觸控。 |
+| UI-12 | 2026-10-29 | `feat(ui): support mouse ball selection` | 新增 9 項互動測試通過，涵蓋選取／確認、零數量錯誤、命令失敗、滾輪邊界、取消與重開；Chromium default／legacy 實測整列範圍、數量、取消列、逐列滾輪與右鍵返回通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。捕捉命令使用替身，未消耗真實資料，未測實體手把與觸控。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。
 pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或修改 lockfile。
 
 新增紀錄時同步更新上方完成數量，避免文字與勾選狀態矛盾。
-
-| UI-10 | 2026-10-29 | `feat(ui): support mouse battle commands` | 新增 9 項互動測試通過；Chromium default／legacy 實測整格選取／確認、精靈球入口、逃跑替身回呼、右鍵 CANCEL、轉場阻擋及滾輪無作用通過。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過。雙出戰游標由替身測試驗證；太晶化可見／資格沿用原判定，未實測實體手把與觸控。新增美術及 UI-10～15 操作決策，其餘項目仍待個別完成。 |
-
-| UI-11 | 2026-10-29 | `feat(ui): support mouse move selection` | 新增 9 項互動測試通過，含太晶化來源、確認失敗、空格／隱藏招式、神秘事件取消限制及清理；Chromium default／legacy 實測兩階段選取、既有確認替身、右鍵返回與滾輪無作用通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。未新增資訊浮層操作，未測實體手把與觸控。 |

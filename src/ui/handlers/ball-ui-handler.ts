@@ -7,11 +7,13 @@ import { UiMode } from "#enums/ui-mode";
 import type { CommandPhase } from "#phases/command-phase";
 import { addTextObject, getTextStyleOptions } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
+import { UiPointerTargets } from "#ui/ui-pointer-targets";
 import { addWindow } from "#ui/ui-theme";
 import { fixedInt } from "#utils/common";
 import i18next from "i18next";
 
 export class BallUiHandler extends UiHandler {
+  private pointerTargets: UiPointerTargets | null = null;
   private pokeballSelectContainer: Phaser.GameObjects.Container;
   private pokeballSelectBg: Phaser.GameObjects.NineSlice;
   private optionsText: Phaser.GameObjects.Text;
@@ -84,8 +86,57 @@ export class BallUiHandler extends UiHandler {
     this.updateCounts();
     this.pokeballSelectContainer.setVisible(true);
     this.setCursor(this.cursor);
+    this.createPointerTargets();
 
     return true;
+  }
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const bounds = () => ({
+      x: this.pokeballSelectBg.x,
+      y: this.pokeballSelectBg.y - this.pokeballSelectBg.height,
+      width: this.pokeballSelectBg.width,
+      height: this.pokeballSelectBg.height,
+    });
+    const wheel = (direction: number) => {
+      const count = Object.keys(globalScene.pokeballCounts).length;
+      const next = Math.max(0, Math.min(count, this.cursor + direction));
+      if (next !== this.cursor && this.setCursor(next)) {
+        this.getUi().playSelect();
+      }
+    };
+    targets.add(this.pokeballSelectContainer, "ball-panel", bounds, undefined, wheel);
+    const count = Object.keys(globalScene.pokeballCounts).length;
+    for (let index = 0; index <= count; index++) {
+      targets.add(
+        this.pokeballSelectContainer,
+        `ball-${index}`,
+        () => ({
+          x: bounds().x + 4,
+          y: bounds().y + 6 + index * 96 * this.scale,
+          width: bounds().width - 8,
+          height: 96 * this.scale,
+        }),
+        () => {
+          if (index === this.cursor) {
+            this.getUi().processInput(Button.ACTION);
+          } else if (this.setCursor(index)) {
+            this.getUi().playSelect();
+          }
+        },
+        wheel,
+      );
+    }
+  }
+
+  override destroy(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
+    this.stopPokeballWiggle();
+    super.destroy();
   }
 
   processInput(button: Button): boolean {
@@ -206,6 +257,8 @@ export class BallUiHandler extends UiHandler {
   }
 
   clear() {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
     super.clear();
     this.stopPokeballWiggle();
     this.pokeballSelectContainer.setVisible(false);
