@@ -1,0 +1,101 @@
+# SPDX-FileCopyrightText: 2026 Garrison-code
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Check setup or deploy the existing production stack
+        type: choice
+        options: [check, deploy]
+        default: check
+      source_repository:
+        description: Automatic publisher repository (leave empty for a manual request)
+        type: string
+        default: ''
+      source_sha:
+        description: Automatic publisher commit
+        type: string
+        default: ''
+      source_run_id:
+        description: Automatic publisher workflow run
+        type: string
+        default: ''
+      resume:
+        description: Manually acknowledge a failure/unfinished deployment and retry
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokerogue-production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy-production:
+    if: >-
+      github.repository == 'Garrison-code/pokerogue' &&
+      github.ref == 'refs/heads/beta' &&
+      (inputs.mode == 'check' || inputs.mode == 'deploy')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      actions: write
+      deployments: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PROD_DEPLOY_GH_TOKEN: ${{ secrets.PROD_DEPLOY_GH_TOKEN }}
+      DEPLOY_MODE: ${{ inputs.mode }}
+      SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      RESUME: ${{ inputs.resume }}
+      PROD_AUTO_DEPLOY_ENABLED: ${{ vars.PROD_AUTO_DEPLOY_ENABLED }}
+      COOLIFY_READ_TOKEN: ${{ secrets.COOLIFY_READ_TOKEN }}
+      COOLIFY_DEPLOY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+      PROD_SMOKE_USERNAME: ${{ secrets.PROD_SMOKE_USERNAME }}
+      PROD_SMOKE_PASSWORD: ${{ secrets.PROD_SMOKE_PASSWORD }}
+      PROD_SMOKE_CLIENT_ID: ${{ vars.PROD_SMOKE_CLIENT_ID }}
+    steps:
+      - name: Check out only deployment tooling
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/scripts/
+            container/check_static.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Validate publications, deduplicate and check the failure latch
+        id: prepare
+        run: python3 .github/scripts/prod_deploy.py prepare
+      - name: Join Tailscale with short-lived OIDC identity
+        if: steps.prepare.outputs.run == 'true'
+        uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf # v4
+        with:
+          oauth-client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
+          tags: tag:ci-pokerogue-prod
+          ping: 100.64.67.54
+      - name: Check or deploy and verify the production service over private ingress
+        if: steps.prepare.outputs.run == 'true'
+        run: python3 .github/scripts/prod_deploy.py execute
+      - name: Upload deployment report without credentials or save contents
+        if: always() && steps.checkout.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-deployment-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-deploy-report.json
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Record success or stop subsequent automatic deployments
+        if: always() && steps.checkout.outcome == 'success'
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: python3 .github/scripts/prod_deploy.py finalize
