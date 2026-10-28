@@ -150,6 +150,7 @@ function findClosestStarterIndex(y: number, teamSize = 6): number {
 }
 
 export class StarterSelectUiHandler extends MessageUiHandler {
+  private starterGridContainer: Phaser.GameObjects.Container;
   private starterSelectContainer: Phaser.GameObjects.Container;
 
   private starterContainers: StarterContainer[] = [];
@@ -221,6 +222,320 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private allowTera: boolean;
   private oldCursor = -1;
 
+  private pointerZones: Phaser.GameObjects.Zone[] = [];
+  private pointerCleanups: (() => void)[] = [];
+  private pointerGridId: StarterSpeciesId | null = null;
+  private pointerSession = 0;
+
+  private gridHasFocus(): boolean {
+    return (
+      !this.filterMode && !this.partyCursorObj.visible && !this.startCursorObj.visible && !this.randomCursorObj.visible
+    );
+  }
+
+  private focusPointerArea(area: "grid" | "party" | "start" | "random" | "filter"): void {
+    this.stopIconAnimation(this.cursor);
+    this.filterMode = area === "filter";
+    this.filterBar.cursorObj.setVisible(this.filterMode);
+    this.cursorObj.setVisible(area === "grid");
+    this.partyCursorObj.setVisible(area === "party");
+    this.startCursorObj.setVisible(area === "start");
+    this.randomCursorObj.setVisible(area === "random");
+    this.updateInstructions();
+  }
+
+  private handlePointerDown(pointer: Phaser.Input.Pointer, action: () => void): void {
+    if (pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
+      return;
+    }
+    if (pointer.rightButtonDown()) {
+      this.getUi().processInput(Button.CANCEL);
+    } else if (pointer.leftButtonDown() && !this.blockInput) {
+      action();
+    }
+  }
+
+  private closePointerDropDown(): boolean {
+    if (!this.filterBar.openDropDown) {
+      return false;
+    }
+    this.filterBar.hideDropDowns();
+    return true;
+  }
+
+  private scrollPointerGrid(dy: number): void {
+    if (!dy || this.blockInput || this.filterBar.openDropDown) {
+      return;
+    }
+    const max = Math.max(0, Math.ceil(this.filteredStarterIds.length / COLUMNS) - ROWS);
+    const next = Phaser.Math.Clamp(this.scrollCursor + Math.sign(dy), 0, max);
+    if (next === this.scrollCursor) {
+      return;
+    }
+    this.stopIconAnimation(this.cursor);
+    this.scrollCursor = next;
+    this.updateScroll();
+    this.restorePointerGridSelection();
+  }
+
+  private restorePointerGridSelection(): void {
+    const index = this.pointerGridId === null ? -1 : this.filteredStarterIds.indexOf(this.pointerGridId);
+    if (index < 0) {
+      this.pointerGridId = null;
+      if (!this.partyCursorObj.visible) {
+        this.setNoStarter();
+      }
+    }
+    if (!this.gridHasFocus()) {
+      return;
+    }
+    const relative = index - this.scrollCursor * COLUMNS;
+    this.cursorObj.setVisible(index >= 0 && relative >= 0 && relative < ROWS * COLUMNS);
+    if (this.cursorObj.visible) {
+      this.cursor = relative;
+      const pos = calcStarterContainerPosition(relative);
+      this.cursorObj.setPosition(pos.x - 1, pos.y + 1);
+      if (getStarterData(this.pointerGridId!).dexEntry.caughtAttr) {
+        this.startIconAnimation(relative);
+      }
+    }
+    if (index < 0) {
+      this.instructionsContainer.hideInstructions();
+    }
+  }
+
+  private setupPointerInput(): void {
+    this.clearPointerInput();
+    type Rect = { x: number; y: number; width: number; height: number; visible?: boolean };
+    const add = (
+      parent: Phaser.GameObjects.Container,
+      rect: () => Rect,
+      action: () => void,
+      wheel?: (dy: number) => void,
+    ) => {
+      const zone = globalScene.add.zone(0, 0, 1, 1).setOrigin(0).setInteractive();
+      parent.add(zone);
+      zone.setName(`starter-pointer-${this.pointerZones.length}`);
+      this.pointerZones.push(zone);
+      const sync = () => {
+        const r = rect();
+        zone
+          .setPosition(r.x, r.y)
+          .setSize(r.width, r.height)
+          .setVisible(r.visible !== false);
+        if (zone.input) {
+          zone.input.hitArea.setTo(0, 0, r.width, r.height);
+        }
+      };
+      sync();
+      globalScene.events.on(Phaser.Scenes.Events.PRE_UPDATE, sync);
+      this.pointerCleanups.push(() => globalScene.events.off(Phaser.Scenes.Events.PRE_UPDATE, sync));
+      zone.on(
+        "pointerdown",
+        (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+          event.stopPropagation();
+          sync();
+          if (zone.visible) {
+            this.handlePointerDown(pointer, action);
+          }
+        },
+      );
+      zone.on(
+        "wheel",
+        (pointer: Phaser.Input.Pointer, _dx: number, dy: number, _dz: number, event: Phaser.Types.Input.EventData) => {
+          event.stopPropagation();
+          sync();
+          if (zone.visible && !pointer.wasTouch && this.getUi().canProcessPointerInput(this) && !this.blockInput) {
+            wheel?.(dy);
+          }
+        },
+      );
+      return zone;
+    };
+    const page = add(
+      this.starterSelectContainer,
+      () => ({ x: 0, y: 0, width: 320, height: 180 }),
+      () => this.closePointerDropDown(),
+    );
+    this.starterSelectContainer.sendToBack(page);
+    const grid = this.starterGridContainer;
+    add(
+      grid,
+      () => ({ x: 0, y: 12, width: 168, height: 155 }),
+      () => this.closePointerDropDown(),
+      dy => this.scrollPointerGrid(dy),
+    );
+    this.starterContainers.forEach((container, index) => {
+      add(
+        grid,
+        () => ({ x: container.x, y: container.y, width: 18, height: 17, visible: container.visible }),
+        () => {
+          if (this.closePointerDropDown()) {
+            return;
+          }
+          const id = this.filteredStarterIds[this.scrollCursor * COLUMNS + index];
+          if (id === undefined) {
+            return;
+          }
+          if (this.gridHasFocus() && this.pointerGridId === id) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.focusPointerArea("grid");
+            this.setCursor(index);
+            this.getUi().playSelect();
+          }
+        },
+        dy => this.scrollPointerGrid(dy),
+      );
+    });
+    this.partyIcons.forEach((icon, index) => {
+      add(
+        this.partyColumn,
+        () => ({ x: teamWindowX + 2, y: icon.y, width: 30, height: 15 }),
+        () => {
+          if (this.closePointerDropDown() || index >= this.partyStarterIds.length) {
+            return;
+          }
+          if (this.partyCursorObj.visible && this.partyIconsCursorIndex === index) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.focusPointerArea("party");
+            this.partyIconsCursorIndex = index;
+            this.movePartyIconsCursor(index);
+            this.updateInstructions();
+            this.getUi().playSelect();
+          }
+        },
+      );
+    });
+    for (const [area, cursor] of [
+      ["random", this.randomCursorObj],
+      ["start", this.startCursorObj],
+    ] as const) {
+      add(
+        this.partyColumn,
+        () => ({ x: cursor.x, y: cursor.y, width: cursor.width, height: cursor.height }),
+        () => {
+          if (this.closePointerDropDown()) {
+            return;
+          }
+          if (cursor.visible) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.focusPointerArea(area);
+            this.setNoStarter();
+            this.getUi().playSelect();
+          }
+        },
+      );
+    }
+    for (const { icon, label, button } of this.instructionsContainer.getPointerTargets()) {
+      add(
+        this.starterSelectContainer,
+        () => ({
+          x: icon.x,
+          y: icon.y,
+          width: label.x + label.displayWidth - icon.x,
+          height: Math.max(icon.frame ? icon.displayHeight : 0, label.displayHeight, 8),
+          visible: icon.visible && label.visible,
+        }),
+        () => {
+          if (!this.closePointerDropDown()) {
+            this.getUi().processInput(button);
+          }
+        },
+      );
+    }
+    for (const { label, index, dropDown } of this.filterBar.getPointerTargets()) {
+      add(
+        this.filterBar,
+        () => ({ x: label.x - 3, y: 0, width: label.displayWidth + 6, height: this.filterBar.height }),
+        () => {
+          const same = this.filterMode && this.filterBarCursor === index;
+          const open = this.filterBar.openDropDown;
+          this.filterBar.hideDropDowns();
+          this.focusPointerArea("filter");
+          this.setCursor(index);
+          if (!same || !open) {
+            this.getUi().processInput(Button.ACTION);
+          }
+        },
+      );
+      const targets = dropDown.getPointerTargets();
+      add(
+        dropDown,
+        () => ({ x: 0, y: 0, width: targets.window.width, height: targets.window.height }),
+        () => {},
+        dy => {
+          if (dy) {
+            const next = Phaser.Math.Clamp(dropDown.cursor + Math.sign(dy), 0, dropDown.options.length - 1);
+            if (next !== dropDown.cursor) {
+              dropDown.setCursor(next);
+              this.getUi().playSelect();
+            }
+          }
+        },
+      );
+      targets.options.forEach((option, optionIndex) => {
+        add(
+          dropDown,
+          () => ({
+            x: 0,
+            y: option.y,
+            width: targets.window.width,
+            height: targets.rowHeight,
+            visible: option.visible,
+          }),
+          () => {
+            if (dropDown.cursor === optionIndex) {
+              this.getUi().processInput(Button.ACTION);
+            } else {
+              dropDown.setCursor(optionIndex);
+              this.getUi().playSelect();
+            }
+          },
+          dy => {
+            if (dy) {
+              const next = Phaser.Math.Clamp(dropDown.cursor + Math.sign(dy), 0, dropDown.options.length - 1);
+              if (next !== dropDown.cursor) {
+                dropDown.setCursor(next);
+                this.getUi().playSelect();
+              }
+            }
+          },
+        );
+      });
+    }
+    // Existing summary tooltip targets sit above the page background. Give their
+    // clicks the same background/CANCEL behavior without replacing their hover.
+    const visit = (object: Phaser.GameObjects.GameObject) => {
+      if (object.input) {
+        const down = (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+          event.stopPropagation();
+          this.handlePointerDown(pointer, () => this.closePointerDropDown());
+        };
+        object.on("pointerdown", down);
+        this.pointerCleanups.push(() => object.off("pointerdown", down));
+      }
+      if (object instanceof Phaser.GameObjects.Container) {
+        object.list.forEach(visit);
+      }
+    };
+    visit(this.starterSummary);
+    this.starterSelectContainer.bringToTop(this.filterBar);
+  }
+
+  private clearPointerInput(): void {
+    for (const cleanup of this.pointerCleanups) {
+      cleanup();
+    }
+    this.pointerCleanups = [];
+    for (const zone of this.pointerZones) {
+      zone.destroy();
+    }
+    this.pointerZones = [];
+  }
+
   public override setup(): void {
     const ui = this.getUi();
 
@@ -252,6 +567,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.partyColumn = this.setupPartyColumn();
 
     const starterBoxContainer = globalScene.add.container(speciesContainerX + 6, 9); //115
+    this.starterGridContainer = starterBoxContainer;
 
     this.starterSelectScrollBar = new ScrollBar(161, 12, 5, 155, 9);
 
@@ -584,6 +900,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     if (args.length > 0 && args[0] instanceof Function) {
       super.show(args);
+      ++this.pointerSession;
       this.starterSelectCallback = args[0] as StarterSelectCallback;
 
       this.starterSelectContainer.setVisible(true);
@@ -607,11 +924,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.resetFilters();
       this.updateStarters();
 
+      this.filterBar.hideDropDowns();
+      this.partyCursorObj.setVisible(false);
+      this.startCursorObj.setVisible(false);
+      this.randomCursorObj.setVisible(false);
+      this.cursorObj.setVisible(true);
       this.setFilterMode(false);
       this.filterBarCursor = 0;
       this.setCursor(0);
       this.tryUpdateValue(0);
 
+      this.setupPointerInput();
       handleTutorial(Tutorial.STARTER_SELECT);
 
       return true;
@@ -1111,14 +1434,26 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         const moveset = this.starterMoveset?.slice(0) as StarterMoveset;
         const starterCost = globalScene.gameData.getSpeciesStarterValue(randomStarterId);
         const speciesForm = speciesDataRegistry.getPokemonSpeciesForm(randomStarterId, props.formIndex);
-        speciesForm.loadAssets(props.female, props.formIndex, props.shiny, props.variant, true).then(() => {
-          if (this.tryUpdateValue(starterCost, true)) {
-            this.addToParty(randomStarterId, dexAttr, abilityIndex, natureIndex, moveset, teraType);
-            this.getUi().playSelect();
-          }
+        const session = this.pointerSession;
+        speciesForm
+          .loadAssets(props.female, props.formIndex, props.shiny, props.variant, true)
+          .then(() => {
+            if (session !== this.pointerSession) {
+              return;
+            }
+            if (this.tryUpdateValue(starterCost, true)) {
+              this.addToParty(randomStarterId, dexAttr, abilityIndex, natureIndex, moveset, teraType);
+              this.getUi().playSelect();
+            }
 
-          this.blockInput = false;
-        });
+            this.blockInput = false;
+          })
+          .catch(() => {
+            if (session === this.pointerSession) {
+              this.blockInput = false;
+              this.getUi().playError();
+            }
+          });
         break;
       }
       case Button.UP:
@@ -1573,6 +1908,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   /** Opens the menu and populates its options. */
   private openPokemonMenu(): void {
+    // Keyboard confirmation after mouse scrolling still acts on the remembered
+    // species. Reveal it before existing menu callbacks use the grid cursor.
+    if (this.gridHasFocus() && this.pointerGridId !== null && !this.cursorObj.visible) {
+      const index = this.filteredStarterIds.indexOf(this.pointerGridId);
+      if (index >= 0) {
+        const max = Math.max(0, Math.ceil(this.filteredStarterIds.length / COLUMNS) - ROWS);
+        this.scrollCursor = Math.min(Math.floor(index / COLUMNS), max);
+        this.updateScroll();
+        this.restorePointerGridSelection();
+      }
+    }
     const ui = this.getUi();
     const options: OptionSelectItem[] = [];
 
@@ -1588,16 +1934,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.originalStarterPreferences[this.lastStarterId] ??= {};
     const originalStarterPreferences = this.originalStarterPreferences[this.lastStarterId]!;
 
-    // this gets the correct pokemon cursor depending on whether you're in the starter screen or the party icons
-    if (this.partyCursorObj.visible) {
-      // if species is in filtered starters, get the starter container from the filtered starters, it can be undefined if the species is not in the filtered starters
-      starterContainer =
-        this.starterContainers[
-          this.starterContainers.findIndex(container => container.species.speciesId === this.lastStarterId)
-        ];
-    } else {
-      starterContainer = this.starterContainers[this.cursor];
-    }
+    // Mouse scrolling can leave the selected species outside the visible grid.
+    starterContainer = this.starterContainers.find(
+      container => container.visible && container.species.speciesId === this.lastStarterId,
+    )!;
 
     const [isDupe, removeIndex]: [boolean, number] = this.isInParty(this.lastStarterId);
 
@@ -2076,14 +2416,18 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           const species = speciesDataRegistry.getSpecies(this.lastStarterId);
           ui.setOverlayMode(UiMode.POKEDEX_PAGE, species, attributes, null, null, () => {
             if (species) {
-              starterContainer = this.starterContainers[this.cursor];
+              starterContainer = this.starterContainers.find(
+                container => container.visible && container.species.speciesId === this.lastStarterId,
+              )!;
               const persistentStarterData = globalScene.gameData.starterData[this.lastStarterId];
-              this.updateCandyUpgradeDisplay(starterContainer);
-              this.updateStarterValueLabel(starterContainer);
-              starterContainer.starterPassiveBgs.setVisible(
-                !!persistentStarterData.passiveAttr && !globalScene.gameMode.hasChallenge(Challenges.FRESH_START),
-              );
-              this.setStarter(this.lastStarterId);
+              if (starterContainer) {
+                this.updateCandyUpgradeDisplay(starterContainer);
+                this.updateStarterValueLabel(starterContainer);
+                starterContainer.starterPassiveBgs.setVisible(
+                  !!persistentStarterData.passiveAttr && !globalScene.gameMode.hasChallenge(Challenges.FRESH_START),
+                );
+              }
+              this.setStarter(this.lastStarterId, this.gridHasFocus() && this.cursorObj.visible);
             }
           });
         });
@@ -2155,6 +2499,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     } else if (this.randomCursorObj.visible) {
       [success, error] = this.processRandomCursorInput(button);
     } else if (button === Button.ACTION) {
+      if (this.pointerZones.length > 0 && this.pointerGridId === null) {
+        return false;
+      }
       const { dexEntry } = getStarterData(this.lastStarterId);
       if (!dexEntry?.caughtAttr) {
         error = true;
@@ -2352,6 +2699,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.starterContainers.forEach(container => {
       this.setUpgradeAnimation(container);
     });
+    if (this.pointerZones.length > 0) {
+      this.restorePointerGridSelection();
+    }
   }
 
   private filterStarters(): void {
@@ -2660,6 +3010,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const species = this.starterContainers[cursor].species;
 
       if (species) {
+        this.pointerGridId = species.speciesId as StarterSpeciesId;
         this.setStarter(species.speciesId as StarterSpeciesId);
         this.updateInstructions();
       } else {
@@ -2838,7 +3189,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       starter.teraType = teraType;
     }
 
-    const currentContainer = this.starterContainers.find(p => p.species.speciesId === starterId);
+    const currentContainer = this.starterContainers.find(p => p.visible && p.species.speciesId === starterId);
     if (currentContainer) {
       const starterSprite = currentContainer.icon;
       const species = speciesDataRegistry.getSpecies(starterId);
@@ -3083,7 +3434,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     let isPartyValid = this.isPartyValid();
     if (addingToParty) {
-      const starterId = this.starterContainers[this.cursor].species.speciesId as StarterSpeciesId;
+      const starterId = this.lastStarterId;
       const isNewPokemonValid = checkStarterValidForChallenge(
         starterId,
         this.getStarterDexAttrPropsFromPreferences(starterId),
@@ -3285,6 +3636,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   public override clear(): void {
+    ++this.pointerSession;
+    this.clearPointerInput();
+    this.pointerGridId = null;
     super.clear();
 
     saveStarterPreferences(this.originalStarterPreferences);
@@ -3294,6 +3648,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.oldCursor = -1;
     this.instructionsContainer.hideInstructions();
     this.randomCursorObj.setVisible(false);
+    this.startCursorObj.setVisible(false);
+    this.filterBar.hideDropDowns();
 
     this.starterSummary.clear();
 
@@ -3339,6 +3695,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   public override destroy(): void {
+    this.starterSummary.clear();
+    ++this.pointerSession;
+    this.clearPointerInput();
     // Without this the reference gets hung up and no startercontainers get GCd
     for (const container of this.starterContainers) {
       container.destroy();

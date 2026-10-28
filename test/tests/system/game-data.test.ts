@@ -5,6 +5,7 @@ import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { version } from "#package.json";
 import { GameData } from "#system/game-data";
 import { cloneSystemData, decodeSystemImport, serializeSystemData } from "#system/system-data-merge";
@@ -322,11 +323,14 @@ describe("System - Game Data", () => {
       vi.spyOn(pokerogueApi.savedata.session, "clear").mockResolvedValue({
         error: "session out of date",
       });
+      // Test stale-save recovery at the UI boundary; alert interaction has its own tests.
+      const setMode = vi.spyOn(game.scene.ui, "setMode").mockResolvedValue();
 
       const result = await game.scene.gameData.tryClearSession(0);
 
       expect(result).toEqual([false, false]);
       expect(account.updateUserInfo).toHaveBeenCalled();
+      expect(setMode).toHaveBeenCalledWith(UiMode.ALERT_MODAL, expect.any(String));
     });
   });
 });

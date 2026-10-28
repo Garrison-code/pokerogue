@@ -10,6 +10,7 @@ import { MockRectangle } from "#test/mocks/mocks-container/mock-rectangle";
 import { MockSprite } from "#test/mocks/mocks-container/mock-sprite";
 import { MockText } from "#test/mocks/mocks-container/mock-text";
 import { MockTexture } from "#test/mocks/mocks-container/mock-texture";
+import { MockZone } from "#test/mocks/mocks-container/mock-zone";
 
 /**
  * Stub class for Phaser.Textures.TextureManager
@@ -31,6 +32,7 @@ export class MockTextureManager {
       tileSprite: this.sprite.bind(this),
       existing: this.existing.bind(this),
       rectangle: this.rectangle.bind(this),
+      zone: () => new MockZone(),
       nineslice: this.nineslice.bind(this),
       image: this.image.bind(this),
       polygon: this.polygon.bind(this),

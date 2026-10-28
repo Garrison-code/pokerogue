@@ -15,6 +15,8 @@ export class TabMenu extends Phaser.GameObjects.Container {
   private static readonly CENTERED_LABEL_LEFT_BOUNDARY = 24;
   private static readonly CENTERED_LABEL_RIGHT_BOUNDARY = 24;
 
+  private pointerZones: Phaser.GameObjects.Zone[] = [];
+
   public selectedIndex = 0;
 
   private readonly labels: string[];
@@ -105,6 +107,54 @@ export class TabMenu extends Phaser.GameObjects.Container {
       title.setX(currentX);
       currentX += title.displayWidth + labelSpacing;
     }
+  }
+
+  /** Enable direct navigation only for the owning page that explicitly opts in. */
+  public enablePointerNavigation(canProcess: () => boolean, onCancel: () => void): void {
+    this.disablePointerNavigation();
+    const addTarget = (x: number, width: number, select: () => boolean): void => {
+      const zone = globalScene.add.zone(x, 0, width, this.height).setOrigin(0).setInteractive();
+      zone.on(
+        "pointerdown",
+        (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+          event.stopPropagation();
+          if (pointer.wasTouch || !canProcess()) {
+            return;
+          }
+          if (pointer.rightButtonDown()) {
+            onCancel();
+          } else if (pointer.leftButtonDown() && select()) {
+            globalScene.ui.playSelect();
+          }
+        },
+      );
+      zone.on(
+        "wheel",
+        (_pointer: Phaser.Input.Pointer, _dx: number, _dy: number, _dz: number, event: Phaser.Types.Input.EventData) =>
+          event.stopPropagation(),
+      );
+      this.pointerZones.push(zone);
+      this.add(zone);
+    };
+    this.headerTitles.forEach((title, index) =>
+      addTarget(title.x - 2, title.displayWidth + 4, () => {
+        if (index === this.selectedIndex) {
+          return false;
+        }
+        this.setIndex(index);
+        this.onChangeCallback(index);
+        return true;
+      }),
+    );
+    addTarget(4, 20, () => this.navigate(Button.CYCLE_FORM));
+    addTarget(this.width - 24, 20, () => this.navigate(Button.CYCLE_SHINY));
+  }
+
+  public disablePointerNavigation(): void {
+    for (const zone of this.pointerZones) {
+      zone.destroy();
+    }
+    this.pointerZones = [];
   }
 
   public setIndex(index: number): void {

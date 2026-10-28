@@ -47,6 +47,15 @@ export class FilterBar extends Phaser.GameObjects.Container {
     this.add([this.window, this.cursorObj]);
   }
 
+  /** Internal hit targets; callers explicitly opt in to pointer support. */
+  public getPointerTargets() {
+    return this.labels.map((label, index) => ({
+      label,
+      index,
+      dropDown: this.dropDowns[index],
+    }));
+  }
+
   /**
    * Add a new filter to the FilterBar, as long that a unique DropDownColumn is provided
    * @param column  the DropDownColumn that will be used to access the filter values

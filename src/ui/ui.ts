@@ -289,6 +289,16 @@ export class UI extends Phaser.GameObjects.Container {
     return handler.processInput(button);
   }
 
+  /** Whether a handler may change selection or confirm through direct pointer input. */
+  public canProcessPointerInput(handler: UiHandler): boolean {
+    return (
+      !this.overlayActive
+      && handler.active
+      && this.getHandler() === handler
+      && !(handler instanceof AwaitableUiHandler && handler.tutorialActive)
+    );
+  }
+
   public showTextPromise(text: string, callbackDelay = 0, prompt = true, promptDelay?: number | null): Promise<void> {
     return new Promise<void>(resolve => {
       this.showText(text ?? "", null, () => resolve(), callbackDelay, prompt, promptDelay);

@@ -10,6 +10,10 @@ import i18next from "i18next";
 import type BBCodeText from "phaser3-rex-plugins/plugins/bbcodetext";
 
 export class BattleMessageUiHandler extends MessageUiHandler {
+  private messagePointerZone: Phaser.GameObjects.Zone;
+  // A previous prompt may retain its keyboard callback while a new message is typing.
+  private pointerPromptReady = false;
+
   private levelUpStatsContainer: Phaser.GameObjects.Container;
   private levelUpStatsIncrContent: Phaser.GameObjects.Text;
   private levelUpStatsValuesContent: BBCodeText;
@@ -115,11 +119,22 @@ export class BattleMessageUiHandler extends MessageUiHandler {
     levelUpStatsContainer.add(levelUpStatsValuesContent);
 
     this.levelUpStatsValuesContent = levelUpStatsValuesContent;
+
+    this.messagePointerZone = globalScene.add.zone(0, -this.bg.height, this.bg.width, this.bg.height);
+    this.messagePointerZone.setName("message-pointer-zone").setOrigin(0).setInteractive();
+    this.messagePointerZone.on("pointerdown", this.onMessagePointerDown, this);
+    ui.add(this.messagePointerZone);
+    if (ui.getHandler() === this) {
+      this.show([]);
+    } else {
+      this.messagePointerZone.disableInteractive();
+    }
   }
 
   show(args: any[]): boolean {
     super.show(args);
 
+    this.messagePointerZone.setInteractive();
     this.commandWindow.setVisible(false);
     this.movesWindowContainer.setVisible(false);
     this.message.setWordWrapWidth(this.wordWrapWidth);
@@ -140,8 +155,53 @@ export class BattleMessageUiHandler extends MessageUiHandler {
     return false;
   }
 
+  private onMessagePointerDown(
+    pointer: Phaser.Input.Pointer,
+    _localX: number,
+    _localY: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    event.stopPropagation();
+    if (pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
+      return;
+    }
+    if (pointer.rightButtonDown()) {
+      this.getUi().processInput(Button.CANCEL);
+      return;
+    }
+    if (
+      !pointer.leftButtonDown()
+      || !this.pointerPromptReady
+      || this.pendingPrompt
+      || !this.awaitingActionInput
+      || !this.onActionInput
+    ) {
+      return;
+    }
+    this.pointerPromptReady = false;
+    this.getUi().processInput(Button.ACTION);
+  }
+
+  override showPrompt(callback?: (() => void) | null, callbackDelay?: number | null): void {
+    super.showPrompt(callback, callbackDelay);
+    this.pointerPromptReady = true;
+  }
+
+  override clearText(): void {
+    this.pointerPromptReady = false;
+    super.clearText();
+  }
+
   clear() {
     super.clear();
+    this.pointerPromptReady = false;
+    this.messagePointerZone.disableInteractive();
+  }
+
+  override destroy(): void {
+    this.clear();
+    this.messagePointerZone.destroy();
+    super.destroy();
   }
 
   showText(
@@ -152,6 +212,7 @@ export class BattleMessageUiHandler extends MessageUiHandler {
     prompt?: boolean | null,
     promptDelay?: number | null,
   ) {
+    this.pointerPromptReady = false;
     this.hideNameText();
     super.showText(text, delay, callback, callbackDelay, prompt, promptDelay);
   }
@@ -181,6 +242,7 @@ export class BattleMessageUiHandler extends MessageUiHandler {
       this.levelUpStatsValuesContent.text = levelUpStatsValuesText;
       this.levelUpStatsIncrContent.setVisible(!showTotals);
       this.levelUpStatsContainer.setVisible(true);
+      this.pointerPromptReady = true;
       this.awaitingActionInput = true;
       this.onActionInput = () => {
         if (!showTotals) {
@@ -202,6 +264,7 @@ export class BattleMessageUiHandler extends MessageUiHandler {
         this.levelUpStatsValuesContent.text = levelUpStatsValuesText;
         this.levelUpStatsIncrContent.setVisible(false);
         this.levelUpStatsContainer.setVisible(true);
+        this.pointerPromptReady = true;
         this.awaitingActionInput = true;
         this.onActionInput = () => {
           this.levelUpStatsContainer.setVisible(false);

@@ -494,6 +494,7 @@ export class StarterSummary extends Phaser.GameObjects.Container {
   }
 
   public setNoStarter(): void {
+    ++this.spriteRequest;
     if (globalScene.ui.getTooltip().visible) {
       globalScene.ui.hideTooltip();
     }
@@ -512,6 +513,7 @@ export class StarterSummary extends Phaser.GameObjects.Container {
     // Checking here to ensure achievements are loaded, and updated if unlocked while playing
     this.allowTera = Object.hasOwn(globalScene.gameData.achvUnlocks, achvs.TERASTALLIZE.id);
 
+    ++this.spriteRequest;
     this.speciesId = starterId;
     const species = speciesDataRegistry.getSpecies(starterId);
 
@@ -796,6 +798,8 @@ export class StarterSummary extends Phaser.GameObjects.Container {
       .setPosition(iconPosition.x, iconPosition.y);
   }
 
+  private spriteRequest = 0;
+
   private updateSprite(
     species: PokemonSpecies,
     female: boolean,
@@ -803,7 +807,11 @@ export class StarterSummary extends Phaser.GameObjects.Container {
     shiny: boolean,
     variant: Variant,
   ): void {
+    const request = ++this.spriteRequest;
     species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
+      if (request !== this.spriteRequest || !this.scene) {
+        return;
+      }
       this.pokemonSprite
         .play(species.getSpriteKey(female, formIndex, shiny, variant))
         .setPipelineData("shiny", shiny)
@@ -875,6 +883,7 @@ export class StarterSummary extends Phaser.GameObjects.Container {
   }
 
   public clear(): void {
+    ++this.spriteRequest;
     globalScene.ui.hideTooltip();
     this.activeTooltip = undefined;
   }
