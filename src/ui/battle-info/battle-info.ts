@@ -680,6 +680,11 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
   // #endregion Update methods and helpers
 
+  /** Visible frame used by the target-selection handler, excluding hidden flyouts. */
+  getPointerTarget(): Phaser.GameObjects.Sprite {
+    return this.box;
+  }
+
   getBaseY(): number {
     return this.baseY;
   }

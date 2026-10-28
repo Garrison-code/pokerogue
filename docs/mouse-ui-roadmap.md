@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 12 項完成、42 項待辦；EX-01 與 UI-13 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 13 項完成、41 項待辦；EX-01 與 UI-14 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -196,7 +196,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-10** 戰鬥指令 — `COMMAND`；戰鬥、精靈球、寶可夢、逃跑及太晶化入口。
 - [x] **UI-11** 招式選擇 — `FIGHT`。
 - [x] **UI-12** 精靈球選擇 — `BALL`。
-- [ ] **UI-13** 戰鬥目標選擇 — `TARGET_SELECT`；包含雙打與有效目標限制。
+- [x] **UI-13** 戰鬥目標選擇 — `TARGET_SELECT`；包含雙打與有效目標限制。
 - [ ] **UI-14** 隊伍頁 — `PARTY`；包含換人、查看、放生、道具管理、招式回憶等既有模式與子選單。
 - [ ] **UI-15** 寶可夢詳細資料 — `SUMMARY`；包含分頁與招式學習／替換等既有用途。
 - [ ] **UI-16** 戰後獎勵／商店 — `MODIFIER_SELECT`；包含獎勵、購買、重抽、隊伍及道具轉移入口。
@@ -261,7 +261,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-12；其餘 42 個項目保持待辦。
+目前已完成 UI-01～UI-13；其餘 41 個項目保持待辦。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -280,6 +280,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-10 | 2026-10-29 | `feat(ui): support mouse battle commands` | 新增 9 項互動測試通過；Chromium default／legacy 實測整格選取／確認、精靈球入口、逃跑替身回呼、右鍵 CANCEL、轉場阻擋及滾輪無作用通過。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過。雙出戰游標由替身測試驗證；太晶化可見／資格沿用原判定，未實測實體手把與觸控。新增美術及 UI-10～15 操作決策，其餘項目仍待個別完成。 |
 | UI-11 | 2026-10-29 | `feat(ui): support mouse move selection` | 新增 9 項互動測試通過，含太晶化來源、確認失敗、空格／隱藏招式、神秘事件取消限制及清理；Chromium default／legacy 實測兩階段選取、既有確認替身、右鍵返回與滾輪無作用通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。未新增資訊浮層操作，未測實體手把與觸控。 |
 | UI-12 | 2026-10-29 | `feat(ui): support mouse ball selection` | 新增 9 項互動測試通過，涵蓋選取／確認、零數量錯誤、命令失敗、滾輪邊界、取消與重開；Chromium default／legacy 實測整列範圍、數量、取消列、逐列滾輪與右鍵返回通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。捕捉命令使用替身，未消耗真實資料，未測實體手把與觸控。 |
+| UI-13 | 2026-10-29 | `feat(ui): support mouse battle target selection` | 新增 9 項互動測試通過，涵蓋單體兩階段、無效目標、多目標整組確認、取消、阻擋及高亮清理；Chromium default／legacy 實測目標血量框、整組回呼與右鍵空陣列取消通過。命中範圍取可見血量框背景，排除隱藏資訊面板，重疊順序跟隨畫面圖層。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。雙打隊伍／回呼使用測試資料，未測實體手把與觸控。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。
