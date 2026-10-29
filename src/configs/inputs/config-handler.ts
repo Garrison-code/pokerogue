@@ -178,6 +178,9 @@ export function getIconForLatestInput(
   } else {
     config = configs[devices[Device.KEYBOARD]];
   }
+  if (!config?.custom) {
+    return undefined;
+  }
   const icon = getIconWithSettingName(config, settingName);
   if (!icon) {
     const isAlt = settingName.includes("ALT_");

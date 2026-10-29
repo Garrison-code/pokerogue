@@ -20,6 +20,7 @@ describe("UI - gamepad settings mouse controls", () => {
   let game: GameManager;
   let handler: SettingsGamepadUiHandler;
   let pointer: Phaser.Input.Pointer;
+  let previousSource: string;
   let previousDevice: string | undefined;
   let previousConfigs: Record<string, InterfaceConfig>;
   beforeAll(() => {
@@ -29,6 +30,7 @@ describe("UI - gamepad settings mouse controls", () => {
     game = new GameManager(phaserGame);
     await game.runToTitle();
     const controller = game.scene.inputController;
+    previousSource = controller.lastSource;
     previousDevice = controller.selectedDevice[Device.GAMEPAD];
     previousConfigs = { ...controller["configs"] };
     const config = deepCopy(PAD_XBOX360);
@@ -45,6 +47,7 @@ describe("UI - gamepad settings mouse controls", () => {
     game.scene.ui.handlers[UiMode.GAMEPAD_BINDING].clear();
     handler.clear();
     game.scene.inputController["configs"] = previousConfigs;
+    game.scene.inputController.lastSource = previousSource;
     if (previousDevice == null) {
       delete game.scene.inputController.selectedDevice[Device.GAMEPAD];
     } else {

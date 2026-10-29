@@ -26,7 +26,7 @@ export abstract class BaseBindingUiHandler extends UiHandler {
   private boundConfig: CustomInterfaceConfig | null = null;
 
   protected get supportsBindingPointer(): boolean {
-    return this.device === Device.KEYBOARD;
+    return this.device === Device.KEYBOARD || this.device === Device.GAMEPAD;
   }
 
   protected isCurrentDevice(): boolean {

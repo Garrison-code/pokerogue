@@ -4,6 +4,7 @@ import { GameManager } from "#test/framework/game-manager";
 import { MenuButton } from "#ui/menu-button";
 import type { MenuUiHandler } from "#ui/menu-ui-handler";
 import { MessageUiHandler } from "#ui/message-ui-handler";
+import i18next from "i18next";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -98,6 +99,30 @@ describe("UI - game menu mouse controls", () => {
     pointer.wasTouch = true;
     wheel(-120);
     expect(handler.getCursor()).toBe(handler["options"].length - 1);
+  });
+  it("locks the first frame of a warning before any characters are displayed", () => {
+    handler.showText("Warning", 10);
+    expect(handler.message.text).toBe("");
+    click(1);
+    expect(handler.getCursor()).toBe(0);
+  });
+  it.each([false, true])("ignores an export result after its submenu closes (reopen=%s)", async reopen => {
+    const pending = Promise.withResolvers<Awaited<ReturnType<typeof game.scene.gameData.getSession>>>();
+    vi.spyOn(game.scene.gameData, "getSession").mockReturnValue(pending.promise);
+    await game.scene.ui.setOverlayMode(UiMode.MENU_OPTION_SELECT, handler["manageDataConfig"]);
+    const option = handler["manageDataConfig"].options.find(
+      item => item.label === i18next.t("menuUiHandler:exportSession"),
+    )!;
+    option.handler();
+    await game.scene.ui.revertMode();
+    if (reopen) {
+      await game.scene.ui.setOverlayMode(UiMode.MENU_OPTION_SELECT, handler["manageDataConfig"]);
+    }
+    pending.resolve(undefined);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    expect(game.scene.ui.mode).toBe(reopen ? UiMode.MENU_OPTION_SELECT : UiMode.MENU);
+    expect(handler.message.text).toBe("");
+    game.scene.ui.handlers[UiMode.MENU_OPTION_SELECT].clear();
   });
   it("removes old page zones and prevents delayed messages updating a reopened menu", () => {
     const callback = vi.fn();

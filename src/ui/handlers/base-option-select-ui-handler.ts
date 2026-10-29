@@ -37,6 +37,13 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   private options: (UIOptionSelectItem & T)[] = [];
   private maxOptions: number;
 
+  private displayGeneration = 0;
+
+  /** Internal lifetime token for async work initiated by a menu option. */
+  public get displayToken(): number {
+    return this.displayGeneration;
+  }
+
   private repeatInput = false;
   private maxIconWidth = 0;
 
@@ -122,6 +129,7 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
       return false;
     }
 
+    ++this.displayGeneration;
     super.show(args);
 
     this.resetInputDelay();
@@ -696,6 +704,7 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   }
 
   public override clear(): void {
+    ++this.displayGeneration;
     super.clear();
 
     this.clearPointerTargets();

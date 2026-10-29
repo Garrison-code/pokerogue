@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 26 項完成、28 項待辦；EX 項目與 UI-27 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 27 項完成、27 項待辦；EX 項目與 UI-28 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -171,13 +171,13 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 已定案：Phase 2 收尾（UI-16～UI-19，EX 除外）
 
-- 依 UI-16 → UI-19 分別實作、驗證、提交並 push 至同一 draft PR；定案本身不代表完成。EX-01／EX-02 與 Phase 3 起保持待辦。
+- 依 UI-16 → UI-19 分別實作、驗證、提交並 push 至同一 draft PR；定案本身不代表完成。EX-01／EX-02 維持待辦；Phase 3 進度依下方清單。
 - 四頁均不新增滾輪導航；事件先消耗再檢查目前 handler、教學與轉場。中鍵／觸控不走新增操作，保留既有資訊 hover。
 - MODIFIER_SELECT 的獎勵、商店商品、重抽、鎖定稀有度、管理道具、查看隊伍及繼續採兩階段點擊，更新既有游標與資訊；確認走 ACTION，頁面右鍵完全沿用 CANCEL（含放棄確認）。揭示／升級與教學完成前不允許左鍵操作，資訊浮層遮住的商品不可點。處理商店反向列索引、返回重新啟用與舊動畫／非同步回呼失效。
 - MYSTERY_ENCOUNTER 的二／三／四選項與查看隊伍採兩階段點擊；固定格範圍不跟隨長文字捲動，選取更新既有說明。未達需求仍可查看，確認沿用 optionMode 判定；右鍵只送 CANCEL，目前不新增離開事件能力。管理入場／返回延遲、捲動動畫及 hover 清理。
 - EVOLUTION_SCENE 的可見訊息框在文字／提示完成且等待確認時，左鍵走 ACTION；不快轉逐字訊息或動畫。頁面右鍵完整沿用 CANCEL 的取消進化優先順序、不可取消限制與訊息推進。進化、形態變化、暫停確認及學招保留原流程。
 - RENAME_POKEMON 保留既有表單單擊提交／取消與原生文字編輯，不改成選項兩階段操作。本 handler 補齊 CANCEL 並與取消按鈕共用入口，右鍵只送 CANCEL；彈窗本體含輸入框生效，框外僅阻擋背景。保留 SUBMIT、空白修剪、Unicode 編碼與呼叫端回呼；清理 focus 延遲、DOM 監聽與進場 tween，不擴及其他表單。
-- 新增互動測試並以 Chromium default／legacy 驗證；使用測試隊伍與替身，不讀寫真實存檔。UI-16～UI-19 已依下方完成紀錄驗證，現為 19 項完成、35 項待辦，僅 Phase 2 的 UI 項目完成，EX-02 仍待辦。
+- 新增互動測試並以 Chromium default／legacy 驗證；使用測試隊伍與替身，不讀寫真實存檔。UI-16～UI-19 已依下方完成紀錄驗證，該批完成時累計 19 項完成、35 項待辦，Phase 2 的 UI 項目完成，EX-02 仍待辦。
 
 ## Phase 0：共用選項、確認與訊息
 
@@ -237,7 +237,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-24** 鍵盤設定 — `SETTINGS_KEYBOARD`。
 - [x] **UI-25** 鍵盤按鍵綁定彈窗 — `KEYBOARD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
 - [x] **UI-26** 手把設定 — `SETTINGS_GAMEPAD`。
-- [ ] **UI-27** 手把按鍵綁定彈窗 — `GAMEPAD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
+- [x] **UI-27** 手把按鍵綁定彈窗 — `GAMEPAD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
 - [ ] **EX-03** 移動觸控控制按鈕的配置畫面；`src/ui/settings/move-touch-controls-handler.ts`，已有 pointer 操作，需驗證整合。
 
 ## Phase 4：收藏、圖鑑與紀錄
@@ -284,7 +284,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-26；其餘 28 個項目保持待辦。Phase 2 的 UI 項目已完成，EX-02 除外；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-27；其餘 27 個項目保持待辦。Phase 2 與 Phase 3 的 UI 項目已完成，EX-01／EX-02／EX-03 仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -328,6 +328,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-25 | 2026-10-29 | `feat(ui): support mouse keyboard binding dialogs` | 新增 15 項綁定互動測試，連同鍵盤設定及原重新綁定回歸共 62 項通過。Chromium default／legacy 實測原鍵盤 A 輸入、返回／指派兩階段、成功單次保存、預選返回、倒數返回與等待／確認時右鍵無法關閉通過；使用測試配置與替身保存。保留原 CANCEL 回傳與音效，外側事件只消耗；清理延後監聽與倒數，避免舊計時器／重複回呼，擷取新鍵後停止原按鍵重複輸入。共用裝置身分保護亦供後續手把使用，手把彈窗尚未啟用直接滑鼠。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；未測實體裝置。 |
 
 | UI-26 | 2026-10-29 | `feat(ui): support mouse gamepad settings` | 新增 18 項手把設定測試，連同鍵盤設定回歸共 32 項通過；涵蓋 Xbox、Generic、Dualshock、Pro Controller 與 SNES 的實際列身分。修正共用 xbox 素材導致排版覆蓋，改依配置 padID 分開排版並顯示目前裝置名稱；斷線後清除舊列與區域，無裝置仍可返回。Chromium default／legacy 以模擬裝置實測啟用值兩階段、原裝置清單與切換、長列表滾輪、斷線提示及返回通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。使用模擬配置與替身持久化；未測實體手把／觸控，EX-03 未實作。 |
+
+| UI-27 | 2026-10-29 | `feat(ui): support mouse gamepad binding dialogs` | 新增 15 項手把綁定測試；手把／鍵盤綁定、選單及輸入共 63 項通過。Chromium default／legacy 以模擬手把實測實際 down 事件、選取／確認分離、原 A／B 交換、單次保存、預選返回、倒數及右鍵 CANCEL 無法關閉通過。擷取／確認保留裝置身分、方向鍵黑名單與原錯誤／音效；清理舊監聽、計時器與區域。另補強 UI-20 警告首字前鎖定、取消／重開子選單後過期匯出無效與訊息回呼，新增 3 項案例；無上次手把配置時安全隱藏圖示，新增 1 項輸入案例，並還原模擬裝置測試來源狀態。整批新增 124 項測試；58 檔 900 項及另 2 檔 13 項回歸共 60 檔 913 項通過（4 skipped、3 todo）。typecheck、build:dev、全量 Biome、Dependency Cruiser、main／github／js 型別、REUSE 與 diff check 通過。使用測試配置及替身保存，未測實體手把／觸控；Phase 3 UI 完成，所有 EX 及 UI-28 起維持待辦。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。

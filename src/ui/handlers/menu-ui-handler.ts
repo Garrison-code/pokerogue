@@ -59,10 +59,11 @@ export class MenuUiHandler extends OptionSelectUiHandler {
   private readonly textPadding = 8;
   private displayId = 0;
   private messageId = 0;
+  private pointerMessageBlocked = false;
   private pointerTargets: UiPointerTargets | null = null;
 
   protected override get canSelectWithPointer(): boolean {
-    return !this.message?.text;
+    return !this.pointerMessageBlocked;
   }
 
   private menuContainer: Phaser.GameObjects.Container;
@@ -298,6 +299,8 @@ export class MenuUiHandler extends OptionSelectUiHandler {
       label: i18next.t("menuUiHandler:exportSession"),
       handler: () => {
         const displayId = this.displayId;
+        const sourceHandler = ui.getHandler<OptionSelectUiHandler>();
+        const sourceToken = sourceHandler.displayToken;
         const dataSlots: number[] = [];
         Promise.all(
           new Array(5).fill(null).map((_, i) => {
@@ -309,7 +312,13 @@ export class MenuUiHandler extends OptionSelectUiHandler {
             });
           }),
         ).then(() => {
-          if (!this.active || displayId !== this.displayId) {
+          if (
+            !this.active
+            || displayId !== this.displayId
+            || ui.getHandler() !== sourceHandler
+            || !sourceHandler.active
+            || sourceHandler.displayToken !== sourceToken
+          ) {
             return;
           }
           confirmSlot(
@@ -813,6 +822,7 @@ export class MenuUiHandler extends OptionSelectUiHandler {
     prompt?: boolean,
     promptDelay?: number,
   ): void {
+    this.pointerMessageBlocked = !!text;
     this.menuMessageBoxContainer.setVisible(!!text);
 
     const displayId = this.displayId;
@@ -822,7 +832,12 @@ export class MenuUiHandler extends OptionSelectUiHandler {
       delay,
       callback
         && (() => {
-          if (this.active && this.displayId === displayId && this.messageId === messageId) {
+          if (
+            this.active
+            && this.displayId === displayId
+            && this.messageId === messageId
+            && this.getUi().getHandler() === this
+          ) {
             callback();
           }
         }),
