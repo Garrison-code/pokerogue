@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 15 項完成、39 項待辦；EX-01 與 UI-16 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 16 項完成、38 項待辦；EX-01 與 UI-17 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -169,6 +169,16 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 所有新操作先消耗事件再檢查目前 handler、啟用、教學與轉場；不穿透上層或新頁，不新增 hover 選取，中鍵／水平滾輪／觸控不啟用。保留各模式回呼、錯誤與音效，不修改遊戲規則或公開介面。
 - 驗證含單雙打、全部 PartyUiMode、招式學習／排序／刪除與 default／legacy；測試使用替身與測試隊伍，不讀寫真實存檔或修改真實隊伍。未測的入口與裝置如實記錄。
 
+## 已定案：Phase 2 收尾（UI-16～UI-19，EX 除外）
+
+- 依 UI-16 → UI-19 分別實作、驗證、提交並 push 至同一 draft PR；定案本身不代表完成。EX-01／EX-02 與 Phase 3 起保持待辦。
+- 四頁均不新增滾輪導航；事件先消耗再檢查目前 handler、教學與轉場。中鍵／觸控不走新增操作，保留既有資訊 hover。
+- MODIFIER_SELECT 的獎勵、商店商品、重抽、鎖定稀有度、管理道具、查看隊伍及繼續採兩階段點擊，更新既有游標與資訊；確認走 ACTION，頁面右鍵完全沿用 CANCEL（含放棄確認）。揭示／升級與教學完成前不允許左鍵操作，資訊浮層遮住的商品不可點。處理商店反向列索引、返回重新啟用與舊動畫／非同步回呼失效。
+- MYSTERY_ENCOUNTER 的二／三／四選項與查看隊伍採兩階段點擊；固定格範圍不跟隨長文字捲動，選取更新既有說明。未達需求仍可查看，確認沿用 optionMode 判定；右鍵只送 CANCEL，目前不新增離開事件能力。管理入場／返回延遲、捲動動畫及 hover 清理。
+- EVOLUTION_SCENE 的可見訊息框在文字／提示完成且等待確認時，左鍵走 ACTION；不快轉逐字訊息或動畫。頁面右鍵完整沿用 CANCEL 的取消進化優先順序、不可取消限制與訊息推進。進化、形態變化、暫停確認及學招保留原流程。
+- RENAME_POKEMON 保留既有表單單擊提交／取消與原生文字編輯，不改成選項兩階段操作。本 handler 補齊 CANCEL 並與取消按鈕共用入口，右鍵只送 CANCEL；彈窗本體含輸入框生效，框外僅阻擋背景。保留 SUBMIT、空白修剪、Unicode 編碼與呼叫端回呼；清理 focus 延遲、DOM 監聽與進場 tween，不擴及其他表單。
+- 新增互動測試並以 Chromium default／legacy 驗證；使用測試隊伍與替身，不讀寫真實存檔。完成後預期為 19 項完成、35 項待辦，僅 Phase 2 的 UI 項目完成，EX-02 仍待辦。
+
 ## Phase 0：共用選項、確認與訊息
 
 這些元件被多個頁面重用，先處理可減少後續重複工作。
@@ -199,7 +209,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-13** 戰鬥目標選擇 — `TARGET_SELECT`；包含雙打與有效目標限制。
 - [x] **UI-14** 隊伍頁 — `PARTY`；包含換人、查看、放生、道具管理、招式回憶等既有模式與子選單。
 - [x] **UI-15** 寶可夢詳細資料 — `SUMMARY`；包含分頁與招式學習／替換等既有用途。
-- [ ] **UI-16** 戰後獎勵／商店 — `MODIFIER_SELECT`；包含獎勵、購買、重抽、隊伍及道具轉移入口。
+- [x] **UI-16** 戰後獎勵／商店 — `MODIFIER_SELECT`；包含獎勵、購買、重抽、隊伍及道具轉移入口。
 - [ ] **UI-17** 神秘事件 — `MYSTERY_ENCOUNTER`；包含事件選項與結果流程。
 - [ ] **UI-18** 進化畫面 — `EVOLUTION_SCENE`。
 - [ ] **UI-19** 寶可夢重新命名 — `RENAME_POKEMON`。
@@ -261,7 +271,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-15；其餘 39 個項目保持待辦。
+目前已完成 UI-01～UI-16；其餘 38 個項目保持待辦。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -283,6 +293,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-13 | 2026-10-29 | `feat(ui): support mouse battle target selection` | 新增 9 項互動測試通過，涵蓋單體兩階段、無效目標、多目標整組確認、取消、阻擋及高亮清理；Chromium default／legacy 實測目標血量框、整組回呼與右鍵空陣列取消通過。命中範圍取可見血量框背景，排除隱藏資訊面板，重疊順序跟隨畫面圖層。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。雙打隊伍／回呼使用測試資料，未測實體手把與觸控。 |
 | UI-14 | 2026-10-29 | `feat(ui): support mouse party controls` | 新增 32 項互動測試通過，含全部 PartyUiMode 選取路由、子選單、強制取消限制、等待訊息、長回憶清單、道具數量循環與捲動後原道具數量重設；既有換位／鍵盤與模擬手把／雙打回歸通過。Chromium default／legacy 實測整卡兩階段、子選單選取／右鍵返回、卡片滾輪及道具數量箭頭通過。typecheck、build:dev、Biome、diff check 通過；最終整批相關測試共 281 項通過。確認與資料操作沿用既有路由，使用測試隊伍與替身回呼；未讀寫真實存檔，未測實體手把與觸控。 |
 | UI-15 | 2026-10-29 | `feat(ui): support mouse summary controls` | 新增 17 項互動測試通過，涵蓋分頁、滾輪沿用上下鍵、隊員切換限制、招式選取／排序／既有子選單、學習及放棄索引、IV、取消、轉場與清理；整批相關測試共 281 項通過。Chromium default／legacy 實測新分頁箭頭、IV、滾輪切換隊員、招式兩階段與子選單返回、學習／放棄替身回呼通過。保留既有 tooltip，移除重開後累積監聽，清理分頁／說明動畫與游標計時器。typecheck、build:dev、全量 Biome、Dependency Cruiser、主程式型別、REUSE 及 diff check 通過。fixture 使用測試隊伍／素材與替身回呼，不操作真實資料；未測實體手把與觸控。EX-01／EX-02 仍待辦。 |
+
+| UI-16 | 2026-10-29 | `feat(ui): support mouse reward and shop selection` | 新增 16 項互動測試；連同商店游標與獎勵 Phase 回歸共 24 項通過，另有 2 項既有 todo。涵蓋商品／按鈕兩階段、回呼失敗、單／雙排商店索引、空獎勵繼續、原 CANCEL、上層／教學／轉場阻擋、舊延遲失效及清理。Chromium default／legacy 實測獎勵／商店／隊伍按鈕選取與替身確認、滾輪無作用、右鍵回傳及重開通過；資料操作用替身，未執行真實購買或重抽扣款。修正揭示動畫完成等待，保留既有資訊浮層入口。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過；未測實體手把與觸控。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。
