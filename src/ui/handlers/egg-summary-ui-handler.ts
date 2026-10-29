@@ -12,6 +12,7 @@ import { PokemonHatchInfoContainer } from "#ui/pokemon-hatch-info-container";
 import { PokemonIconAnimHelper } from "#ui/pokemon-icon-anim-helper";
 import { ScrollBar } from "#ui/scroll-bar";
 import { ScrollableGridHelper } from "#ui/scrollable-grid-helper";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 
 const iconContainerX = 112;
 const iconContainerY = 9;
@@ -25,6 +26,8 @@ const iconSize = 18;
  * Also handles display of the pokemon-hatch-info-container
  */
 export class EggSummaryUiHandler extends MessageUiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
+  private exitTimer: Phaser.Time.TimerEvent | undefined;
   /** holds all elements in the scene */
   private eggHatchContainer: Phaser.GameObjects.Container;
   /** holds the icon containers and info container */
@@ -96,6 +99,7 @@ export class EggSummaryUiHandler extends MessageUiHandler {
     this.summaryContainer.add(scrollBar);
 
     this.scrollGridHandler = new ScrollableGridHelper(this, numRows, numCols)
+      .withPointerSelection(visible => this.cursorObj.setVisible(visible))
       .withScrollBar(scrollBar)
       .withUpdateGridCallBack(() => this.updatePokemonIcons())
       .withUpdateSingleElementCallback((i: number) => this.infoContainer.showHatchInfo(this.eggHatchData[i]));
@@ -104,11 +108,16 @@ export class EggSummaryUiHandler extends MessageUiHandler {
   }
 
   clear() {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    this.exitTimer?.remove();
+    this.exitTimer = undefined;
     super.clear();
     this.scrollGridHandler.reset();
     this.cursor = -1;
 
     this.summaryContainer.setVisible(false);
+    this.infoContainer.hideDisplayPokemon();
     this.pokemonIconsContainer.removeAll(true);
     this.pokemonContainers = [];
     this.eggHatchBg.setVisible(false);
@@ -131,7 +140,9 @@ export class EggSummaryUiHandler extends MessageUiHandler {
       }
     });
     // Clears eggHatchData in EggSummaryUiHandler
-    this.eggHatchData.length = 0;
+    if (this.eggHatchData) {
+      this.eggHatchData.length = 0;
+    }
     // Removes Pokemon icons in EggSummaryUiHandler
     this.iconAnimHandler.removeAll();
   }
@@ -141,6 +152,12 @@ export class EggSummaryUiHandler extends MessageUiHandler {
    * args[0]: list of EggHatchData for each egg/pokemon hatched
    */
   show(args: EggHatchData[][]): boolean {
+    this.pointerTargets?.destroy();
+    this.exitTimer?.remove();
+    this.pokemonIconsContainer.removeAll(true);
+    this.pokemonContainers = [];
+    this.iconAnimHandler.removeAll();
+    this.cursor = -1;
     super.show(args);
     if (args.length > 0) {
       // sort the egg hatch data by egg tier then by species number (then by order hatched)
@@ -169,9 +186,47 @@ export class EggSummaryUiHandler extends MessageUiHandler {
     this.eggHatchBg.setVisible(true);
     this.infoContainer.hideDisplayPokemon();
 
+    this.eggHatchData ??= [];
     this.scrollGridHandler.setTotalElements(this.eggHatchData.length);
     this.updatePokemonIcons();
-    this.setCursor(0);
+    if (this.eggHatchData.length > 0) {
+      this.scrollGridHandler.selectIndex(0);
+    } else {
+      this.cursorObj.setVisible(false);
+    }
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const page = targets.add(this.summaryContainer, "egg-summary-page", () => ({
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 180,
+    }));
+    this.summaryContainer.moveTo(page, 0);
+    const wheel = (direction: number) => this.scrollGridHandler.scrollByPointer(direction);
+    targets.add(
+      this.pokemonIconsContainer,
+      "egg-summary-grid",
+      () => ({ x: 0, y: 0, width: numCols * iconSize, height: numRows * iconSize }),
+      undefined,
+      wheel,
+    );
+    for (let i = 0; i < numCols * numRows; i++) {
+      targets.add(
+        this.pokemonIconsContainer,
+        `egg-summary-cell-${i}`,
+        () =>
+          i + this.scrollGridHandler.getItemOffset() < this.eggHatchData.length
+            ? { x: (i % numCols) * iconSize, y: Math.floor(i / numCols) * iconSize, width: iconSize, height: iconSize }
+            : null,
+        () => {
+          if (this.scrollGridHandler.selectIndex(i + this.scrollGridHandler.getItemOffset())) {
+            this.getUi().playSelect();
+          }
+        },
+        wheel,
+      );
+    }
 
     audioManager.replaceBgmUntilEnd("bw/evolution_fanfare");
 
@@ -179,7 +234,14 @@ export class EggSummaryUiHandler extends MessageUiHandler {
     // was skipped automatically and for 1 second otherwise
     const exitBlockingDuration = settings.general.eggSkipPreference === EggSkipPreference.ALWAYS ? 2000 : 1000;
     this.blockExit = true;
-    globalScene.time.delayedCall(exitBlockingDuration, () => (this.blockExit = false));
+    const timer = globalScene.time.delayedCall(exitBlockingDuration, () => {
+      if (this.exitTimer !== timer) {
+        return;
+      }
+      this.exitTimer = undefined;
+      this.blockExit = false;
+    });
+    this.exitTimer = timer;
 
     return true;
   }
@@ -212,6 +274,13 @@ export class EggSummaryUiHandler extends MessageUiHandler {
     }
   }
 
+  override destroy(): void {
+    this.clear();
+    this.summaryContainer.destroy();
+    this.eggHatchContainer.destroy();
+    super.destroy();
+  }
+
   processInput(button: Button): boolean {
     const ui = this.getUi();
 
@@ -241,6 +310,9 @@ export class EggSummaryUiHandler extends MessageUiHandler {
   }
 
   setCursor(cursor: number): boolean {
+    if (cursor < 0 || !this.pokemonContainers[cursor]) {
+      return false;
+    }
     let changed = false;
 
     const lastCursor = this.cursor;
