@@ -96,4 +96,8 @@ describe("UI - login entry pointer input", () => {
     click(1);
     expect(register).toHaveBeenCalledOnce();
   });
+  it("keeps the existing account sidebar above its input shield", () => {
+    const ui = game.scene.ui;
+    expect(ui.getIndex(handler["infoContainer"])).toBeGreaterThan(ui.getIndex(handler["backdrop"]!));
+  });
 });

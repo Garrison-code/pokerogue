@@ -70,6 +70,8 @@ export abstract class OAuthProvidersUiHandler extends LoginRegisterInfoContainer
 
   protected processExternalProvider(): void {
     globalScene.tweens.killTweensOf(this.externalPartyContainer);
+    this.discordImage.off("pointerdown");
+    this.googleImage.off("pointerdown");
     const titleX = 22;
     this.externalPartyTitle
       .setText(i18next.t("menu:orUse"))

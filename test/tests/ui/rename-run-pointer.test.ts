@@ -162,12 +162,13 @@ describe("UI - rename run pointer input", () => {
   });
   it("removes old DOM listeners, focus timer and targets on clear/reopen/destroy", () => {
     const targets = handler["pointerTargets"]!;
+    const listenerCount = handler["domCleanups"].length;
     handler.clear();
     expect(targets.zones).toHaveLength(0);
     node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     expect(submit).not.toHaveBeenCalled();
     handler.show([{ buttonActions: [submit, cancel] }, "New name"]);
-    expect(handler["domCleanups"]).toHaveLength(5);
+    expect(handler["domCleanups"]).toHaveLength(listenerCount);
     expect(node.value).toBe("");
     click();
     expect(submit).toHaveBeenCalledOnce();

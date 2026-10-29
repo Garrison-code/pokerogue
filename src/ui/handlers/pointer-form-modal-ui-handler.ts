@@ -6,6 +6,7 @@
 import { globalScene } from "#app/global-scene";
 import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
+import type { AutoCompleteUiHandler } from "#ui/autocomplete-ui-handler";
 import { FormModalUiHandler } from "#ui/form-modal-ui-handler";
 import type { LoadingModalUiHandler } from "#ui/loading-modal-ui-handler";
 import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
@@ -77,6 +78,18 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
     }
   }
 
+  private canEditInputs(): boolean {
+    const ui = this.getUi();
+    return (
+      this.active
+      && this.modalContainer.visible
+      && (ui.canProcessPointerInput(this)
+        || (ui.mode === UiMode.AUTO_COMPLETE
+          && ui.canProcessPointerInput(ui.getHandler())
+          && (ui.getHandler() as AutoCompleteUiHandler).parentModal === this.modalContainer))
+    );
+  }
+
   private bindInputEvents(): void {
     for (const input of this.inputs) {
       const node = input.node;
@@ -95,6 +108,10 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
         if (event.pointerType && event.pointerType !== "mouse") {
           return;
         }
+        if (!this.canEditInputs()) {
+          event.preventDefault();
+          return;
+        }
         if (event.button === 2) {
           event.preventDefault();
           if (this.getUi().canProcessPointerInput(this)) {
@@ -106,6 +123,11 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
         event.stopPropagation();
         event.preventDefault();
       });
+      listen("beforeinput", event => {
+        if (!this.canEditInputs()) {
+          event.preventDefault();
+        }
+      });
       listen("compositionstart", () => {
         this.composing = true;
       });
@@ -116,6 +138,10 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
       listen("keydown", event => {
         // Keep text-editing keys from becoming gameplay CANCEL/ACTION or direction inputs.
         event.stopPropagation();
+        if (!this.canEditInputs()) {
+          event.preventDefault();
+          return;
+        }
         if (event.isComposing || this.composing || event.keyCode === 229 || event.repeat) {
           return;
         }
@@ -217,6 +243,7 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
     this.stopPointerInput();
     super.destroy();
     this.active = false;
+    this.modalContainer.destroy();
   }
 
   protected handleFormKeyDown(_event: KeyboardEvent): boolean {

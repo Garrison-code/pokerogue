@@ -153,4 +153,14 @@ describe("UI - login form pointer input", () => {
     await new Promise(r => setTimeout(r, 0));
     expect(pokerogueApi.account.login).not.toHaveBeenCalled();
   });
+  it("cancels a sidebar focus restore when its form closes", async () => {
+    const input = handler["inputs"][1];
+    const focus = vi.spyOn(input, "setFocus");
+    handler["lastFocusedInput"] = input;
+    handler["setInteractiveInputs"](true);
+    handler.clear();
+    await new Promise(r => setTimeout(r, 60));
+    expect(focus).not.toHaveBeenCalled();
+    expect(handler["restoreFocusTimer"]).toBeUndefined();
+  });
 });

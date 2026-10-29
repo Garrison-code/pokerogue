@@ -41,6 +41,13 @@ export abstract class LoginRegisterInfoContainerUiHandler extends PointerFormMod
   private changeLanguageImage: Phaser.GameObjects.Image;
   private infoContainer: Phaser.GameObjects.Container;
   private lastFocusedInput: InputText | null = null;
+  private restoreFocusTimer: ReturnType<typeof setTimeout> | undefined;
+
+  private stopFocusRestore(): void {
+    clearTimeout(this.restoreFocusTimer);
+    this.restoreFocusTimer = undefined;
+    this.lastFocusedInput = null;
+  }
 
   public override getReadableErrorMessage(error: string): string {
     if (!error) {
@@ -68,6 +75,7 @@ export abstract class LoginRegisterInfoContainerUiHandler extends PointerFormMod
   }
 
   public override clear(): void {
+    this.stopFocusRestore();
     super.clear();
     for (const image of [this.usernameInfoImage, this.saveDownloadImage, this.changeLanguageImage]) {
       image.off("pointerdown");
@@ -80,6 +88,7 @@ export abstract class LoginRegisterInfoContainerUiHandler extends PointerFormMod
   }
 
   public override destroy(): void {
+    this.stopFocusRestore();
     super.destroy();
     this.infoContainer.destroy();
   }
@@ -102,6 +111,7 @@ export abstract class LoginRegisterInfoContainerUiHandler extends PointerFormMod
   }
 
   protected showInfoContainer(config: ModalConfig) {
+    this.stopFocusRestore();
     this.infoContainer //
       .setPosition(5, -76)
       .setVisible(true);
@@ -315,11 +325,17 @@ export abstract class LoginRegisterInfoContainerUiHandler extends PointerFormMod
    * @param active - Whether to enable or disable interactivity
    */
   private setInteractiveInputs(active: boolean): void {
+    clearTimeout(this.restoreFocusTimer);
+    this.restoreFocusTimer = undefined;
     if (active) {
-      // `setFocus` doesn't focus without a timeout
-      setTimeout(() => {
-        this.lastFocusedInput?.setFocus();
-        this.lastFocusedInput = null;
+      const input = this.lastFocusedInput;
+      this.lastFocusedInput = null;
+      // Restore only this display's previous field after the overlay has returned.
+      this.restoreFocusTimer = setTimeout(() => {
+        this.restoreFocusTimer = undefined;
+        if (input && this.active && this.getUi().getHandler() === this && this.inputs.includes(input)) {
+          input.setFocus();
+        }
       }, 50);
     } else {
       this.lastFocusedInput = this.inputs.find(input => input.isFocused) ?? null;

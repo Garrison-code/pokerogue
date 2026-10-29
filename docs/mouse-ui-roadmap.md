@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 47 項完成、7 項待辦；EX 項目與 UI-41 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 48 項完成、6 項待辦；六個 EX 項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -299,7 +299,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-45** 載入中彈窗 — `LOADING`；確認等待期間的輸入行為即可，不預設需要新增操作。
 - [x] **UI-46** 功能不可用提示 — `UNAVAILABLE`。
 - [x] **UI-47** 管理員工具 — `ADMIN`。
-- [ ] **UI-48** 翻譯／對話測試工具 — `TEST_DIALOGUE`。
+- [x] **UI-48** 翻譯／對話測試工具 — `TEST_DIALOGUE`。
 
 ## 盤點依據與範圍
 
@@ -313,7 +313,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-47；其餘 7 個項目保持待辦。所有 EX 與 UI-48 起仍待辦；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-48；其餘 6 個項目保持待辦。全部 48 個 UI 項目已完成，六個 EX 仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -392,3 +392,5 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 | UI-46 | 2026-10-29 | `feat(ui): guard unavailable modal reconnect lifecycle` | 新增 17 項互動／假時間測試通過，涵蓋原 5 秒起始、倍增上限與隨機間隔、成功／200／400、401 原 session 重設、拒絕、單一有效請求及 clear／重開／destroy 舊結果失效。Chromium default／legacy 實測左鍵／滾輪無作用、右鍵原 CANCEL、單次重連成功與重開通過；使用隔離 Guest fixture，不連真實帳號。沿用 UI-45 遮罩，保存並移除重連計時器；typecheck、build:dev 與 UI-45 共用同次已驗證工作樹，修改檔案 Biome、diff check 通過。未新增重試按鈕或取消能力；未測實體裝置。 |
 
 | UI-47 | 2026-10-29 | `feat(ui): support mouse admin tools` | 新增 22 項管理員互動測試通過，涵蓋 LINK／SEARCH／ADMIN、穩定欄位身分、取消、服務映射、單次請求、失敗重試、舊回應與動態欄位／圖示清理。Chromium default／legacy 實測查詢、唯讀、Stats／Pokedex 往返、圖鑑原退出確認、服務圖示及 LINK 返回通過；按鈕尺寸與點擊範圍同步，子頁返回解除操作鎖。使用替身 API 與隔離 Guest 資料；不放寬權限、不操作真實帳號。補齊 Image mock 事件與 NineSlice 型別供真實事件清理驗證。typecheck、build:dev、全量 Biome、Dependency Cruiser、REUSE、diff check 通過；未測實體裝置。 |
+
+| UI-48 | 2026-10-29 | `feat(ui): support mouse dialogue testing` | 新增 24 項對話表單測試；候選／搜尋首輪 47 項、搜尋與兩種命名收尾 76 項通過。Chromium default／legacy 從實際資料管理入口實測候選 SUBMIT 只回填、Check 原預覽、滑鼠不推進教學、鍵盤結束預覽、Escape／右鍵取消與重開通過。保留原 255 字元、Unicode 編碼與空白參數；處理貼上／刪除／組字、空白收起候選及過期回呼。收尾補強共用表單上層原生編輯阻擋、銷毀容器、帳號側欄焦點延遲／OAuth 監聽清理，修正 UI-41 側欄在遮罩上方並兩主題實測語言入口開啟／取消；不擴充 EX-04。整批新增 147 項互動測試，最新來源 65 檔回歸 61 檔、943 項通過（4 檔 skipped、22 todo）。typecheck、main／github／js 型別、build:dev、全量 Biome、Dependency Cruiser、REUSE 與 diff check 通過；GitHub CI 以最終 HEAD 為準。八項各自提交並 push；48 項完成、六個 EX 待辦，不代表整份 roadmap 完成。使用假帳號／替身 API 與隔離 Guest 資料，未測真實授權、實體裝置與 OS 原生 IME；不合併或發布 PR。 |

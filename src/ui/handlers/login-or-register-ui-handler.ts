@@ -66,10 +66,12 @@ export class LoginOrRegisterUiHandler extends LoginRegisterInfoContainerUiHandle
       .setVisible(true)
       .setActive(true);
 
-    const config = args[0];
-    this.showInfoContainer(config);
-
-    return super.show(args);
+    if (!super.show(args)) {
+      return false;
+    }
+    // The account sidebar must stay above the modal's background input shield.
+    this.showInfoContainer(args[0]);
+    return true;
   }
 
   public override clear(): void {
