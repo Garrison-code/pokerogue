@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 31 項完成、23 項待辦；EX 項目與 UI-32 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 32 項完成、22 項待辦；EX 項目與 UI-33 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -261,7 +261,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-29** 蛋抽獎機 — `EGG_GACHA`。
 - [x] **UI-30** 孵蛋畫面 — `EGG_HATCH_SCENE`。
 - [x] **UI-31** 孵蛋結果／詳細資料 — `EGG_HATCH_SUMMARY`。
-- [ ] **UI-32** 圖鑑列表 — `POKEDEX`；包含頁內篩選與裝飾／形態入口。
+- [x] **UI-32** 圖鑑列表 — `POKEDEX`；包含頁內篩選與裝飾／形態入口。
 - [ ] **UI-33** 圖鑑單隻詳細頁 — `POKEDEX_PAGE`。
 - [ ] **UI-34** 圖鑑搜尋／篩選輸入彈窗 — `POKEDEX_SCAN`；也供共用文字篩選使用。
 - [ ] **UI-35** 自動完成候選選單 — `AUTO_COMPLETE`；供搜尋與測試工具共用。
@@ -299,7 +299,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-31；其餘 23 個項目保持待辦。Phase 2 與 Phase 3 的 UI 項目已完成，EX-01／EX-02／EX-03 仍待辦；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-32；其餘 22 個項目保持待辦。Phase 2 與 Phase 3 的 UI 項目已完成，EX-01／EX-02／EX-03 仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -355,3 +355,4 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 | UI-29 | 2026-10-29 | `feat(ui): support mouse egg gacha controls` | 11 項新增互動及 10 項既有免費抽蛋測試通過。Chromium default／legacy 實測抽取列兩階段、滾輪、機台箭頭、原 ACTION 加速、右鍵及返回通過；抽取以替身驗證，不保存真實資料。清理舊儲存後畫面、落蛋 Promise 與 tween／timer。typecheck、開發建置、修改檔案 Biome 及 diff check 通過；未測實體裝置。 |
 | UI-30 | 2026-10-29 | `feat(ui): support mouse egg hatch scenes` | 8 項新互動及 4 項既有蛋階段測試通過；Chromium default／legacy 驗證單次 ACTION、右鍵 CANCEL 與重開清理通過。略過及訊息交給原 handler／Phase，沒有新增略過規則。typecheck、修改檔案 Biome 及 diff check 通過；畫面輸入以替身 Phase 驗證，未測實體裝置。 |
 | UI-31 | 2026-10-29 | `feat(ui): support mouse egg hatch results` | 10 項互動測試通過；Chromium default／legacy 實測結果格選取、捲動保留身分及空結果通過。保留原退出延遲／CANCEL，舊退出 timer 與素材載入回呼失效，重開清理區域與圖示。typecheck、修改檔案 Biome 與 diff check 通過；測試孵化資料，不儲存真實資料，未測實體裝置。 |
+| UI-32 | 2026-10-29 | `feat(ui): support mouse pokedex browsing` | 13 項新互動、12 項既有圖鑑測試通過（2 todo）；與命名／孵化結果共 43 項回歸通過。Chromium default／legacy 實測格子、身分保留、下拉阻擋及文字搜尋入口通過。重開清理下拉、過期素材與退出提示；typecheck、修改檔案 Biome、diff check 通過。另確認 UI-31 實作為 d9a2e7325b：該項完成紀錄因提交時序誤隨 UI-30 文件先入版，本列補記正確實作識別，不改寫已推送歷史。使用測試圖鑑，未測實體裝置。 |
