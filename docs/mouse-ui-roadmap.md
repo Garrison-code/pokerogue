@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 16 項完成、38 項待辦；EX-01 與 UI-17 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 17 項完成、37 項待辦；EX-01 與 UI-18 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -210,7 +210,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-14** 隊伍頁 — `PARTY`；包含換人、查看、放生、道具管理、招式回憶等既有模式與子選單。
 - [x] **UI-15** 寶可夢詳細資料 — `SUMMARY`；包含分頁與招式學習／替換等既有用途。
 - [x] **UI-16** 戰後獎勵／商店 — `MODIFIER_SELECT`；包含獎勵、購買、重抽、隊伍及道具轉移入口。
-- [ ] **UI-17** 神秘事件 — `MYSTERY_ENCOUNTER`；包含事件選項與結果流程。
+- [x] **UI-17** 神秘事件 — `MYSTERY_ENCOUNTER`；包含事件選項與結果流程。
 - [ ] **UI-18** 進化畫面 — `EVOLUTION_SCENE`。
 - [ ] **UI-19** 寶可夢重新命名 — `RENAME_POKEMON`。
 - [ ] **EX-02** 戰鬥資訊與招式資訊浮層／展開面板；依附各頁，沒有獨立 UiMode。
@@ -271,7 +271,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-16；其餘 38 個項目保持待辦。
+目前已完成 UI-01～UI-17；其餘 37 個項目保持待辦。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -295,6 +295,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-15 | 2026-10-29 | `feat(ui): support mouse summary controls` | 新增 17 項互動測試通過，涵蓋分頁、滾輪沿用上下鍵、隊員切換限制、招式選取／排序／既有子選單、學習及放棄索引、IV、取消、轉場與清理；整批相關測試共 281 項通過。Chromium default／legacy 實測新分頁箭頭、IV、滾輪切換隊員、招式兩階段與子選單返回、學習／放棄替身回呼通過。保留既有 tooltip，移除重開後累積監聽，清理分頁／說明動畫與游標計時器。typecheck、build:dev、全量 Biome、Dependency Cruiser、主程式型別、REUSE 及 diff check 通過。fixture 使用測試隊伍／素材與替身回呼，不操作真實資料；未測實體手把與觸控。EX-01／EX-02 仍待辦。 |
 
 | UI-16 | 2026-10-29 | `feat(ui): support mouse reward and shop selection` | 新增 16 項互動測試；連同商店游標與獎勵 Phase 回歸共 24 項通過，另有 2 項既有 todo。涵蓋商品／按鈕兩階段、回呼失敗、單／雙排商店索引、空獎勵繼續、原 CANCEL、上層／教學／轉場阻擋、舊延遲失效及清理。Chromium default／legacy 實測獎勵／商店／隊伍按鈕選取與替身確認、滾輪無作用、右鍵回傳及重開通過；資料操作用替身，未執行真實購買或重抽扣款。修正揭示動畫完成等待，保留既有資訊浮層入口。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過；未測實體手把與觸控。 |
+
+| UI-17 | 2026-10-29 | `feat(ui): support mouse mystery encounter options` | 新增 16 項互動測試與 18 項既有事件 Phase 回歸共 34 項通過，涵蓋二／三／四選項、需求模式、預選／失敗重試／單次接受、入場限制、原 CANCEL、重開延遲失效、遮罩與監聽清理。Chromium default／legacy 實測固定選項格、長文字、禁用項目、查看隊伍往返、右鍵不新增離開能力及重開通過；事件選擇使用替身回呼，不執行真實事件效果。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。既有資訊 hover 保留，EX-02 仍待辦；未測實體手把與觸控。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。
