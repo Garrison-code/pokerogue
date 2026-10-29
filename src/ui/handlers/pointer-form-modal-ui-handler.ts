@@ -14,6 +14,34 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
   private backdrop: Phaser.GameObjects.Zone | undefined;
   private domCleanups: (() => void)[] = [];
   private handled = false;
+
+  protected get pointerFormEnabled(): boolean {
+    return true;
+  }
+
+  protected processFormButton(index: number): void {
+    this.getUi().processInput(index === 0 ? Button.SUBMIT : Button.CANCEL);
+  }
+
+  protected releaseFormInput(): void {
+    this.handled = false;
+  }
+
+  protected invokeFormAction(action: (() => void) | undefined, submitting = false): boolean {
+    if (
+      !action
+      || !this.getUi().canProcessPointerInput(this)
+      || !this.modalContainer.visible
+      || this.handled
+      || globalScene.tweens.getTweensOf(this.modalContainer).length > 0
+      || (submitting && this.composing)
+    ) {
+      return false;
+    }
+    this.handled = true;
+    action();
+    return true;
+  }
   protected composing = false;
 
   private onButtonPointer(index: number, pointer: Phaser.Input.Pointer, event: Phaser.Types.Input.EventData): void {
@@ -24,61 +52,63 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
     if (pointer.rightButtonDown()) {
       this.getUi().processInput(Button.CANCEL);
     } else if (pointer.leftButtonDown()) {
-      this.getUi().processInput(index === 0 ? Button.SUBMIT : Button.CANCEL);
+      this.processFormButton(index);
     }
   }
 
   private bindInputEvents(): void {
-    const node = this.inputs[0]?.node;
-    if (!(node instanceof HTMLInputElement)) {
-      return;
+    for (const input of this.inputs) {
+      const node = input.node;
+      if (!(node instanceof HTMLInputElement)) {
+        continue;
+      }
+      const listen = <K extends keyof HTMLElementEventMap>(
+        name: K,
+        callback: (event: HTMLElementEventMap[K]) => void,
+      ) => {
+        node.addEventListener(name, callback);
+        this.domCleanups.push(() => node.removeEventListener(name, callback));
+      };
+      listen("pointerdown", event => {
+        event.stopPropagation();
+        if (event.pointerType && event.pointerType !== "mouse") {
+          return;
+        }
+        if (event.button === 2) {
+          event.preventDefault();
+          if (this.getUi().canProcessPointerInput(this)) {
+            this.getUi().processInput(Button.CANCEL);
+          }
+        }
+      });
+      listen("contextmenu", event => {
+        event.stopPropagation();
+        event.preventDefault();
+      });
+      listen("compositionstart", () => {
+        this.composing = true;
+      });
+      listen("compositionend", () => {
+        this.composing = false;
+        this.onFormCompositionEnd();
+      });
+      listen("keydown", event => {
+        // Keep text-editing keys from becoming gameplay CANCEL/ACTION or direction inputs.
+        event.stopPropagation();
+        if (event.isComposing || this.composing || event.keyCode === 229 || event.repeat) {
+          return;
+        }
+        if (this.handleFormKeyDown(event)) {
+          return;
+        }
+        if (event.key === "Enter" || event.key === "Escape") {
+          event.preventDefault();
+          if (this.getUi().canProcessPointerInput(this)) {
+            this.getUi().processInput(event.key === "Enter" ? Button.SUBMIT : Button.CANCEL);
+          }
+        }
+      });
     }
-    const listen = <K extends keyof HTMLElementEventMap>(
-      name: K,
-      callback: (event: HTMLElementEventMap[K]) => void,
-    ) => {
-      node.addEventListener(name, callback);
-      this.domCleanups.push(() => node.removeEventListener(name, callback));
-    };
-    listen("pointerdown", event => {
-      event.stopPropagation();
-      if (event.pointerType && event.pointerType !== "mouse") {
-        return;
-      }
-      if (event.button === 2) {
-        event.preventDefault();
-        if (this.getUi().canProcessPointerInput(this)) {
-          this.getUi().processInput(Button.CANCEL);
-        }
-      }
-    });
-    listen("contextmenu", event => {
-      event.stopPropagation();
-      event.preventDefault();
-    });
-    listen("compositionstart", () => {
-      this.composing = true;
-    });
-    listen("compositionend", () => {
-      this.composing = false;
-      this.onFormCompositionEnd();
-    });
-    listen("keydown", event => {
-      // Keep text-editing keys from becoming gameplay CANCEL/ACTION or direction inputs.
-      event.stopPropagation();
-      if (event.isComposing || this.composing || event.keyCode === 229 || event.repeat) {
-        return;
-      }
-      if (this.handleFormKeyDown(event)) {
-        return;
-      }
-      if (event.key === "Enter" || event.key === "Escape") {
-        event.preventDefault();
-        if (this.getUi().canProcessPointerInput(this)) {
-          this.getUi().processInput(event.key === "Enter" ? Button.SUBMIT : Button.CANCEL);
-        }
-      }
-    });
   }
 
   protected createPointerTargets(): void {
@@ -138,28 +168,22 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
     }
     this.domCleanups.length = 0;
     this.composing = false;
-    const node = this.inputs[0]?.node;
-    if (node instanceof HTMLElement) {
-      node.blur();
+    for (const input of this.inputs) {
+      const node = input.node;
+      if (node instanceof HTMLElement) {
+        node.blur();
+      }
     }
   }
 
   override processInput(button: Button): boolean {
-    if (
-      !this.getUi().canProcessPointerInput(this)
-      || this.handled
-      || globalScene.tweens.getTweensOf(this.modalContainer).length > 0
-    ) {
-      return false;
+    if (!this.pointerFormEnabled) {
+      return super.processInput(button);
     }
-    const action =
-      button === Button.SUBMIT ? this.submitAction : button === Button.CANCEL ? this.cancelAction : undefined;
-    if (!action || (button === Button.SUBMIT && this.composing)) {
-      return false;
-    }
-    this.handled = true;
-    action();
-    return true;
+    return this.invokeFormAction(
+      button === Button.SUBMIT ? this.submitAction : button === Button.CANCEL ? this.cancelAction : undefined,
+      button === Button.SUBMIT,
+    );
   }
 
   override clear(): void {
@@ -184,7 +208,9 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
       return false;
     }
     this.handled = false;
-    this.createPointerTargets();
+    if (this.pointerFormEnabled) {
+      this.createPointerTargets();
+    }
     return true;
   }
 }

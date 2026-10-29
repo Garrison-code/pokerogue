@@ -3,7 +3,7 @@ import { LANGUAGE_MAX_OPTIONS } from "#constants/app-constants";
 import { UiMode } from "#enums/ui-mode";
 import { SUPPORTED_LANGUAGE_ENTRIES } from "#system/supported-languages";
 import type { ModalConfig, OptionSelectItem, OptionSelectModeConfig } from "#types/ui-types";
-import { FormModalUiHandler } from "#ui/form-modal-ui-handler";
+import { PointerFormModalUiHandler } from "#ui/pointer-form-modal-ui-handler";
 import { fixedInt } from "#utils/common";
 import i18next from "i18next";
 import JSZip from "jszip";
@@ -31,7 +31,11 @@ const MAX_SAVES_FOR_USERNAME_PANEL = 7;
 const ERR_NO_SAVES: string = "No save files found";
 const ERR_TOO_MANY_SAVES: string = "Too many save files found";
 
-export abstract class LoginRegisterInfoContainerUiHandler extends FormModalUiHandler {
+export abstract class LoginRegisterInfoContainerUiHandler extends PointerFormModalUiHandler {
+  protected override get pointerFormEnabled(): boolean {
+    return false;
+  }
+
   private usernameInfoImage: Phaser.GameObjects.Image;
   private saveDownloadImage: Phaser.GameObjects.Image;
   private changeLanguageImage: Phaser.GameObjects.Image;
@@ -65,6 +69,10 @@ export abstract class LoginRegisterInfoContainerUiHandler extends FormModalUiHan
 
   public override clear(): void {
     super.clear();
+    for (const image of [this.usernameInfoImage, this.saveDownloadImage, this.changeLanguageImage]) {
+      image.off("pointerdown");
+    }
+    globalScene.tweens.killTweensOf(this.infoContainer);
     this.infoContainer //
       .setVisible(false)
       .setActive(false);
@@ -99,6 +107,10 @@ export abstract class LoginRegisterInfoContainerUiHandler extends FormModalUiHan
       .setVisible(true);
     this.getUi().moveTo(this.infoContainer, this.getUi().length - 1);
 
+    for (const image of [this.usernameInfoImage, this.saveDownloadImage, this.changeLanguageImage]) {
+      image.off("pointerdown");
+    }
+    globalScene.tweens.killTweensOf(this.infoContainer);
     this.usernameInfoImage //
       .setPositionRelative(this.infoContainer, 0, 0)
       .on("pointerdown", () => this.showUsernames(config));

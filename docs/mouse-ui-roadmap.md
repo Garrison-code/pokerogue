@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 40 項完成、14 項待辦；EX 項目與 UI-41 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 41 項完成、13 項待辦；EX 項目與 UI-41 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -273,9 +273,23 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## Phase 5：帳號、資料管理、狀態與維護工具
 
-部分介面已有滑鼠操作，仍須逐項確認；管理員／測試專用畫面排在玩家主要流程之後。
+### UI-41～UI-48 決策（2026-10-29）
 
-- [ ] **UI-41** 登入／註冊入口 — `LOGIN_OR_REGISTER`。
+- 依 UI-41 → UI-48 實作、驗證、更新紀錄、各自 commit 並 push；所有 EX 保持待辦，定案不代表完成。
+- 既有表單與按鈕保留單擊執行，不新增選取游標。登入／註冊入口第二個按鈕為註冊，不能當成取消；該入口 CANCEL 維持無作用。
+- 登入、註冊、改密碼、管理員與對話測試補齊共用 CANCEL；取消按鈕、Escape／鍵盤 CANCEL 與框內右鍵共用原回呼與音效。右鍵只送 UI.processInput(Button.CANCEL)。
+- 先消耗事件，再檢查目前 handler、啟用、教學及轉場；框外只阻擋，上層不得穿透。中鍵、觸控及滾輪不走新增操作，候選仍沿用 UI-35。
+- 共用表單處理所有輸入欄位、密碼／唯讀、原生編輯與組字保護；按鈕以實際索引分派。清理 DOM／Phaser 監聽、焦點延遲、動態欄位與進場動畫。
+- 提交擷取當次欄位值及回呼，防止連點／Enter 重複。非同步工作核對操作與當次 LOADING 身分，正常進入 LOADING 保留工作，過期結果不得切頁、發聲或啟動後續請求。
+- 保留登入／註冊／改密碼驗證與原 API；註冊後登入失敗仍 2 秒重試一次，保存並清理重試計時器。
+- LOADING／UNAVAILABLE 不新增操作，右鍵 CANCEL 維持無作用。重連保持 5 秒起始、倍增至 5 分鐘、最多額外 10 秒隨機間隔及原狀態碼處理；只保留單一有效請求，清理計時器與晚到結果。
+- ADMIN 驗證 LINK／SEARCH／ADMIN、唯讀、服務連結／解除、Stats／Pokedex 與原返回層級；子頁返回可再次操作，無資料保留原錯誤，不放寬權限。
+- TEST_DIALOGUE 保留 255 字元、空白參數與原 Unicode 編碼；候選只替換最後一段、不提交 Check，Enter／Escape／空白與焦點沿用 UI-35。預覽保留鍵盤／手把推進，滑鼠待 EX-01。
+- 帳號側欄維持功能與層級，必要生命週期修正不完成 EX-04；第三方授權、下載、匯入皆不擴充。本批不修改公開設定型別、呼叫端、API 契約、驗證規則或存檔格式。
+- 各頁以互動測試及 Chromium default／legacy 驗證，使用假帳號／替身 API 與持久化。回歸 UI-01～40、鍵盤／模擬手把及 API；執行型別、Biome、Vitest、build、REUSE、Dependency Cruiser、diff check 及最終 HEAD CI。未測實體裝置／OS IME 如實記錄。
+- 八項完成後才為 48 完成、6 待辦；六個 EX 仍未完成，不合併或發布 PR。
+
+- [x] **UI-41** 登入／註冊入口 — `LOGIN_OR_REGISTER`。
 - [ ] **UI-42** 登入表單 — `LOGIN_FORM`。
 - [ ] **UI-43** 註冊表單 — `REGISTRATION_FORM`。
 - [ ] **UI-44** 修改密碼 — `CHANGE_PASSWORD_FORM`。
@@ -299,7 +313,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-40；其餘 14 個項目保持待辦。Phase 2、Phase 3 與 Phase 4 的 UI 項目已完成，所有 EX 與 Phase 5 仍待辦；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-41；其餘 13 個項目保持待辦。Phase 2、Phase 3 與 Phase 4 的 UI 項目已完成，所有 EX 與 UI-42 起仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -364,3 +378,5 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 | UI-38 | 2026-10-29 | `feat(ui): support mouse run history navigation` | 11 項新增互動測試通過，包含舊載入結果失效、連續捲動時舊 tween 回呼不解除新鎖定。Chromium default／legacy 實測卡片選取、連續滾輪、首末邊界及正確紀錄開啟通過。清理卡片、捲動與載入身分，保留原鍵盤循環／CANCEL；補齊 headless 文字 append 模擬。typecheck、修改檔案 Biome、build:dev、diff check 通過；測試紀錄及替身資料來源，未讀寫真實存檔。 |
 | UI-39 | 2026-10-29 | `feat(ui): support mouse run information views` | 8 項新增互動測試通過；Chromium default／legacy 實測名人堂／結局圖、右鍵先關覆蓋層、存檔預覽及持有道具切換通過。僅沿用原循環輸入與 CANCEL；清理所有容器與監聽，過期訓練家／名人堂素材不回填；預覽不沿用上一局勝利狀態，結局容器可重用並隨清除銷毀。typecheck、修改檔案 Biome、build:dev、diff check 通過；使用測試紀錄／隊伍與替身資料，不讀寫真實存檔。 |
 | UI-40 | 2026-10-29 | `feat(ui): support mouse run renaming` | 19 項命名互動與 5 項既有紀錄命名測試通過；Chromium default／legacy 從實際存檔管理入口實測 Unicode 名稱、原編碼、替身 renameSession 與返回通過。沿用共用表單的單擊提交／取消、鍵盤／右鍵 CANCEL、組字保護與單次回呼。整批新增 145 項測試：54 檔回歸 759 項通過（4 檔 skipped、22 todo），另 24 項收尾回歸補齊 1 項新案例，累計 760 個不同案例。收尾一併補強 UI-28／31 重用格子資訊與圖示身分、離屏／空列表清理、UI-30 保留既有資訊 hover 的場景及訊息點擊分層、UI-33 箭頭避開操作列與晚到 cry 失效、UI-36 離屏切頁／退出；新增抽蛋等待 Promise 清理及 UI-48 共用候選整合測試（UI-48 本身仍待辦）。13 頁 Chromium default／legacy 與實際抽蛋動畫通過；孵蛋略過／訊息由原 Phase 與替身回呼驗證。typecheck、main／github／js 型別、build:dev、全量 Biome、Dependency Cruiser、REUSE 及 diff check 通過，GitHub CI 以最終 HEAD 為準。測試資料與替身保存，未測實體手把／觸控及 OS 原生 IME；Phase 4 UI 完成，40 完成、14 待辦，所有 EX 與 Phase 5 保持待辦，不合併或發布 PR。 |
+
+| UI-41 | 2026-10-29 | `feat(ui): support mouse login entry` | 新增 10 項入口互動測試與搜尋／兩種命名 52 項回歸通過。Chromium default／legacy 實測登入／註冊獨立單擊、連點防重複、右鍵無作用與重開通過；沿用現有側欄層級，未擴充 EX-04。共用表單改為所有欄位 DOM 監聽與可覆寫按鈕分派，側欄監聽去重及動畫清理。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。使用替身入口，未操作真實帳號；未測實體裝置／OS IME。 |

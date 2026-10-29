@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { Button } from "#enums/buttons";
 import type { ModalConfig } from "#types/ui-types";
 import type { InputFieldConfig } from "#ui/form-modal-ui-handler";
 import { LoginRegisterInfoContainerUiHandler } from "#ui/login-register-info-container-ui-handler";
@@ -6,6 +7,22 @@ import i18next from "i18next";
 import type Phaser from "phaser";
 
 export class LoginOrRegisterUiHandler extends LoginRegisterInfoContainerUiHandler {
+  protected override get pointerFormEnabled(): boolean {
+    return true;
+  }
+
+  protected override processFormButton(index: number): void {
+    if (index === 1) {
+      this.invokeFormAction(this.cancelAction);
+    } else {
+      super.processFormButton(index);
+    }
+  }
+
+  override processInput(button: Button): boolean {
+    return button === Button.CANCEL ? false : super.processInput(button);
+  }
+
   private logo: Phaser.GameObjects.Image;
 
   public override getModalTitle(): string {
