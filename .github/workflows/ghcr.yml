@@ -25,7 +25,7 @@ on:
         type: string
         default: ''
       resume:
-        description: Manually acknowledge a failure/unfinished deployment and retry
+        description: Force a manual retry or recover an unfinished deployment
         type: boolean
         default: false
 
@@ -275,7 +275,7 @@ jobs:
             container/check_static.py
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: Validate publications, deduplicate and check the failure latch
+      - name: Validate publications, deduplicate and check unfinished deployments
         id: prepare
         run: python3 .github/scripts/dev_deploy.py prepare
       - name: Join Tailscale with short-lived OIDC identity
@@ -297,8 +297,60 @@ jobs:
           path: ${{ runner.temp }}/dev-deploy-report.json
           if-no-files-found: ignore
           retention-days: 30
-      - name: Record success or stop subsequent automatic deployments
+      - name: Record this deployment result
         if: always() && steps.checkout.outcome == 'success'
         env:
           JOB_STATUS: ${{ job.status }}
         run: python3 .github/scripts/dev_deploy.py finalize
+  registry-ready-production:
+    needs: publish
+    if: >-
+      always() &&
+      github.ref == 'refs/heads/beta' &&
+      needs.publish.result == 'success' && needs.publish.outputs.image_digest != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      ready: ${{ steps.registry.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - name: Confirm the published tag and build identity in GHCR
+        id: registry
+        env:
+          PROD_AUTO_DEPLOY_ENABLED: ${{ vars.PROD_AUTO_DEPLOY_ENABLED }}
+          BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          PUBLISHED_DIGEST: ${{ needs.publish.outputs.image_digest }}
+        run: python3 .github/scripts/publish_production.py published
+
+  notify-production:
+    needs: [publish, registry-ready-production]
+    if: >-
+      always() &&
+      vars.PROD_AUTO_DEPLOY_ENABLED == 'true' &&
+      github.ref == 'refs/heads/beta' &&
+      needs.publish.result == 'success' &&
+      needs.registry-ready-production.result == 'success' &&
+      needs.registry-ready-production.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - name: Notify the frontend coordinator after registry confirmation
+        env:
+          PROD_AUTO_DEPLOY_ENABLED: ${{ vars.PROD_AUTO_DEPLOY_ENABLED }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          PUBLISHED_DIGEST: ${{ needs.publish.outputs.image_digest }}
+        run: python3 .github/scripts/publish_production.py notify
+
