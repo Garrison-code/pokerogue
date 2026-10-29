@@ -16,6 +16,10 @@ const ERR_FAILED_TO_GENERATE_TOKEN = "failed to generate token";
 const ERR_FAILED_TO_ADD_SESSION = "failed to add account session";
 
 export class LoginFormUiHandler extends OAuthProvidersUiHandler {
+  protected override get pointerFormEnabled(): boolean {
+    return true;
+  }
+
   public override getModalTitle(): string {
     if (import.meta.env.VITE_SERVER_URL === "https://apibeta.pokerogue.net") {
       return i18next.t("menu:loginBeta");
@@ -83,36 +87,38 @@ export class LoginFormUiHandler extends OAuthProvidersUiHandler {
     this.processExternalProvider();
     this.showInfoContainer(config);
     const originalLoginAction = this.submitAction;
-    this.submitAction = () => {
-      if (globalScene.tweens.getTweensOf(this.modalContainer).length > 0) {
-        return;
-      }
-      // Prevent overlapping overrides on action modification
-      this.submitAction = originalLoginAction;
+    this.submitAction = async () => {
       this.sanitizeInputs();
-      globalScene.ui.setMode(UiMode.LOADING, { buttonActions: [] });
+      const username = this.inputs[0].text;
+      const password = this.inputs[1].text;
+      const current = await this.beginLoadingOperation();
       const onFail = (error: string | null) => {
-        globalScene.ui.setMode(UiMode.LOGIN_FORM, Object.assign(config, { errorMessage: error?.trim() }));
+        if (!current()) {
+          return;
+        }
+        globalScene.ui.setMode(UiMode.LOGIN_FORM, { ...config, errorMessage: error?.trim() });
         globalScene.ui.playError();
       };
-      if (!this.inputs[0].text) {
-        return onFail(i18next.t("menu:emptyUsername"));
+      if (!current()) {
+        return;
       }
-
-      const [usernameInput, passwordInput] = this.inputs;
-
-      pokerogueApi.account
-        .login({
-          username: usernameInput.text,
-          password: passwordInput.text,
-        })
-        .then(error => {
-          if (!error && originalLoginAction) {
-            originalLoginAction();
-          } else {
-            onFail(error);
-          }
-        });
+      if (!username) {
+        onFail(i18next.t("menu:emptyUsername"));
+        return;
+      }
+      try {
+        const error = await pokerogueApi.account.login({ username, password });
+        if (!current()) {
+          return;
+        }
+        if (!error && originalLoginAction) {
+          originalLoginAction();
+        } else {
+          onFail(error);
+        }
+      } catch (error) {
+        onFail(String(error));
+      }
     };
 
     return true;

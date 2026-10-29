@@ -4,6 +4,27 @@ import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 
 export class LoadingModalUiHandler extends ModalUiHandler {
+  private generation = 0;
+
+  public get displayId(): number {
+    return this.generation;
+  }
+
+  override show(args: any[]): boolean {
+    this.generation++;
+    return super.show(args);
+  }
+
+  override clear(): void {
+    this.generation++;
+    super.clear();
+  }
+
+  override destroy(): void {
+    this.clear();
+    this.modalContainer.destroy();
+  }
+
   getModalTitle(): string {
     return "";
   }

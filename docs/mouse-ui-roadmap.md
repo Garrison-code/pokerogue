@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 41 項完成、13 項待辦；EX 項目與 UI-41 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 42 項完成、12 項待辦；EX 項目與 UI-41 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -290,7 +290,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 八項完成後才為 48 完成、6 待辦；六個 EX 仍未完成，不合併或發布 PR。
 
 - [x] **UI-41** 登入／註冊入口 — `LOGIN_OR_REGISTER`。
-- [ ] **UI-42** 登入表單 — `LOGIN_FORM`。
+- [x] **UI-42** 登入表單 — `LOGIN_FORM`。
 - [ ] **UI-43** 註冊表單 — `REGISTRATION_FORM`。
 - [ ] **UI-44** 修改密碼 — `CHANGE_PASSWORD_FORM`。
 - [ ] **EX-04** 第三方登入與帳號資訊／存檔下載區；`oauth-providers-ui-handler.ts`、`login-register-info-container-ui-handler.ts`，已有部分點擊。
@@ -313,7 +313,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-41；其餘 13 個項目保持待辦。Phase 2、Phase 3 與 Phase 4 的 UI 項目已完成，所有 EX 與 UI-42 起仍待辦；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-42；其餘 12 個項目保持待辦。所有 EX 與 UI-43 起仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -380,3 +380,5 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 | UI-40 | 2026-10-29 | `feat(ui): support mouse run renaming` | 19 項命名互動與 5 項既有紀錄命名測試通過；Chromium default／legacy 從實際存檔管理入口實測 Unicode 名稱、原編碼、替身 renameSession 與返回通過。沿用共用表單的單擊提交／取消、鍵盤／右鍵 CANCEL、組字保護與單次回呼。整批新增 145 項測試：54 檔回歸 759 項通過（4 檔 skipped、22 todo），另 24 項收尾回歸補齊 1 項新案例，累計 760 個不同案例。收尾一併補強 UI-28／31 重用格子資訊與圖示身分、離屏／空列表清理、UI-30 保留既有資訊 hover 的場景及訊息點擊分層、UI-33 箭頭避開操作列與晚到 cry 失效、UI-36 離屏切頁／退出；新增抽蛋等待 Promise 清理及 UI-48 共用候選整合測試（UI-48 本身仍待辦）。13 頁 Chromium default／legacy 與實際抽蛋動畫通過；孵蛋略過／訊息由原 Phase 與替身回呼驗證。typecheck、main／github／js 型別、build:dev、全量 Biome、Dependency Cruiser、REUSE 及 diff check 通過，GitHub CI 以最終 HEAD 為準。測試資料與替身保存，未測實體手把／觸控及 OS 原生 IME；Phase 4 UI 完成，40 完成、14 待辦，所有 EX 與 Phase 5 保持待辦，不合併或發布 PR。 |
 
 | UI-41 | 2026-10-29 | `feat(ui): support mouse login entry` | 新增 10 項入口互動測試與搜尋／兩種命名 52 項回歸通過。Chromium default／legacy 實測登入／註冊獨立單擊、連點防重複、右鍵無作用與重開通過；沿用現有側欄層級，未擴充 EX-04。共用表單改為所有欄位 DOM 監聽與可覆寫按鈕分派，側欄監聽去重及動畫清理。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。使用替身入口，未操作真實帳號；未測實體裝置／OS IME。 |
+
+| UI-42 | 2026-10-29 | `feat(ui): support mouse account login` | 新增 17 項登入互動測試，連同入口共 27 項通過；涵蓋所有欄位取消／組字、單次提交、空帳號、錯誤重試及離頁／另一個 LOADING／銷毀後舊結果失效。Chromium default／legacy 實測原生帳密編輯、密碼遮罩、單擊提交與右鍵／Escape 返回通過。加入內部 LOADING 顯示身分與表單操作識別，正常進入等待不取消當次工作；OAuth 動畫生命週期清理，不擴充 EX-04。typecheck、build:dev、修改檔案 Biome、diff check 通過。全部登入使用替身 API／回呼，未測真實授權與實體裝置。 |

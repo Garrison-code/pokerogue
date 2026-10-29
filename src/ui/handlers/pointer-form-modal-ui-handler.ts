@@ -5,7 +5,9 @@
  */
 import { globalScene } from "#app/global-scene";
 import { Button } from "#enums/buttons";
+import { UiMode } from "#enums/ui-mode";
 import { FormModalUiHandler } from "#ui/form-modal-ui-handler";
+import type { LoadingModalUiHandler } from "#ui/loading-modal-ui-handler";
 import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 
 /** Explicit opt-in mouse/DOM lifecycle for player text forms. */
@@ -14,6 +16,23 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
   private backdrop: Phaser.GameObjects.Zone | undefined;
   private domCleanups: (() => void)[] = [];
   private handled = false;
+  private operationId = 0;
+
+  /** Keep the submitted work alive across its own clear-to-LOADING, but never another display. */
+  protected async beginLoadingOperation(): Promise<() => boolean> {
+    const operationId = ++this.operationId;
+    const scene = globalScene;
+    const ui = this.getUi();
+    await ui.setMode(UiMode.LOADING, { buttonActions: [] });
+    const loading = ui.handlers[UiMode.LOADING] as LoadingModalUiHandler;
+    const displayId = loading.displayId;
+    return () =>
+      globalScene === scene
+      && operationId === this.operationId
+      && loading.active
+      && ui.getHandler() === loading
+      && displayId === loading.displayId;
+  }
 
   protected get pointerFormEnabled(): boolean {
     return true;
@@ -192,6 +211,7 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
   }
 
   override destroy(): void {
+    this.operationId++;
     this.stopPointerInput();
     super.destroy();
     this.active = false;
@@ -203,6 +223,7 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
   protected onFormCompositionEnd(): void {}
 
   override show(args: any[]): boolean {
+    this.operationId++;
     this.stopPointerInput();
     if (!super.show(args)) {
       return false;
