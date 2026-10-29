@@ -40,6 +40,11 @@ export class RibbonTray extends Phaser.GameObjects.Container {
     this.add(this.trayCursorObj);
   }
 
+  /** Geometry is exposed only for the owning page's explicit mouse support. */
+  getPointerTargets() {
+    return { icons: this.trayIcons, width: this.trayBg.width, height: this.trayBg.height };
+  }
+
   processInput(button: Button) {
     let success = false;
 
