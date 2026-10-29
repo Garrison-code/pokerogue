@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 45 項完成、9 項待辦；EX 項目與 UI-41 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 46 項完成、8 項待辦；EX 項目與 UI-41 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -297,7 +297,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [ ] **EX-05** 合併匯入資料視窗 — `src/ui/system-merge-dialog.ts`；包含檔案來源、預覽、移除、取消與確認，已有 DOM 操作。
 - [ ] **EX-06** 一般資料匯入選檔入口／iOS 上傳覆蓋層 — `src/system/game-data.ts` 的 `importData`；資料管理選單本身由 UI-04 涵蓋。
 - [x] **UI-45** 載入中彈窗 — `LOADING`；確認等待期間的輸入行為即可，不預設需要新增操作。
-- [ ] **UI-46** 功能不可用提示 — `UNAVAILABLE`。
+- [x] **UI-46** 功能不可用提示 — `UNAVAILABLE`。
 - [ ] **UI-47** 管理員工具 — `ADMIN`。
 - [ ] **UI-48** 翻譯／對話測試工具 — `TEST_DIALOGUE`。
 
@@ -313,7 +313,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-45；其餘 9 個項目保持待辦。所有 EX 與 UI-46 起仍待辦；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-46；其餘 8 個項目保持待辦。所有 EX 與 UI-47 起仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -388,3 +388,5 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 | UI-44 | 2026-10-29 | `feat(ui): support mouse password changes` | 新增 20 項互動測試通過，涵蓋單次提交、全部欄位組字／取消、空密碼／不符、錯誤重試、成功與取消清空、晚到結果失效。Chromium default／legacy 實測兩個密碼欄編輯、單擊提交、右鍵與 Escape 返回通過。沿用原 API、錯誤映射及音效，共用 LOADING 身分保護；typecheck、build:dev、修改檔案 Biome 與 diff check 通過。全部請求為替身，不修改真實密碼；未測實體裝置／OS IME。 |
 
 | UI-45 | 2026-10-29 | `feat(ui): shield loading modal pointer input` | 新增 12 項等待畫面測試通過；與登入／註冊首輪 50 項、收尾等待／登入 30 項通過，另補齊同輪微任務替換 LOADING 不取得新流程的案例。Chromium default／legacy 實測本體／框外阻擋、右鍵 CANCEL 無作用、重開與原 fadeOut 工作單次開始通過。新增明確啟用的狀態 modal 基礎；清理互動、舊淡出遮罩／tween 與計時器，過期淡出回呼失效。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。未新增關閉能力，資料操作為替身；未測實體裝置。 |
+
+| UI-46 | 2026-10-29 | `feat(ui): guard unavailable modal reconnect lifecycle` | 新增 17 項互動／假時間測試通過，涵蓋原 5 秒起始、倍增上限與隨機間隔、成功／200／400、401 原 session 重設、拒絕、單一有效請求及 clear／重開／destroy 舊結果失效。Chromium default／legacy 實測左鍵／滾輪無作用、右鍵原 CANCEL、單次重連成功與重開通過；使用隔離 Guest fixture，不連真實帳號。沿用 UI-45 遮罩，保存並移除重連計時器；typecheck、build:dev 與 UI-45 共用同次已驗證工作樹，修改檔案 Biome、diff check 通過。未新增重試按鈕或取消能力；未測實體裝置。 |
