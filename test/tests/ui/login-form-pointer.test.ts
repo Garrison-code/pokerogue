@@ -146,4 +146,11 @@ describe("UI - login form pointer input", () => {
     }
     expect(cancel).not.toHaveBeenCalled();
   });
+  it("does not acquire another waiting display within the submission microtask", async () => {
+    click();
+    void game.scene.ui.setMode(UiMode.MESSAGE);
+    void game.scene.ui.setMode(UiMode.LOADING, { buttonActions: [] });
+    await new Promise(r => setTimeout(r, 0));
+    expect(pokerogueApi.account.login).not.toHaveBeenCalled();
+  });
 });

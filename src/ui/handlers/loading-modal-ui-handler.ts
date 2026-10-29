@@ -1,10 +1,10 @@
 import { globalScene } from "#app/global-scene";
 import { TextStyle } from "#enums/text-style";
-import { ModalUiHandler } from "#ui/modal-ui-handler";
+import { PointerModalUiHandler } from "#ui/pointer-modal-ui-handler";
 import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 
-export class LoadingModalUiHandler extends ModalUiHandler {
+export class LoadingModalUiHandler extends PointerModalUiHandler {
   private generation = 0;
   private readonly operationTimers = new Set<Phaser.Time.TimerEvent>();
 
