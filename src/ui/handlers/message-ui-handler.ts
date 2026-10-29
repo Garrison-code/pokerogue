@@ -1,6 +1,7 @@
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
+import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { addBBCodeTextObject } from "#ui/text";
@@ -12,6 +13,53 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
   protected textTimer: Phaser.Time.TimerEvent | null;
   protected textCallbackTimer: Phaser.Time.TimerEvent | null;
   public pendingPrompt = false;
+  private textDisplayId = 0;
+  private pointerMessagePending = false;
+  private finishText: (() => void) | null = null;
+  protected promptTimer: Phaser.Time.TimerEvent | null = null;
+  private releaseFade: (() => void) | null = null;
+  private pauseTween: Phaser.Tweens.Tween | null = null;
+  private readonly messageTimers = new Set<Phaser.Time.TimerEvent>();
+
+  /** Internal mouse state: ordinary description text never becomes an action. */
+  get hasPointerMessage(): boolean {
+    return this.pointerMessagePending || (!!this.awaitingActionInput && !!this.onActionInput);
+  }
+
+  processPointerMessage(): boolean {
+    if (this.finishText && this.pointerMessagePending) {
+      this.finishText();
+      return true;
+    }
+    if (this.pendingPrompt || !this.awaitingActionInput || !this.onActionInput) {
+      return false;
+    }
+    return this.getUi().processInput(Button.ACTION);
+  }
+
+  private stopMessage(): void {
+    ++this.textDisplayId;
+    this.releaseFade?.();
+    this.releaseFade = null;
+    this.textTimer?.remove(false);
+    this.textTimer = null;
+    this.textCallbackTimer?.remove(false);
+    this.textCallbackTimer = null;
+    this.promptTimer?.remove(false);
+    this.promptTimer = null;
+    this.pauseTween?.remove();
+    this.pauseTween = null;
+    for (const timer of this.messageTimers) {
+      timer.remove(false);
+    }
+    this.messageTimers.clear();
+    this.finishText = null;
+    this.pointerMessagePending = false;
+    this.pendingPrompt = false;
+    this.awaitingActionInput = false;
+    this.onActionInput = null;
+    this.prompt?.setVisible(false);
+  }
 
   public message: Phaser.GameObjects.Text;
   public prompt: Phaser.GameObjects.Sprite;
@@ -105,14 +153,17 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
     prompt?: boolean | null,
     promptDelay?: number | null,
   ) {
+    this.stopMessage();
+    const textDisplayId = this.textDisplayId;
+    const current = () => textDisplayId === this.textDisplayId;
+    this.pointerMessagePending = !!prompt;
     if (delay === null || delay === undefined) {
       delay = 20;
     }
 
     // Pattern matching regex that checks for @c{}, @f{}, @s{}, and @f{} patterns within message text and parses them to their respective behaviors.
-    const charVarMap = new Map<number, string>();
+    const effects = new Map<number, (() => void)[]>();
     const delayMap = new Map<number, number>();
-    const soundMap = new Map<number, string>();
     const fadeMap = new Map<number, number>();
     const actionPattern = /@(c|d|s|f)\{(.*?)\}/;
     let actionMatch: RegExpExecArray | null;
@@ -123,15 +174,22 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
       text = text.split(pokename[p]).join(repname[p]);
     }
     while ((actionMatch = actionPattern.exec(text))) {
+      const value = actionMatch[2];
       switch (actionMatch[1]) {
         case "c":
-          charVarMap.set(actionMatch.index, actionMatch[2]);
+          effects.set(actionMatch.index, [
+            ...(effects.get(actionMatch.index) ?? []),
+            () => globalScene.charSprite.setVariant(value),
+          ]);
           break;
         case "d":
           delayMap.set(actionMatch.index, Number.parseInt(actionMatch[2]));
           break;
         case "s":
-          soundMap.set(actionMatch.index, actionMatch[2]);
+          effects.set(actionMatch.index, [
+            ...(effects.get(actionMatch.index) ?? []),
+            () => audioManager.playSound(value),
+          ]);
           break;
         case "f":
           fadeMap.set(actionMatch.index, Number.parseInt(actionMatch[2]));
@@ -173,80 +231,166 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
       }
     }
 
-    if (this.textTimer) {
-      this.textTimer.remove();
-      if (this.textCallbackTimer) {
-        this.textCallbackTimer.callback();
-      }
-    }
-    if (prompt) {
-      const originalCallback = callback;
-      callback = () => {
-        const showPrompt = () => this.showPrompt(originalCallback, callbackDelay);
-        if (promptDelay) {
-          globalScene.time.delayedCall(promptDelay, showPrompt);
-        } else {
-          showPrompt();
+    const originalCallback = callback;
+    const later = (duration: number, action: () => void) => {
+      const timer = globalScene.time.delayedCall(duration, () => {
+        this.messageTimers.delete(timer);
+        if (current()) {
+          action();
         }
-      };
-    }
-    if (delay) {
-      this.clearText();
-      if (prompt) {
-        this.pendingPrompt = true;
+      });
+      this.messageTimers.add(timer);
+      return timer;
+    };
+    const completed = () => {
+      if (!current()) {
+        return;
       }
+      if (prompt) {
+        const show = () => {
+          this.promptTimer = null;
+          if (current()) {
+            this.showPrompt(originalCallback, callbackDelay);
+          }
+        };
+        if (promptDelay) {
+          this.promptTimer = later(promptDelay, show);
+        } else {
+          show();
+        }
+      } else if (originalCallback) {
+        if (delay && callbackDelay) {
+          this.textCallbackTimer = later(callbackDelay, () => {
+            this.textCallbackTimer = null;
+            originalCallback();
+          });
+        } else {
+          originalCallback();
+        }
+      }
+    };
+    let processed = -1;
+    let done = false;
+    let revealing = false;
+    let fading = false;
+    const finish = () => {
+      if (done || !current()) {
+        return;
+      }
+      done = true;
+      this.textTimer?.remove(false);
+      this.textTimer = null;
+      this.finishText = null;
+      completed();
+    };
+    const apply = (index: number) => {
+      if (!current() || index <= processed) {
+        return;
+      }
+      processed = index;
+      for (const effect of effects.get(index) ?? []) {
+        effect();
+      }
+    };
+    const fade = (index: number, frames: number) => {
+      fading = true;
+      if (this.textTimer) {
+        this.textTimer.paused = true;
+      }
+      later(150, () => {
+        const ui = this.getUi();
+        const fadeOut = ui.fadeOut(750);
+        const fadeId = ui.currentFadeId;
+        this.releaseFade = () => ui.cancelMessageFade(fadeId);
+        fadeOut.then(() => {
+          if (!current()) {
+            return;
+          }
+          later(getFrameMs(frames), () => {
+            const fadeIn = ui.fadeIn(500);
+            const fadeInId = ui.currentFadeId;
+            this.releaseFade = () => ui.cancelMessageFade(fadeInId);
+            fadeIn.then(() => {
+              if (!current()) {
+                return;
+              }
+              this.releaseFade = null;
+              fading = false;
+              apply(index);
+              if (revealing) {
+                reveal();
+              } else if (index === text.length) {
+                finish();
+              } else if (this.textTimer) {
+                this.textTimer.paused = false;
+              }
+            });
+          });
+        });
+      });
+    };
+    const reveal = () => {
+      if (!current() || done) {
+        return;
+      }
+      revealing = true;
+      this.textTimer?.remove(false);
+      this.textTimer = null;
+      this.pauseTween?.remove();
+      this.pauseTween = null;
+      if (fading) {
+        return;
+      }
+      for (let index = processed + 1; index <= text.length; index++) {
+        this.message.setText(text.slice(0, index));
+        const frames = fadeMap.get(index);
+        if (frames) {
+          fade(index, frames);
+          return;
+        }
+        apply(index);
+      }
+      finish();
+    };
+    this.pendingPrompt = !!prompt;
+    if (delay) {
+      this.message.setText("");
+      this.finishText = reveal;
       this.textTimer = globalScene.time.addEvent({
         delay,
         callback: () => {
-          const charIndex = text.length - this.textTimer?.repeatCount!; // TODO: is this bang correct?
-          const charVar = charVarMap.get(charIndex);
-          const charSound = soundMap.get(charIndex);
-          const charDelay = delayMap.get(charIndex);
-          const charFade = fadeMap.get(charIndex);
-          this.message.setText(text.slice(0, charIndex));
+          if (!current() || done || !this.textTimer) {
+            return;
+          }
+          const index = text.length - this.textTimer.repeatCount;
+          this.message.setText(text.slice(0, index));
           const advance = () => {
-            if (charVar) {
-              globalScene.charSprite.setVariant(charVar);
+            if (!current()) {
+              return;
             }
-            if (charSound) {
-              audioManager.playSound(charSound);
-            }
-            if (callback && !this.textTimer?.repeatCount) {
-              if (callbackDelay && !prompt) {
-                this.textCallbackTimer = globalScene.time.delayedCall(callbackDelay, () => {
-                  if (this.textCallbackTimer) {
-                    this.textCallbackTimer.destroy();
-                    this.textCallbackTimer = null;
-                  }
-                  callback();
-                });
-              } else {
-                callback();
-              }
+            apply(index);
+            if (index === text.length) {
+              finish();
             }
           };
+          const charDelay = delayMap.get(index);
+          const frames = fadeMap.get(index);
           if (charDelay) {
-            this.textTimer!.paused = true; // TODO: is the bang correct?
-            globalScene.tweens.addCounter({
+            this.textTimer.paused = true;
+            this.pauseTween = globalScene.tweens.addCounter({
               duration: getFrameMs(charDelay),
               onComplete: () => {
-                this.textTimer!.paused = false; // TODO: is the bang correct?
-                advance();
+                if (current()) {
+                  this.pauseTween = null;
+                  if (this.textTimer) {
+                    this.textTimer.paused = false;
+                  }
+                  advance();
+                }
               },
             });
-          } else if (charFade) {
-            this.textTimer!.paused = true;
-            globalScene.time.delayedCall(150, () => {
-              globalScene.ui.fadeOut(750).then(() => {
-                const delay = getFrameMs(charFade);
-                globalScene.time.delayedCall(delay, () => {
-                  globalScene.ui.fadeIn(500).then(() => {
-                    this.textTimer!.paused = false;
-                    advance();
-                  });
-                });
-              });
-            });
+          } else if (frames) {
+            fade(index, frames);
           } else {
             advance();
           }
@@ -255,16 +399,14 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
       });
     } else {
       this.message.setText(text);
-      if (prompt) {
-        this.pendingPrompt = true;
-      }
-      if (callback) {
-        callback();
-      }
+      finish();
     }
+    this.getUi().updateMessagePointer?.();
   }
 
   showPrompt(callback?: (() => void) | null, callbackDelay?: number | null) {
+    const textDisplayId = this.textDisplayId;
+    this.pointerMessagePending = true;
     const wrappedTextLines = this.message.runWordWrap(this.message.text).split(/\n/g);
     const textLinesCount = wrappedTextLines.length;
     const lastTextLine = wrappedTextLines.at(-1) ?? "";
@@ -281,24 +423,28 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
     this.pendingPrompt = false;
     this.awaitingActionInput = true;
     this.onActionInput = () => {
-      if (this.prompt) {
-        this.prompt.anims.stop();
-        this.prompt.setVisible(false);
+      if (textDisplayId !== this.textDisplayId) {
+        return;
       }
-      if (callback) {
-        if (callbackDelay) {
-          this.textCallbackTimer = globalScene.time.delayedCall(callbackDelay, () => {
-            if (this.textCallbackTimer) {
-              this.textCallbackTimer.destroy();
-              this.textCallbackTimer = null;
-            }
-            callback();
-          });
-        } else {
-          callback();
+      this.awaitingActionInput = false;
+      this.onActionInput = null;
+      this.prompt?.anims.stop();
+      this.prompt?.setVisible(false);
+      const complete = () => {
+        if (textDisplayId === this.textDisplayId) {
+          this.pointerMessagePending = false;
+          this.textCallbackTimer = null;
+          callback?.();
+          this.getUi().updateMessagePointer?.();
         }
+      };
+      if (callback && callbackDelay) {
+        this.textCallbackTimer = globalScene.time.delayedCall(callbackDelay, complete);
+      } else {
+        complete();
       }
     };
+    this.getUi().updateMessagePointer?.();
   }
 
   /**
@@ -334,19 +480,25 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
   }
 
   isTextAnimationInProgress() {
-    if (this.textTimer) {
-      return this.textTimer.repeatCount < this.textTimer.repeat;
-    }
-
-    return false;
+    return !!this.finishText;
   }
 
   clearText() {
+    this.stopMessage();
     this.message.setText("");
-    this.pendingPrompt = false;
+    this.getUi().updateMessagePointer?.();
   }
 
   clear() {
+    this.stopMessage();
     super.clear();
+    this.getUi().updateMessagePointer?.();
+  }
+
+  override destroy(): void {
+    this.stopMessage();
+    this.active = false;
+    this.getUi().updateMessagePointer?.();
+    super.destroy();
   }
 }

@@ -27,7 +27,7 @@ describe("UI - message advancement with a mouse", () => {
 
   function click(): void {
     const stopPropagation = vi.fn();
-    handler["messagePointerZone"].emit("pointerdown", pointer, 0, 0, { stopPropagation });
+    game.scene.ui["messagePointer"]!.zone.emit("pointerdown", pointer, 0, 0, { stopPropagation });
     expect(stopPropagation).toHaveBeenCalledOnce();
   }
 
@@ -51,8 +51,8 @@ describe("UI - message advancement with a mouse", () => {
   it("ignores hover, wheel, middle buttons and touch", () => {
     const callback = vi.fn();
     handler.showText("Ready", 0, callback, null, true);
-    handler["messagePointerZone"].emit("pointerover", pointer);
-    handler["messagePointerZone"].emit("wheel", pointer, 0, 120, 0);
+    game.scene.ui["messagePointer"]!.zone.emit("pointerover", pointer);
+    game.scene.ui["messagePointer"]!.zone.emit("wheel", pointer, 0, 120, 0, { stopPropagation: vi.fn() });
     for (const buttons of [0, 4]) {
       pointer.buttons = buttons;
       click();
@@ -63,13 +63,14 @@ describe("UI - message advancement with a mouse", () => {
     expect(callback).not.toHaveBeenCalled();
   });
 
-  it("does not finish typing or consume a stale prompt while waiting for the next prompt", () => {
+  it("reveals typing without consuming a stale prompt or bypassing the next prompt delay", () => {
     const stale = vi.fn();
     handler.showText("Old", 0, stale, null, true);
     handler.showText("Typing", 20, vi.fn(), null, true, 500);
     const timer = handler["textTimer"]!;
     click();
-    expect(timer.repeatCount).toBe(timer.repeat);
+    expect(handler.message.text).toBe("Typing");
+    expect(timer.hasDispatched).toBe(true);
     expect(stale).not.toHaveBeenCalled();
     expect(handler.pendingPrompt).toBe(true);
   });
@@ -201,9 +202,10 @@ describe("UI - message advancement with a mouse", () => {
     expect(callback).toHaveBeenCalledOnce();
   });
 
-  it("removes its input listener on destruction", () => {
-    const zone = handler["messagePointerZone"];
+  it("removes its actionable message on destruction", () => {
+    const zone = game.scene.ui["messagePointer"]!.zone;
     handler.destroy();
-    expect(zone.listenerCount("pointerdown")).toBe(0);
+    expect(zone.visible).toBe(false);
+    expect(handler.hasPointerMessage).toBe(false);
   });
 });

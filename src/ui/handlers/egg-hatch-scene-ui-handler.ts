@@ -32,7 +32,7 @@ export class EggHatchSceneUiHandler extends UiHandler {
           if (pointer.rightButtonDown()) {
             this.getUi().processInput(Button.CANCEL);
           } else if (pointer.leftButtonDown()) {
-            this.getUi().processInput(Button.ACTION);
+            this.processPointerAction();
           }
         };
         object.on("pointerdown", down);
@@ -82,7 +82,7 @@ export class EggHatchSceneUiHandler extends UiHandler {
         width: globalScene.scaledCanvas.width,
         height: globalScene.scaledCanvas.height,
       }),
-      () => this.getUi().processInput(Button.ACTION),
+      () => this.processPointerAction(),
     );
 
     this.eggHatchContainer.moveTo(this.pointerTargets.zones[0], 0);
@@ -90,7 +90,7 @@ export class EggHatchSceneUiHandler extends UiHandler {
       this.getUi(),
       "egg-hatch-message",
       () => ({ x: 0, y: -49, width: globalScene.scaledCanvas.width, height: 49 }),
-      () => this.getUi().processInput(Button.ACTION),
+      () => this.processPointerAction(),
     );
     globalScene.events.on("preupdate", this.bindHoverClicks, this);
     this.getUi().showText("", 0);
@@ -98,6 +98,20 @@ export class EggHatchSceneUiHandler extends UiHandler {
     globalScene.setModifiersVisible(false);
 
     return true;
+  }
+
+  private processPointerAction(): void {
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    // The phase decides whether the current animation can be skipped.
+    if (phase.is("EggHatchPhase") && phase.trySkip()) {
+      return;
+    }
+    const message = this.getUi().getMessageHandler();
+    if (message.hasPointerMessage) {
+      message.processPointerMessage();
+    } else {
+      this.getUi().processInput(Button.ACTION);
+    }
   }
 
   processInput(button: Button): boolean {

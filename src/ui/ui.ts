@@ -62,6 +62,7 @@ import { TitleUiHandler } from "#ui/title-ui-handler";
 import type { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { UnavailableModalUiHandler } from "#ui/unavailable-modal-ui-handler";
+import { MessagePointerController } from "#ui/utils/message-pointer-controller";
 import { executeIf } from "#utils/common";
 import i18next from "i18next";
 
@@ -123,6 +124,7 @@ export class UI extends Phaser.GameObjects.Container {
   private tooltipContent: Phaser.GameObjects.Text;
 
   private overlayActive: boolean;
+  private fadeId = 0;
 
   public handlers: UiHandler[];
 
@@ -130,6 +132,7 @@ export class UI extends Phaser.GameObjects.Container {
   public bgmBar: BgmBar;
   public savingIcon: SavingIconContainer;
   private menuButton: MenuButton;
+  private messagePointer: MessagePointerController | undefined;
 
   constructor() {
     super(globalScene, 0, globalScene.scaledCanvas.height);
@@ -220,6 +223,7 @@ export class UI extends Phaser.GameObjects.Container {
 
     this.menuButton = new MenuButton();
     this.add(this.menuButton);
+    this.messagePointer = new MessagePointerController(this);
   }
 
   private setupTooltip() {
@@ -291,7 +295,14 @@ export class UI extends Phaser.GameObjects.Container {
       return handler.processTutorialInput(button);
     }
 
-    return handler.processInput(button);
+    const result = handler.processInput(button);
+    this.updateMessagePointer();
+    return result;
+  }
+
+  /** Refresh synchronously when a callback changes the current page. */
+  public updateMessagePointer(): void {
+    this.messagePointer?.update();
   }
 
   /** Whether a handler may change selection or confirm through direct pointer input. */
@@ -494,7 +505,23 @@ export class UI extends Phaser.GameObjects.Container {
     audioManager.playSound("ui/error");
   }
 
+  /** Identity of the current global fade, used only to release an owned inline fade. */
+  public get currentFadeId(): number {
+    return this.fadeId;
+  }
+
+  public cancelMessageFade(fadeId: number): void {
+    if (this.fadeId !== fadeId) {
+      return;
+    }
+    ++this.fadeId;
+    globalScene.tweens.killTweensOf(this.overlay);
+    this.overlay.setVisible(false).setAlpha(0);
+    this.overlayActive = false;
+  }
+
   public fadeOut(duration: number): Promise<void> {
+    ++this.fadeId;
     return new Promise(resolve => {
       if (this.overlayActive) {
         return resolve();
@@ -513,6 +540,7 @@ export class UI extends Phaser.GameObjects.Container {
   }
 
   public fadeIn(duration: number): Promise<void> {
+    const fadeId = ++this.fadeId;
     return new Promise(resolve => {
       if (!this.overlayActive) {
         return resolve();
@@ -523,11 +551,13 @@ export class UI extends Phaser.GameObjects.Container {
         duration,
         ease: "Sine.easeIn",
         onComplete: () => {
-          this.overlay.setVisible(false);
+          if (this.fadeId === fadeId) {
+            this.overlay.setVisible(false);
+            this.overlayActive = false;
+          }
           resolve();
         },
       });
-      this.overlayActive = false;
     });
   }
 
@@ -549,7 +579,7 @@ export class UI extends Phaser.GameObjects.Container {
           if (clear) {
             this.getHandler().clear();
           }
-          if (chainMode && this._mode && !clear) {
+          if (chainMode && !clear) {
             this._modeChain.push(this._mode);
             globalScene.updateGameInfo();
           }
@@ -559,6 +589,7 @@ export class UI extends Phaser.GameObjects.Container {
             touchControls.dataset.uiMode = UiMode[mode];
           }
           this.getHandler().show(args);
+          this.updateMessagePointer();
         }
         resolve();
       };
@@ -613,6 +644,7 @@ export class UI extends Phaser.GameObjects.Container {
       const doRevertMode = () => {
         this.getHandler().clear();
         this._mode = this._modeChain.pop()!; // TODO: is this bang correct?
+        this.updateMessagePointer();
         globalScene.updateGameInfo();
         const touchControls = document.getElementById("touchControls");
         if (touchControls) {
@@ -662,6 +694,8 @@ export class UI extends Phaser.GameObjects.Container {
    * Attempts to free memory held by UI handlers
    */
   public freeUIData(): void {
+    this.messagePointer?.destroy();
+    this.messagePointer = undefined;
     this.menuButton?.destroy();
     this.handlers.forEach(h => h.destroy());
     this.handlers = [];
