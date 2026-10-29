@@ -90,7 +90,7 @@ def prepare():
         summary("Automatic deployment is disabled; no Coolify operation was requested.")
         return
     if source and resume:
-        raise Failure("Automated requests cannot clear the manual failure latch")
+        raise Failure("Automated requests cannot force a manual deployment retry")
     if source and source not in publish.REPOSITORIES:
         raise Failure("Unapproved source repository")
     images = snapshot()
@@ -111,8 +111,13 @@ def prepare():
              "verified": False, "restart_attempted": False, "resume": resume}
     if mode == "deploy":
         previous, status = latest_record()
-        if status in ("error", "failure", "in_progress", "pending", "queued") and not resume:
-            raise Failure("Previous deployment is failed or unfinished; inspect it and use a manual resume")
+        # An earlier verification failure must not block a subsequent version.
+        # Unfinished deployments can still be applying a non-idempotent restart.
+        if status in ("in_progress", "pending", "queued") and not resume:
+            raise Failure(
+                f"Previous deployment {previous['id']} is unfinished ({status}); "
+                "inspect it and use a manual resume if recovery is needed"
+            )
         if (previous and status == "success"
                 and previous.get("payload", {}).get("pair_key") == state["pair_key"] and not resume):
             publish.output("run", "false")
@@ -164,6 +169,8 @@ def build_matches(images):
 
 def api(path, token=None, form=None, payload=None):
     # The account is dedicated to deployment tests. Never print bodies or auth.
+    route = path.split("?")[0]
+    report(api_check=route)
     time.sleep(0.25)
     headers = {"Origin": SITE, "User-Agent": "PokeRogue-dev-smoke/1.0"}
     if token:
@@ -180,8 +187,15 @@ def api(path, token=None, form=None, payload=None):
         with urllib.request.urlopen(request, timeout=30) as response:
             raw = response.read()
             return response.status, json.loads(raw) if raw else None
-    except (urllib.error.HTTPError, OSError, ValueError):
-        raise Failure("Deployment account/save API check failed: " + path.split("?")[0]) from None
+    except urllib.error.HTTPError as error:
+        error.close()
+        raise Failure(f"Deployment account/save API check failed: {route} (HTTP {error.code})") from None
+    except OSError as error:
+        raise Failure(
+            f"Deployment account/save API check failed: {route} (transport {type(error).__name__})"
+        ) from None
+    except ValueError:
+        raise Failure(f"Deployment account/save API check failed: {route} (invalid JSON response)") from None
 
 def smoke():
     username = publish.require("DEV_SMOKE_USERNAME")
@@ -219,16 +233,27 @@ def smoke():
                 or api(session_path, token)[1].get("timestamp") != stamp):
             raise Failure("Save writes did not round-trip")
     finally:
-        if api("/account/logout", token)[0] != 200:
-            raise Failure("Deployment account logout failed")
+        primary_failure = sys.exc_info()[0] is not None
+        try:
+            if api("/account/logout", token)[0] != 200:
+                raise Failure("Deployment account logout failed")
+        except Failure as error:
+            if not primary_failure:
+                raise
+            # Cleanup must not replace the account/save error that triggered it.
+            report(cleanup_error=str(error))
+            print(f"::warning::{error}", file=sys.stderr)
 
 def execute():
     state = load_state()
     if not state:
         raise Failure("Prepared deployment state is missing")
     # Validate the saved configuration, without requesting sensitive Compose fields.
-    if not coolify_status() and not (state["mode"] == "deploy" and state.get("resume")):
-        raise Failure("Existing stack is not healthy; inspect it before restarting")
+    healthy = coolify_status()
+    if state["mode"] == "check" and not healthy:
+        raise Failure("Existing stack is not healthy; preflight check failed")
+    # A new deployment may repair an unhealthy application. coolify_status()
+    # still rejects an unexpected stack or image/database configuration.
     if state["mode"] == "check":
         public_get("/api/game/titlestats")
         report(phase="check-complete", result="success",
@@ -279,11 +304,11 @@ def finalize():
     gh(f"/repos/{publish.REPOSITORIES[0]}/deployments/{state['deployment_id']}/statuses",
        {"state": status, "environment": ENVIRONMENT, "environment_url": SITE,
         "log_url": f"https://github.com/{publish.REPOSITORIES[0]}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
-        "description": "Verified" if success else "Stopped; manual inspection and resume required"},
+        "description": "Verified" if success else "Failed; see run diagnostics. Later versions remain eligible"},
        "POST")
     report(deployment_status=status)
     if not success:
-        summary("Deployment stopped. No automatic rollback/restart retry. Later automatic requests are blocked until manual resume.")
+        summary("Deployment failed. No automatic rollback/restart retry. Later versions remain eligible for deployment.")
 
 def main():
     parser = argparse.ArgumentParser()
