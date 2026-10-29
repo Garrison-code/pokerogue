@@ -1,6 +1,7 @@
 import { MockContainer } from "#test/mocks/mocks-container/mock-container";
 
 export class MockNineslice extends MockContainer {
+  readonly type = "NineSlice";
   private originX = 0.5;
   private originY = 0.5;
   override setOrigin(x = 0.5, y = x): this {
