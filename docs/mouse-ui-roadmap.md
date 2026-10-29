@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 33 項完成、21 項待辦；EX 項目與 UI-34 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 34 項完成、20 項待辦；EX 項目與 UI-35 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -263,7 +263,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-31** 孵蛋結果／詳細資料 — `EGG_HATCH_SUMMARY`。
 - [x] **UI-32** 圖鑑列表 — `POKEDEX`；包含頁內篩選與裝飾／形態入口。
 - [x] **UI-33** 圖鑑單隻詳細頁 — `POKEDEX_PAGE`。
-- [ ] **UI-34** 圖鑑搜尋／篩選輸入彈窗 — `POKEDEX_SCAN`；也供共用文字篩選使用。
+- [x] **UI-34** 圖鑑搜尋／篩選輸入彈窗 — `POKEDEX_SCAN`；也供共用文字篩選使用。
 - [ ] **UI-35** 自動完成候選選單 — `AUTO_COMPLETE`；供搜尋與測試工具共用。
 - [ ] **UI-36** 成就頁 — `ACHIEVEMENTS`。
 - [ ] **UI-37** 遊戲統計頁 — `GAME_STATS`。
@@ -299,7 +299,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-33；其餘 21 個項目保持待辦。Phase 2 與 Phase 3 的 UI 項目已完成，EX-01／EX-02／EX-03 仍待辦；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-34；其餘 20 個項目保持待辦。Phase 2 與 Phase 3 的 UI 項目已完成，EX-01／EX-02／EX-03 仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -357,3 +357,4 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 | UI-31 | 2026-10-29 | `feat(ui): support mouse egg hatch results` | 10 項互動測試通過；Chromium default／legacy 實測結果格選取、捲動保留身分及空結果通過。保留原退出延遲／CANCEL，舊退出 timer 與素材載入回呼失效，重開清理區域與圖示。typecheck、修改檔案 Biome 與 diff check 通過；測試孵化資料，不儲存真實資料，未測實體裝置。 |
 | UI-32 | 2026-10-29 | `feat(ui): support mouse pokedex browsing` | 13 項新互動、12 項既有圖鑑測試通過（2 todo）；與命名／孵化結果共 43 項回歸通過。Chromium default／legacy 實測格子、身分保留、下拉阻擋及文字搜尋入口通過。重開清理下拉、過期素材與退出提示；typecheck、修改檔案 Biome、diff check 通過。另確認 UI-31 實作為 d9a2e7325b：該項完成紀錄因提交時序誤隨 UI-30 文件先入版，本列補記正確實作識別，不改寫已推送歷史。使用測試圖鑑，未測實體裝置。 |
 | UI-33 | 2026-10-29 | `feat(ui): support mouse pokedex details` | 10 項新增互動測試及既有圖鑑回歸通過；Chromium default／legacy 實測操作列、滾輪及原物種切換流程通過。保留解鎖／糖果操作，能力值與勳章盤阻擋背景；新增清理、素材／模式回呼身分檢查並防止糖果 tooltip 監聽累積。typecheck、修改檔案 Biome 與 diff check 通過；持久化／糖果未操作真實資料，未測實體裝置。 |
+| UI-34 | 2026-10-29 | `feat(ui): support mouse pokedex search forms` | 13 項搜尋互動及 20 項原寶可夢命名回歸共 33 項通過。Chromium default／legacy 以實際文字輸入、Enter 接受候選而不提交、Escape 取消及焦點往返通過。從 UI-19 抽出明確啟用的共用表單基礎，搜尋補齊 CANCEL；清理舊輸入欄、DOM／文字事件與候選回呼。保留有效值及原 Unicode 編碼；typecheck、修改檔案 Biome、diff check 通過。OS 原生 IME 未實測，組字以事件模擬驗證。 |

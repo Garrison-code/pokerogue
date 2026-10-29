@@ -7,6 +7,10 @@ import type Phaser from "phaser";
 export class AutoCompleteUiHandler extends OptionSelectUiHandler {
   private modalContainer?: Phaser.GameObjects.Container;
 
+  public get parentModal(): Phaser.GameObjects.Container | undefined {
+    return this.modalContainer;
+  }
+
   constructor() {
     super(UiMode.AUTO_COMPLETE);
   }
