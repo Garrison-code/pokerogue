@@ -7,6 +7,7 @@ import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 
 export class GamepadBindingUiHandler extends BaseBindingUiHandler {
+  protected readonly device = Device.GAMEPAD;
   constructor() {
     super();
 
@@ -53,7 +54,7 @@ export class GamepadBindingUiHandler extends BaseBindingUiHandler {
     const blacklist = [12, 13, 14, 15]; // d-pad buttons are blacklisted.
     // Check conditions before processing the button press.
     if (
-      !this.listening
+      !this.canCaptureInput()
       || pad.id.toLowerCase() !== this.getSelectedDevice()
       || blacklist.includes(button.index)
       || this.buttonPressed !== null
@@ -78,7 +79,8 @@ export class GamepadBindingUiHandler extends BaseBindingUiHandler {
     const activeConfig = globalScene.inputController.getActiveConfig(Device.GAMEPAD);
     const selectedDevice = this.getSelectedDevice();
     if (
-      activeConfig != null
+      this.isCurrentDevice()
+      && activeConfig != null
       && this.buttonPressed != null
       && selectedDevice != null
       && globalScene.inputController.assignBinding(activeConfig, this.target, this.buttonPressed)
@@ -87,6 +89,11 @@ export class GamepadBindingUiHandler extends BaseBindingUiHandler {
       return true;
     }
     return false;
+  }
+
+  public override destroy(): void {
+    globalScene.input.gamepad?.off("down", this.gamepadButtonDown, this);
+    super.destroy();
   }
 
   /**
