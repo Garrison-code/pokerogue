@@ -489,10 +489,18 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
           ui,
           `modifier-${row}-${cursor}`,
           () => {
-            if (this.moveInfoOverlay.visible) {
+            const area = option.getPointerArea(options.length);
+            const overlay = this.moveInfoOverlay;
+            if (
+              overlay.visible
+              && area.x + area.width > overlay.x
+              && area.x < overlay.x + globalScene.scaledCanvas.width - 2
+              && area.y + area.height > overlay.y
+              && area.y < overlay.y + MoveInfoOverlay.getHeight(true)
+            ) {
               return null;
             }
-            return option.getPointerArea(options.length);
+            return area;
           },
           () => select(row, cursor),
         );
@@ -505,7 +513,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         ui,
         `modifier-button-${cursor}`,
         () => {
-          if (!button.visible || !button.alpha) {
+          if (!button.visible || !button.alpha || button.getAt<Phaser.GameObjects.Text>(0).visible === false) {
             return null;
           }
           const bounds = getPointerBounds(button, ui);

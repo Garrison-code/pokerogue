@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 18 項完成、36 項待辦；EX-01 與 UI-19 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 19 項完成、35 項待辦；EX-01／EX-02 與 UI-20 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -177,7 +177,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - MYSTERY_ENCOUNTER 的二／三／四選項與查看隊伍採兩階段點擊；固定格範圍不跟隨長文字捲動，選取更新既有說明。未達需求仍可查看，確認沿用 optionMode 判定；右鍵只送 CANCEL，目前不新增離開事件能力。管理入場／返回延遲、捲動動畫及 hover 清理。
 - EVOLUTION_SCENE 的可見訊息框在文字／提示完成且等待確認時，左鍵走 ACTION；不快轉逐字訊息或動畫。頁面右鍵完整沿用 CANCEL 的取消進化優先順序、不可取消限制與訊息推進。進化、形態變化、暫停確認及學招保留原流程。
 - RENAME_POKEMON 保留既有表單單擊提交／取消與原生文字編輯，不改成選項兩階段操作。本 handler 補齊 CANCEL 並與取消按鈕共用入口，右鍵只送 CANCEL；彈窗本體含輸入框生效，框外僅阻擋背景。保留 SUBMIT、空白修剪、Unicode 編碼與呼叫端回呼；清理 focus 延遲、DOM 監聽與進場 tween，不擴及其他表單。
-- 新增互動測試並以 Chromium default／legacy 驗證；使用測試隊伍與替身，不讀寫真實存檔。完成後預期為 19 項完成、35 項待辦，僅 Phase 2 的 UI 項目完成，EX-02 仍待辦。
+- 新增互動測試並以 Chromium default／legacy 驗證；使用測試隊伍與替身，不讀寫真實存檔。UI-16～UI-19 已依下方完成紀錄驗證，現為 19 項完成、35 項待辦，僅 Phase 2 的 UI 項目完成，EX-02 仍待辦。
 
 ## Phase 0：共用選項、確認與訊息
 
@@ -212,7 +212,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-16** 戰後獎勵／商店 — `MODIFIER_SELECT`；包含獎勵、購買、重抽、隊伍及道具轉移入口。
 - [x] **UI-17** 神秘事件 — `MYSTERY_ENCOUNTER`；包含事件選項與結果流程。
 - [x] **UI-18** 進化畫面 — `EVOLUTION_SCENE`。
-- [ ] **UI-19** 寶可夢重新命名 — `RENAME_POKEMON`。
+- [x] **UI-19** 寶可夢重新命名 — `RENAME_POKEMON`。
 - [ ] **EX-02** 戰鬥資訊與招式資訊浮層／展開面板；依附各頁，沒有獨立 UiMode。
 
 ## Phase 3：遊戲選單與設定
@@ -271,7 +271,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-18；其餘 36 個項目保持待辦。
+目前已完成 UI-01～UI-19；其餘 35 個項目保持待辦。Phase 2 的 UI 項目已完成，EX-02 除外；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -299,6 +299,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-17 | 2026-10-29 | `feat(ui): support mouse mystery encounter options` | 新增 16 項互動測試與 18 項既有事件 Phase 回歸共 34 項通過，涵蓋二／三／四選項、需求模式、預選／失敗重試／單次接受、入場限制、原 CANCEL、重開延遲失效、遮罩與監聽清理。Chromium default／legacy 實測固定選項格、長文字、禁用項目、查看隊伍往返、右鍵不新增離開能力及重開通過；事件選擇使用替身回呼，不執行真實事件效果。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。既有資訊 hover 保留，EX-02 仍待辦；未測實體手把與觸控。 |
 
 | UI-18 | 2026-10-29 | `feat(ui): support mouse evolution prompts` | 新增 15 項互動測試；連同進化、形態變化與安靜形態變化回歸共 31 項通過。涵蓋提示就緒、逐字／自動訊息阻擋、舊逐字狀態被新提示取代、延遲／重開清理、同步下一提示、防穿透及右鍵原取消優先順序。Chromium default／legacy 實測訊息框、場景左鍵無操作、可取消旗標、不可取消時推進、逐字阻擋及重開通過；瀏覽器使用進化訊息情境與替身回呼，實際進化／形態規則由既有測試回歸。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；未測實體手把與觸控。 |
+
+| UI-19 | 2026-10-29 | `feat(ui): support mouse Pokemon renaming` | 新增 20 項重新命名與 1 項共用放鍵測試，連同輸入與紀錄回歸共 41 項通過。保留單擊表單按鈕、Unicode／空白處理及回呼；本頁 CANCEL 與取消按鈕共用入口，右鍵不另訂語意。清理 DOM 監聽、焦點延遲與進場動畫；修正欄位消耗按下後、關閉時未初始化鍵盤的放鍵錯誤。Chromium default／legacy 實測文字編輯、長度限制、中文文字、合成 IME 組字事件、按鈕／輸入框右鍵、框外阻擋及重開通過；實際隊伍與起始寶可夢選單的命名提交／返回皆通過，使用測試資料及替身儲存，不操作真實資料。另補強 UI-16 浮層僅阻擋覆蓋商品、隱藏繼續文字不可操作兩項案例（商品互動現為 18 項）；兩主題浮層實測通過。隊伍換位回歸顯式等待獎勵揭示完成後輸入，12 項通過。整批 54 檔 756 項相關回歸通過（4 skipped、3 todo）；商品範圍／隱藏文字補強後，商品／命名／輸入 54 項通過。typecheck、build:dev、全量 Biome、Dependency Cruiser、主程式型別、REUSE 與 diff check 通過。未測作業系統實際 IME、實體手把與觸控；EX-01／EX-02 保持待辦。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。

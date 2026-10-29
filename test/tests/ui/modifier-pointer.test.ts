@@ -33,6 +33,8 @@ describe("UI - modifier pointer input", () => {
     pointer.buttons = 1;
   });
   afterEach(() => {
+    // MockText.setVisible is a no-op; remove the explicit visibility fixture.
+    Reflect.deleteProperty(handler["continueButtonContainer"].getAt(0), "visible");
     handler?.clear();
     game.scene.ui["overlayActive"] = false;
     handler.tutorialActive = false;
@@ -94,8 +96,26 @@ describe("UI - modifier pointer input", () => {
     expect(handler.getCursor()).toBe(0);
     handler["awaitingActionInput"] = true;
     handler["moveInfoOverlay"].visible = true;
+    handler["moveInfoOverlay"].y = handler.options[1]!.y;
     click("modifier-1-1");
     expect(handler.getCursor()).toBe(0);
+    expect(callback).not.toHaveBeenCalled();
+  });
+  it("does not activate a hidden Continue label even if its container is visible", () => {
+    const callback = vi.fn(() => false);
+    handler["onActionInput"] = callback;
+    handler["continueButtonContainer"].setVisible(true).setAlpha(1);
+    handler["continueButtonContainer"].getAt<Phaser.GameObjects.Text>(0).visible = false;
+    click("modifier-button-4");
+    expect(callback).not.toHaveBeenCalled();
+  });
+  it("keeps products outside the visible information panel selectable", () => {
+    const callback = vi.fn(() => false);
+    handler["onActionInput"] = callback;
+    handler["moveInfoOverlay"].visible = true;
+    handler["moveInfoOverlay"].y = -49;
+    click("modifier-1-1");
+    expect(handler.getCursor()).toBe(1);
     expect(callback).not.toHaveBeenCalled();
   });
   it.each([true, false])("right click matches player=%s keyboard CANCEL", player => {

@@ -54,6 +54,13 @@ describe("Inputs", () => {
     expect(game.inputsHandler.log.length).toBe(5);
   });
 
+  it("ignores a key release consumed by a text field before keyboard initialization", () => {
+    const controller = game.scene.inputController;
+    vi.spyOn(controller, "getActiveConfig").mockReturnValue(null);
+    expect(() => controller.keyboardKeyUp(new KeyboardEvent("keyup", { keyCode: 13 }))).not.toThrow();
+    expect(game.inputsHandler.logUp).toHaveLength(0);
+  });
+
   it("keyboard - test input holding for 200ms - 1 input", async () => {
     await game.inputsHandler.pressKeyboardKey(CFG_KEYBOARD_QWERTY.deviceMapping.KEY_ARROW_UP, 200);
     expect(game.inputsHandler.log.length).toBe(1);
