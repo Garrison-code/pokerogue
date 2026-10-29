@@ -78,6 +78,19 @@ describe("UI - pokedex detail pointer", () => {
     click("stats");
     expect(input).toHaveBeenCalledExactlyOnceWith(Button.ACTION);
   });
+  it("does not play a late species cry after its page closes", async () => {
+    const species = speciesDataRegistry.getSpecies(SpeciesId.BULBASAUR);
+    game.scene.gameData.dexData[SpeciesId.BULBASAUR].caughtAttr = species.getFullUnlocksData();
+    const assets = Promise.withResolvers<void>();
+    const load = vi.spyOn(species, "loadAssets").mockReturnValue(assets.promise);
+    const cry = vi.spyOn(species.forms[0] ?? species, "cry").mockReturnValue(null);
+    handler.show([species]);
+    expect(load).toHaveBeenCalled();
+    handler.clear();
+    assets.resolve();
+    await Promise.resolve();
+    expect(cry).not.toHaveBeenCalled();
+  });
   it("routes right click to CANCEL and cleans up on reopening", () => {
     const input = vi.spyOn(game.scene.ui, "processInput").mockReturnValue(true);
     pointer.buttons = 2;

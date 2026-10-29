@@ -267,6 +267,9 @@ export class EggSummaryUiHandler extends MessageUiHandler {
         }
         hatchContainer.setVisible(true);
         hatchContainer.updateAndAnimate(hatchData, this.iconAnimHandler);
+        if (i + itemOffset === this.scrollGridHandler.getSelectedIndex()) {
+          this.iconAnimHandler.addOrUpdate(hatchContainer.icon, PokemonIconAnimMode.ACTIVE);
+        }
       } else if (hatchContainer) {
         hatchContainer.setVisible(false);
         this.iconAnimHandler.addOrUpdate(hatchContainer.icon, PokemonIconAnimMode.NONE);

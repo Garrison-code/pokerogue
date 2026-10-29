@@ -294,6 +294,7 @@ export class AchvsUiHandler extends MessageUiHandler {
    * @returns Whether the success sound should be played
    */
   private processActionInput(): true {
+    this.cursor = 0;
     this.setScrollCursor(0);
     if (this.currentPage === Page.ACHIEVEMENTS) {
       this.currentPage = Page.VOUCHERS;
@@ -607,6 +608,7 @@ export class AchvsUiHandler extends MessageUiHandler {
     super.clear();
     this.currentPage = Page.ACHIEVEMENTS;
     this.mainContainer.setVisible(false);
+    this.cursor = 0;
     this.setScrollCursor(0);
     this.setCursor(0, true);
     this.eraseCursor();

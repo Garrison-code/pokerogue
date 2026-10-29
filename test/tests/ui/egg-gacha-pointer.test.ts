@@ -108,6 +108,14 @@ describe("UI - egg gacha pointer controls", () => {
     click("option-0");
     expect(pull).not.toHaveBeenCalled();
   });
+  it("settles an interrupted egg-drop animation and destroys its chain", async () => {
+    const chain = { destroy: vi.fn() } as unknown as Phaser.Tweens.TweenChain;
+    vi.spyOn(game.scene.tweens, "chain").mockReturnValue(chain);
+    const pending = handler["doPullAnim"](game.scene.add.sprite(0, 0, "egg"), 0);
+    handler.clear();
+    await pending;
+    expect(chain.destroy).toHaveBeenCalledOnce();
+  });
   it("ignores a save completion from an old display", async () => {
     const save = Promise.withResolvers<boolean>();
     vi.spyOn(game.scene.gameData, "saveSystem").mockReturnValue(save.promise);

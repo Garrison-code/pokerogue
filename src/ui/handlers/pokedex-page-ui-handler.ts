@@ -281,7 +281,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       ),
     );
     for (const direction of [-1, 1]) {
-      const x = direction < 0 ? 8 : 177;
+      const x = direction < 0 ? 8 : 100;
       const arrow = globalScene.add
         .sprite(x, 18, "cursor")
         .setFlipX(direction < 0)
@@ -2694,6 +2694,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         getTextColor(shiny ? TextStyle.SUMMARY_DEX_NUM_GOLD : TextStyle.SUMMARY_DEX_NUM, true),
       );
 
+      const displayId = this.displayId;
       const assetLoadCancelled = new BooleanHolder(false);
       this.assetLoadCancelled = assetLoadCancelled;
 
@@ -2701,7 +2702,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         const back = !!this.showBackSprite;
         // TODO: is this bang correct?
         species.loadAssets(female!, formIndex, shiny, variant as Variant, true, back).then(() => {
-          if (assetLoadCancelled.value) {
+          if (assetLoadCancelled.value || displayId !== this.displayId) {
             return;
           }
           this.assetLoadCancelled = null;
@@ -2794,7 +2795,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       // Setting tint of the sprite
       if (isFormCaught) {
         this.species.loadAssets(female!, formIndex, shiny, variant as Variant, true).then(() => {
-          if (assetLoadCancelled.value) {
+          if (assetLoadCancelled.value || displayId !== this.displayId) {
             return;
           }
           const crier =

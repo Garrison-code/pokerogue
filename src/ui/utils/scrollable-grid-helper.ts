@@ -50,6 +50,10 @@ export class ScrollableGridHelper {
     return this;
   }
 
+  getSelectedIndex(): number {
+    return this.cursor + this.getItemOffset();
+  }
+
   selectIndex(index: number): boolean {
     if (index < 0 || index >= this.totalElements) {
       return false;
@@ -205,13 +209,27 @@ export class ScrollableGridHelper {
    * Reset the scrolling
    */
   reset(): void {
+    this.cursor = 0;
     this.setScrollCursor(0);
     this.setCursor(0);
   }
 
   private setCursor(cursor: number): boolean {
+    const changed = this.cursor !== cursor;
     this.cursor = cursor;
-    return this.handler.setCursor(cursor);
+    const handlerChanged = this.handler.setCursor(cursor);
+    if (
+      changed
+      && !handlerChanged
+      && this.pointerVisibility
+      && cursor >= 0
+      && this.getSelectedIndex() >= 0
+      && this.getSelectedIndex() < this.totalElements
+    ) {
+      this.updateGridCallback?.();
+      this.updateDetailsCallback?.(this.getSelectedIndex());
+    }
+    return changed || handlerChanged;
   }
 
   private setScrollCursor(scrollCursor: number, cursor?: number): boolean {

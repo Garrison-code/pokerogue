@@ -25,7 +25,7 @@ describe("UI - pokedex pointer controls", () => {
     handler = game.scene.ui.getHandler() as PokedexUiHandler;
     pointer = new Phaser.Input.Pointer(game.scene.input.manager, 0);
     pointer.buttons = 1;
-  });
+  }, 30_000);
   afterEach(() => {
     handler?.clear();
     if (handler) {

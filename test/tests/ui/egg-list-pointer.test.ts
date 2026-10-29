@@ -62,6 +62,13 @@ describe("UI - egg list pointer browsing", () => {
     expect(handler.getCursor()).toBe(3);
     expect(handler["cursorObj"].visible).toBe(true);
   });
+  it("updates details when a recycled cell has the same local index", () => {
+    click("cell-3");
+    wheel(120);
+    const details = vi.spyOn(handler as unknown as { setEggDetails(index: number): void }, "setEggDetails");
+    click("cell-3");
+    expect(details).toHaveBeenCalledExactlyOnceWith(14);
+  });
   it("selects the actual scrolled egg and stops at boundaries", () => {
     for (let i = 0; i < 10; i++) {
       wheel(120);

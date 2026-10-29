@@ -181,9 +181,12 @@ export class EggListUiHandler extends MessageUiHandler {
     const indexOffset = this.scrollGridHandler.getItemOffset();
     const eggsToShow = Math.min(this.eggIcons.length, globalScene.gameData.eggs.length - indexOffset);
     this.eggIcons.forEach((icon, i) => {
-      if (i !== this.cursor) {
-        this.iconAnimHandler.addOrUpdate(icon, PokemonIconAnimMode.NONE);
-      }
+      this.iconAnimHandler.addOrUpdate(
+        icon,
+        i + indexOffset === this.scrollGridHandler.getSelectedIndex()
+          ? PokemonIconAnimMode.ACTIVE
+          : PokemonIconAnimMode.NONE,
+      );
       if (i < eggsToShow) {
         const egg = globalScene.gameData.eggs[i + indexOffset];
         icon.setFrame(egg.getKey()).setVisible(true);

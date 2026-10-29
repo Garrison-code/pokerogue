@@ -63,6 +63,12 @@ describe("UI - achievements pointer browsing", () => {
     expect(handler["pointerSelected"]).toBe(3);
     expect(handler["scrollCursor"]).toBe(0);
   });
+  it("can switch or close while its selected icon is offscreen", () => {
+    click("cell-2");
+    zone("grid").emit("wheel", pointer, 0, 120, 0, { stopPropagation: vi.fn() });
+    expect(() => click("switch")).not.toThrow();
+    expect(() => handler.clear()).not.toThrow();
+  });
   it("uses the header ACTION to switch pages and reset selection", () => {
     click("cell-3");
     click("switch");

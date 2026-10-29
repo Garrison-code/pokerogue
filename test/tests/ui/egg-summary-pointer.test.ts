@@ -66,6 +66,13 @@ describe("UI - egg summary pointer browsing", () => {
     expect(handler.getCursor()).toBe(3);
     expect(handler["scrollGridHandler"].getItemOffset()).toBe(0);
   });
+  it("shows the actual result when clicking the same recycled cell", () => {
+    click("cell-3");
+    zone("grid").emit("wheel", pointer, 0, 120, 0, { stopPropagation: vi.fn() });
+    const details = vi.spyOn(handler["infoContainer"], "showHatchInfo");
+    click("cell-3");
+    expect(details).toHaveBeenLastCalledWith(data[14]);
+  });
   it("keeps the original exit delay for right CANCEL", () => {
     const error = vi.spyOn(game.scene.ui, "playError");
     pointer.buttons = 2;
@@ -101,6 +108,11 @@ describe("UI - egg summary pointer browsing", () => {
     }
     click("cell-2");
     expect(handler.getCursor()).toBe(0);
+  });
+  it("clears an offscreen selection without reading a negative result", () => {
+    click("cell-2");
+    zone("grid").emit("wheel", pointer, 0, 120, 0, { stopPropagation: vi.fn() });
+    expect(() => handler.clear()).not.toThrow();
   });
   it("handles empty results and removes old targets", () => {
     const old = zone("grid");

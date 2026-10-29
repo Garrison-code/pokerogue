@@ -7,6 +7,7 @@ import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import type { AutoCompleteUiHandler } from "#ui/autocomplete-ui-handler";
+import type { TestDialogueUiHandler } from "#ui/test-dialogue-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -96,6 +97,24 @@ describe("UI - autocomplete pointer confirmation", () => {
     }
     click(0);
     expect(callbacks[0]).not.toHaveBeenCalled();
+  });
+  it("fills a candidate in the existing dialogue test host without submitting it", async () => {
+    await game.scene.ui.revertMode();
+    const submit = vi.fn();
+    await game.scene.ui.setOverlayMode(UiMode.TEST_DIALOGUE, { buttonActions: [submit, vi.fn()] }, "");
+    const host = game.scene.ui.getHandler() as TestDialogueUiHandler;
+    const input = host["inputs"][0];
+    const key = host.keys[0];
+    input.text = key;
+    input.emit("textchange", input, { data: "x", inputType: "insertText" });
+    await Promise.resolve();
+    expect(game.scene.ui.mode).toBe(UiMode.AUTO_COMPLETE);
+    handler = game.scene.ui.getHandler() as AutoCompleteUiHandler;
+    click(0);
+    expect(input.text).toBe(key);
+    expect(submit).not.toHaveBeenCalled();
+    expect(game.scene.ui.mode).toBe(UiMode.TEST_DIALOGUE);
+    host.clear();
   });
   it("only consumes backdrop events and clears parent ownership", () => {
     const stopPropagation = vi.fn();
