@@ -52,20 +52,35 @@ class CoordinatorTests(unittest.TestCase):
         with self.assertRaises(d.Failure):
             d.prepare()
 
-    def test_previous_failure_blocks_new_deployments(self):
-        with patch.object(d, "snapshot", return_value=IMAGES), patch.object(
-            d, "latest_record", return_value=({"id": 4}, "failure")
-        ), patch.object(d, "gh") as gh:
-            with self.assertRaisesRegex(d.Failure, r"deployment 4 is failure.*deployments/4/statuses"):
-                d.prepare()
-            gh.assert_not_called()
+    def test_terminal_failure_does_not_block_a_subsequent_deployment(self):
+        for status in ("failure", "error"):
+            for same_pair in (False, True):
+                with self.subTest(status=status, same_pair=same_pair):
+                    old = {"id": 4, "payload": {
+                        "pair_key": d.pair_key(IMAGES) if same_pair else "older-pair",
+                    }}
+                    os.environ.update(SOURCE_REPOSITORY=p.REPOSITORIES[0],
+                                      SOURCE_SHA=IMAGES[0]["revision"], SOURCE_RUN_ID="123")
+                    with patch.object(d, "snapshot", return_value=IMAGES), patch.object(
+                        d, "latest_record", return_value=(old, status)
+                    ), patch.object(d, "gh", return_value={"id": 42}) as gh:
+                        d.prepare()
+                        self.assertEqual(d.load_state()["deployment_id"], 42)
+                        self.assertFalse(d.load_state()["resume"])
+                        self.assertEqual(gh.call_args_list[0].args[2], "POST")
 
-    def test_interrupted_deployment_requires_manual_resume(self):
-        with patch.object(d, "snapshot", return_value=IMAGES), patch.object(
-            d, "latest_record", return_value=({"id": 4}, "in_progress")
-        ):
-            with self.assertRaises(d.Failure):
-                d.prepare()
+    def test_unfinished_deployment_requires_manual_resume(self):
+        for status in ("in_progress", "pending", "queued"):
+            with self.subTest(status=status), patch.object(
+                d, "snapshot", return_value=IMAGES
+            ), patch.object(d, "latest_record", return_value=({"id": 4}, status)), patch.object(d, "gh") as gh:
+                with self.assertRaisesRegex(d.Failure, "Previous deployment 4 is unfinished"):
+                    d.prepare()
+                gh.assert_not_called()
+
+    def test_missing_deployment_status_is_treated_as_unfinished(self):
+        with patch.object(d, "gh", side_effect=[[{"id": 4}], []]):
+            self.assertEqual(d.latest_record(), ({"id": 4}, "in_progress"))
 
     def test_duplicate_image_pair_is_not_restarted(self):
         old = {"id": 4, "payload": {"pair_key": d.pair_key(IMAGES)}}
@@ -76,16 +91,16 @@ class CoordinatorTests(unittest.TestCase):
             gh.assert_not_called()
             self.assertIsNone(d.load_state())
 
-    def test_manual_resume_is_recorded_for_unhealthy_stack_recovery(self):
+    def test_manual_retry_can_recover_an_unfinished_deployment(self):
         os.environ["RESUME"] = "true"
         with patch.object(d, "snapshot", return_value=IMAGES), patch.object(
-            d, "latest_record", return_value=({"id": 4}, "failure")
+            d, "latest_record", return_value=({"id": 4}, "in_progress")
         ), patch.object(d, "gh", return_value={"id": 42}):
             d.prepare()
             self.assertTrue(d.load_state()["resume"])
             self.assertEqual(d.load_state()["deployment_id"], 42)
 
-    def test_automated_request_cannot_clear_failure_latch(self):
+    def test_automated_request_cannot_force_manual_retry(self):
         os.environ.update(SOURCE_REPOSITORY=p.REPOSITORIES[0], RESUME="true")
         with self.assertRaises(d.Failure):
             d.prepare()
@@ -104,6 +119,36 @@ class CoordinatorTests(unittest.TestCase):
             d.execute()
             http.assert_not_called()
             smoke.assert_not_called()
+
+    def test_deployment_can_repair_an_unhealthy_application_without_resume(self):
+        self.state()
+        with patch.object(d, "coolify_status", side_effect=[False, True, True, True]), patch.object(
+            p, "registry", side_effect=IMAGES + IMAGES
+        ), patch.object(p, "http", return_value=({}, {"message": "queued"})) as http, patch.object(
+            d, "build_matches", return_value=True
+        ), patch.object(d.time, "monotonic", side_effect=[0, 1, 2, 3]), patch.object(
+            d.time, "sleep"
+        ), patch.object(d.subprocess, "run"), patch.object(d, "smoke") as smoke:
+            d.execute()
+            self.assertEqual(http.call_count, 1)
+            smoke.assert_called_once()
+            self.assertTrue(d.load_state()["verified"])
+
+    def test_unhealthy_preflight_still_fails_without_restart(self):
+        self.state("check")
+        with patch.object(d, "coolify_status", return_value=False), patch.object(p, "http") as http:
+            with self.assertRaisesRegex(d.Failure, "preflight check failed"):
+                d.execute()
+            http.assert_not_called()
+
+    def test_unexpected_configuration_still_blocks_a_restart(self):
+        self.state()
+        with patch.object(d, "coolify_status", side_effect=d.Failure("Unexpected image reference")), patch.object(
+            p, "http"
+        ) as http:
+            with self.assertRaisesRegex(d.Failure, "Unexpected image reference"):
+                d.execute()
+            http.assert_not_called()
 
     def test_restart_transport_failure_is_not_retried(self):
         self.state()
@@ -156,6 +201,15 @@ class CoordinatorTests(unittest.TestCase):
         with patch.object(d, "gh") as gh:
             d.finalize()
             self.assertEqual(gh.call_args.args[1]["state"], "failure")
+
+    def test_failure_records_this_run_without_requiring_a_resume_for_later_versions(self):
+        self.state()
+        os.environ["JOB_STATUS"] = "failure"
+        with patch.object(d, "gh") as gh, patch.object(d, "summary") as summary:
+            d.finalize()
+            self.assertEqual(gh.call_args.args[1]["state"], "failure")
+            self.assertIn("Later versions remain eligible", gh.call_args.args[1]["description"])
+            self.assertIn("Later versions remain eligible", summary.call_args.args[0])
 
     def test_missing_fixture_is_not_recreated(self):
         calls = []

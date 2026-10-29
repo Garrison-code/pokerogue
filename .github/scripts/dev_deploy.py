@@ -90,7 +90,7 @@ def prepare():
         summary("Automatic deployment is disabled; no Coolify operation was requested.")
         return
     if source and resume:
-        raise Failure("Automated requests cannot clear the manual failure latch")
+        raise Failure("Automated requests cannot force a manual deployment retry")
     if source and source not in publish.REPOSITORIES:
         raise Failure("Unapproved source repository")
     images = snapshot()
@@ -111,11 +111,12 @@ def prepare():
              "verified": False, "restart_attempted": False, "resume": resume}
     if mode == "deploy":
         previous, status = latest_record()
-        if status in ("error", "failure", "in_progress", "pending", "queued") and not resume:
+        # An earlier verification failure must not block a subsequent version.
+        # Unfinished deployments can still be applying a non-idempotent restart.
+        if status in ("in_progress", "pending", "queued") and not resume:
             raise Failure(
-                f"Previous deployment {previous['id']} is {status}; inspect its statuses at "
-                f"https://api.github.com/repos/{publish.REPOSITORIES[0]}/deployments/{previous['id']}/statuses "
-                "and use a manual resume"
+                f"Previous deployment {previous['id']} is unfinished ({status}); "
+                "inspect it and use a manual resume if recovery is needed"
             )
         if (previous and status == "success"
                 and previous.get("payload", {}).get("pair_key") == state["pair_key"] and not resume):
@@ -248,8 +249,11 @@ def execute():
     if not state:
         raise Failure("Prepared deployment state is missing")
     # Validate the saved configuration, without requesting sensitive Compose fields.
-    if not coolify_status() and not (state["mode"] == "deploy" and state.get("resume")):
-        raise Failure("Existing stack is not healthy; inspect it before restarting")
+    healthy = coolify_status()
+    if state["mode"] == "check" and not healthy:
+        raise Failure("Existing stack is not healthy; preflight check failed")
+    # A new deployment may repair an unhealthy application. coolify_status()
+    # still rejects an unexpected stack or image/database configuration.
     if state["mode"] == "check":
         public_get("/api/game/titlestats")
         report(phase="check-complete", result="success",
@@ -300,11 +304,11 @@ def finalize():
     gh(f"/repos/{publish.REPOSITORIES[0]}/deployments/{state['deployment_id']}/statuses",
        {"state": status, "environment": ENVIRONMENT, "environment_url": SITE,
         "log_url": f"https://github.com/{publish.REPOSITORIES[0]}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
-        "description": "Verified" if success else "Stopped; manual inspection and resume required"},
+        "description": "Verified" if success else "Failed; see run diagnostics. Later versions remain eligible"},
        "POST")
     report(deployment_status=status)
     if not success:
-        summary("Deployment stopped. No automatic rollback/restart retry. Later automatic requests are blocked until manual resume.")
+        summary("Deployment failed. No automatic rollback/restart retry. Later versions remain eligible for deployment.")
 
 def main():
     parser = argparse.ArgumentParser()
