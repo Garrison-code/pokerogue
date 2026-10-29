@@ -14,11 +14,143 @@ import { getVoucherTypeIcon } from "#system/voucher";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { addTextObject, getEggTierTextTint, getTextStyleOptions } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import { fixedInt, randSeedShuffle } from "#utils/common";
 import { getEnumValues } from "#utils/enums";
 import i18next from "i18next";
 
 export class EggGachaUiHandler extends MessageUiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
+  private pointerArrows: Phaser.GameObjects.Sprite[] = [];
+  private displayId = 0;
+  private uiTweens: Phaser.Tweens.Tween[] = [];
+  private uiTimers: Phaser.Time.TimerEvent[] = [];
+  private finishDrop: (() => void) | undefined;
+
+  private addTween(config: Phaser.Types.Tweens.TweenBuilderConfig): Phaser.Tweens.Tween {
+    const tween = globalScene.tweens.add(config);
+    this.uiTweens.push(tween);
+    return tween;
+  }
+
+  private delay(delay: number, callback: () => void): void {
+    const id = this.displayId;
+    this.uiTimers.push(
+      globalScene.time.delayedCall(delay, () => {
+        if (id === this.displayId && this.active) {
+          callback();
+        }
+      }),
+    );
+  }
+
+  private stopDisplay(): void {
+    this.displayId++;
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    for (const arrow of this.pointerArrows) {
+      arrow.destroy();
+    }
+    this.pointerArrows = [];
+    for (const tween of this.uiTweens) {
+      tween?.remove();
+    }
+    this.uiTweens = [];
+    for (const timer of this.uiTimers) {
+      timer.remove();
+    }
+    this.uiTimers = [];
+    this.eggDropTweenChain?.destroy();
+    this.eggDropTweenChain = undefined;
+    this.finishDrop?.();
+    this.finishDrop = undefined;
+    for (const hatch of this.gachaHatches) {
+      hatch.anims.timeScale = 1;
+    }
+    this.playTimeTimer?.destroy();
+    this.playTimeTimer = null;
+  }
+
+  private createPointerTargets(): void {
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const page = targets.add(
+      this.eggGachaContainer,
+      "gacha-page",
+      () => ({ x: 0, y: 0, width: 320, height: 180 }),
+      () => {
+        if (this.transitioning || this.eggGachaSummaryContainer.visible) {
+          this.getUi().processInput(Button.ACTION);
+        }
+      },
+    );
+    this.eggGachaContainer.moveTo(page, 1);
+    const normal = () => !this.transitioning && !this.eggGachaSummaryContainer.visible;
+    const wheel = (direction: number) => {
+      if (normal() && this.setCursor(Math.max(0, Math.min(5, this.cursor + direction)))) {
+        this.getUi().playSelect();
+      }
+    };
+    this.gachaContainers.forEach((container, i) =>
+      targets.add(
+        container,
+        `gacha-machine-${i}`,
+        () => (normal() ? { x: 100, y: 0, width: 170, height: 128 } : null),
+        () => {
+          if (this.setGachaCursor(i)) {
+            this.getUi().playSelect();
+          }
+        },
+      ),
+    );
+    for (const direction of [-1, 1]) {
+      const x = direction < 0 ? 105 : 210;
+      const arrow = globalScene.add.sprite(x, 85, "cursor").setFlipX(direction < 0);
+      this.eggGachaContainer.add(arrow);
+      this.pointerArrows.push(arrow);
+      targets.add(
+        this.eggGachaContainer,
+        `gacha-machine-arrow-${direction}`,
+        () => {
+          const visible =
+            normal() && (direction < 0 ? this.gachaCursor > 0 : this.gachaCursor < this.gachaContainers.length - 1);
+          arrow.setVisible(visible);
+          return visible ? { x: x - 7, y: 73, width: 14, height: 24 } : null;
+        },
+        () => this.getUi().processInput(direction < 0 ? Button.LEFT : Button.RIGHT),
+      );
+    }
+    for (let row = 0; row < 6; row++) {
+      targets.add(
+        this.eggGachaOptionsContainer,
+        `gacha-option-${row}`,
+        () =>
+          normal()
+            ? {
+                x:
+                  this.eggGachaOptionSelectBg.x
+                  - this.eggGachaOptionSelectBg.width * this.eggGachaOptionSelectBg.originX,
+                y:
+                  this.eggGachaOptionSelectBg.y
+                  - this.eggGachaOptionSelectBg.height * this.eggGachaOptionSelectBg.originY
+                  + 8
+                  + row * 96 * this.scale,
+                width: this.eggGachaOptionSelectBg.width,
+                height: 96 * this.scale,
+              }
+            : null,
+        () => {
+          if (row === this.cursor) {
+            this.getUi().processInput(Button.ACTION);
+          } else if (this.setCursor(row)) {
+            this.getUi().playSelect();
+          }
+        },
+        wheel,
+      );
+    }
+  }
+
   private eggGachaContainer: Phaser.GameObjects.Container;
   private eggGachaMessageBox: Phaser.GameObjects.NineSlice;
   private eggGachaOptionsContainer: Phaser.GameObjects.Container;
@@ -329,7 +461,13 @@ export class EggGachaUiHandler extends MessageUiHandler {
   }
 
   show(args: any[]): boolean {
+    this.stopDisplay();
     super.show(args);
+    this.transitioning = false;
+    this.summaryFinished = false;
+    this.eggGachaSummaryContainer.setVisible(false).setAlpha(1).removeAll(true);
+    this.eggGachaOverlay.setAlpha(0);
+    this.eggGachaOptionsContainer.setVisible(true);
 
     this.getUi().showText(this.defaultText, 0);
 
@@ -347,6 +485,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
 
     this.legendaryExpiration.setText(this.getLegendaryGachaTimeLeft());
     this.legendaryGachaTimer();
+    this.createPointerTargets();
 
     return true;
   }
@@ -411,6 +550,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
     }
     const promise: Promise<void> = new Promise(res => {
       resolve = res;
+      this.finishDrop = res;
     });
 
     const tweens: Phaser.Types.Tweens.TweenBuilderConfig[] = count ? [] : this.firstDropAnims();
@@ -453,6 +593,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
       onComplete: () => {
         this.eggDropTweenChain = undefined;
         hatch.anims.timeScale = 1; // Reset the hatch animation time scale
+        this.finishDrop = undefined;
         resolve();
       },
       tweens,
@@ -495,6 +636,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
    * @param pullCount - The number of eggs to pull
    */
   async pull(pullCount = 0): Promise<void> {
+    const displayId = this.displayId;
     if (activeOverrides.EGG_GACHA_PULL_COUNT_OVERRIDE) {
       pullCount = activeOverrides.EGG_GACHA_PULL_COUNT_OVERRIDE;
     }
@@ -516,13 +658,13 @@ export class EggGachaUiHandler extends MessageUiHandler {
       return true;
     });
 
-    if (!saveSuccess) {
+    if (!saveSuccess || displayId !== this.displayId || !this.active) {
       return;
     }
 
     const gachaContainer = this.gachaContainers[this.gachaCursor];
     for (let i = 0; i < pullCount; ++i) {
-      if (this.transitionCancelled) {
+      if (this.transitionCancelled || displayId !== this.displayId || !this.active) {
         break;
       }
       const eggSprite = globalScene.add.sprite(127, 75, "egg", `egg_${eggs[i].getKey()}`).setScale(0.5);
@@ -530,7 +672,9 @@ export class EggGachaUiHandler extends MessageUiHandler {
       await this.doPullAnim(eggSprite, i).finally(() => gachaContainer.remove(eggSprite, true));
     }
 
-    this.showSummary(eggs);
+    if (displayId === this.displayId && this.active) {
+      this.showSummary(eggs);
+    }
   }
 
   /**
@@ -560,7 +704,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
 
     const eggScale = eggs.length < 20 ? 1 : 0.5;
 
-    globalScene.tweens.add({
+    this.addTween({
       targets: this.eggGachaOverlay,
       alpha: 0.5,
       ease: "Sine.easeOut",
@@ -600,8 +744,8 @@ export class EggGachaUiHandler extends MessageUiHandler {
         // Otherwise show the eggs one by one with a small delay between each
         eggContainers.forEach((eggContainer, index) => {
           const delay = this.transitionCancelled ? 0 : this.getDelayValue(index * 100);
-          globalScene.time.delayedCall(delay, () =>
-            globalScene.tweens.add({
+          this.delay(delay, () =>
+            this.addTween({
               targets: eggContainer,
               duration: this.getDelayValue(350),
               scale: eggScale,
@@ -621,7 +765,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
 
   hideSummary() {
     this.setTransitioning(true);
-    globalScene.tweens.add({
+    this.addTween({
       targets: [this.eggGachaOverlay, this.eggGachaSummaryContainer],
       alpha: 0,
       duration: this.getDelayValue(250),
@@ -873,7 +1017,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
 
       this.setTransitioning(true);
 
-      globalScene.tweens.add({
+      this.addTween({
         targets: this.gachaContainers,
         duration: this.eggGachaContainer.visible ? 500 : 0,
         x: (_target, _key, _value, index) => 180 * (index - cursor),
@@ -909,9 +1053,17 @@ export class EggGachaUiHandler extends MessageUiHandler {
     return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:${seconds.padStart(2, "0")}`;
   }
 
+  override destroy(): void {
+    this.clear();
+    this.eggGachaContainer.destroy();
+    super.destroy();
+  }
+
   clear(): void {
     super.clear();
-    this.setGachaCursor(-1);
+    this.stopDisplay();
+    this.gachaCursor = -1;
+    globalScene.sound.stopByKey("se/gacha_running");
     this.eggGachaContainer.setVisible(false);
     if (this.playTimeTimer) {
       this.playTimeTimer.destroy();

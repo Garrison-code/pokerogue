@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 28 項完成、26 項待辦；EX 項目與 UI-29 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 29 項完成、25 項待辦；EX 項目與 UI-30 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -258,7 +258,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 ## Phase 4：收藏、圖鑑與紀錄
 
 - [x] **UI-28** 蛋列表 — `EGG_LIST`。
-- [ ] **UI-29** 蛋抽獎機 — `EGG_GACHA`。
+- [x] **UI-29** 蛋抽獎機 — `EGG_GACHA`。
 - [ ] **UI-30** 孵蛋畫面 — `EGG_HATCH_SCENE`。
 - [ ] **UI-31** 孵蛋結果／詳細資料 — `EGG_HATCH_SUMMARY`。
 - [ ] **UI-32** 圖鑑列表 — `POKEDEX`；包含頁內篩選與裝飾／形態入口。
@@ -299,7 +299,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-28；其餘 26 個項目保持待辦。Phase 2 與 Phase 3 的 UI 項目已完成，EX-01／EX-02／EX-03 仍待辦；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-29；其餘 25 個項目保持待辦。Phase 2 與 Phase 3 的 UI 項目已完成，EX-01／EX-02／EX-03 仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -351,5 +351,5 @@ UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；�
 pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或修改 lockfile。
 
 新增紀錄時同步更新上方完成數量，避免文字與勾選狀態矛盾。
-
 | UI-28 | 2026-10-29 | `feat(ui): support mouse egg list browsing` | 11 項互動測試通過；Chromium default／legacy 驗證點格、捲動保留身分、鍵盤接續、右鍵及重開通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。共用格子新增明確啟用的滑鼠選取／捲動方法；測試蛋資料，不寫入真實存檔，未測實體手把與觸控。 |
+| UI-29 | 2026-10-29 | `feat(ui): support mouse egg gacha controls` | 11 項新增互動及 10 項既有免費抽蛋測試通過。Chromium default／legacy 實測抽取列兩階段、滾輪、機台箭頭、原 ACTION 加速、右鍵及返回通過；抽取以替身驗證，不保存真實資料。清理舊儲存後畫面、落蛋 Promise 與 tween／timer。typecheck、開發建置、修改檔案 Biome 及 diff check 通過；未測實體裝置。 |
