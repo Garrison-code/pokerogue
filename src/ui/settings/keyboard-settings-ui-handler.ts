@@ -11,11 +11,10 @@ import {
   settingKeyboardDefaults,
   settingKeyboardOptions,
 } from "#system/settings-keyboard";
-import type { InterfaceConfig } from "#types/inputs";
+import type { InterfaceConfig, MappingSettingName } from "#types/inputs";
 import { BaseControlSettingsUiHandler } from "#ui/base-control-settings-ui-handler";
 import { addTextObject } from "#ui/text";
 import { truncateString } from "#utils/common";
-import { toUpperSnakeCase } from "#utils/strings";
 import i18next from "i18next";
 
 /** Class representing the settings UI handler for keyboards */
@@ -63,10 +62,26 @@ export class SettingsKeyboardUiHandler extends BaseControlSettingsUiHandler {
 
     this.settingsContainer.add(iconDelete);
     this.settingsContainer.add(deleteText);
+    this.footerTargets.push(
+      { object: deleteText, action: () => this.onDeleteDown() },
+      { object: iconDelete, action: () => this.onDeleteDown() },
+    );
 
     // Map the 'noKeyboard' layout options for easy access.
     this.layout["noKeyboard"].optionsContainer = optionsContainer;
     this.layout["noKeyboard"].label = label;
+  }
+
+  public override show(args: any[]): boolean {
+    globalScene.inputController.ensureKeyboardIsInit();
+    return super.show(args);
+  }
+
+  public override destroy(): void {
+    const keyboard = globalScene.input.keyboard;
+    keyboard?.keys[Phaser.Input.Keyboard.KeyCodes.DELETE]?.off("up", this.onDeleteDown, this);
+    keyboard?.keys[Phaser.Input.Keyboard.KeyCodes.HOME]?.off("up", this.onHomeDown, this);
+    super.destroy();
   }
 
   /**
@@ -76,9 +91,7 @@ export class SettingsKeyboardUiHandler extends BaseControlSettingsUiHandler {
     if (![UiMode.SETTINGS_KEYBOARD, UiMode.SETTINGS_GAMEPAD].includes(globalScene.ui.mode)) {
       return;
     }
-    const isKeyboard = globalScene.ui.mode === UiMode.SETTINGS_KEYBOARD;
-    globalScene.gameData.resetMappingToDefault(isKeyboard ? Device.KEYBOARD : Device.GAMEPAD);
-    this.tabMenu?.updateIcons();
+    globalScene.ui.getHandler<BaseControlSettingsUiHandler>().resetMappings();
   }
 
   /**
@@ -89,9 +102,10 @@ export class SettingsKeyboardUiHandler extends BaseControlSettingsUiHandler {
       return;
     }
     const cursor = this.cursor + this.scrollCursor; // Calculate the absolute cursor position.
-    const selection = this.settingLabels[cursor].text;
-    const key = toUpperSnakeCase(selection);
-    const settingName = SettingKeyboard[key];
+    const settingName = this.keys?.[cursor] as MappingSettingName | undefined;
+    if (!settingName) {
+      return;
+    }
     const activeConfig = this.getActiveConfig();
     const success = activeConfig != null && deleteBind(activeConfig, settingName);
     if (success) {
@@ -138,7 +152,7 @@ export class SettingsKeyboardUiHandler extends BaseControlSettingsUiHandler {
       // Check if the current setting corresponds to the layout setting.
       if (setting === this.setting.Default_Layout) {
         // Iterate over all layouts excluding the 'noGamepads' special case.
-        for (const layoutKey of this.layout.keys()) {
+        for (const layoutKey of Object.keys(this.layout)) {
           if (layoutKey === "noKeyboard") {
             continue;
           } // Skip updating the no gamepad layout.

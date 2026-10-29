@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 23 項完成、31 項待辦；EX 項目與 UI-24 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 24 項完成、30 項待辦；EX 項目與 UI-25 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -234,7 +234,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-21** 常規設定 — `SETTINGS_GENERAL`。
 - [x] **UI-22** 顯示設定 — `SETTINGS_DISPLAY`。
 - [x] **UI-23** 音效設定 — `SETTINGS_AUDIO`。
-- [ ] **UI-24** 鍵盤設定 — `SETTINGS_KEYBOARD`。
+- [x] **UI-24** 鍵盤設定 — `SETTINGS_KEYBOARD`。
 - [ ] **UI-25** 鍵盤按鍵綁定彈窗 — `KEYBOARD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
 - [ ] **UI-26** 手把設定 — `SETTINGS_GAMEPAD`。
 - [ ] **UI-27** 手把按鍵綁定彈窗 — `GAMEPAD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
@@ -284,7 +284,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-23；其餘 31 個項目保持待辦。Phase 2 的 UI 項目已完成，EX-02 除外；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-24；其餘 30 個項目保持待辦。Phase 2 的 UI 項目已完成，EX-02 除外；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -322,6 +322,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-22 | 2026-10-29 | `feat(ui): support mouse display settings` | 共用設定案例擴及顯示頁，新增語言取消與主題重載案例，共 30 項通過。Chromium default／legacy 實測直接值套用、長列表與逐列滾輪、語言選單開啟／取消還原、分類及返回通過。重載以自動測試替身驗證，不實際重載或改寫真實偏好。修正共用設定測試替身的兩處型別，typecheck、build:dev、修改檔案 Biome 與 diff check 通過；UI-21 共用基礎亦以本次型別結果為準。未測實體手把／觸控。 |
 
 | UI-23 | 2026-10-29 | `feat(ui): support mouse audio settings` | 共用設定案例擴及音效頁，另驗證全部 11 個音量刻度及既有鍵盤 clamping，共 45 項設定測試通過。Chromium default／legacy 實測音量兩階段值套用、七列列表滾輪邊界、分類與返回通過；沿用原音效與重載入口，不新增滑桿。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。設定持久化使用替身，不改寫真實偏好；未測實體手把／觸控。 |
+
+| UI-24 | 2026-10-29 | `feat(ui): support mouse keyboard settings` | 新增 14 項鍵盤設定互動測試，連同既有重新綁定回歸共 47 項通過。Chromium default／legacy 實測綁定列兩階段、實際 W 鍵擷取及原返回、底部刪除／重設、長列表逐列滾輪與右鍵返回通過；使用測試配置與替身保存／重設。共用裝置基礎改以實際設定鍵識別列，修正翻譯刪除與不同 layout 索引，配置更新後重建區域，無配置仍可分類／返回。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；綁定彈窗直接滑鼠操作於 UI-25 接續，手把設定尚未啟用，未測實體裝置。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。

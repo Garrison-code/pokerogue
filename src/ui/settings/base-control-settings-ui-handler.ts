@@ -1,7 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { Button } from "#enums/buttons";
-import type { Device } from "#enums/devices";
+import { Device } from "#enums/devices";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import { getIconWithSettingName } from "#inputs/config-handler";
@@ -12,6 +12,7 @@ import { specialIconKeys, specialIcons } from "#ui/special-icons";
 import { TabMenu } from "#ui/tab-menu";
 import { addTextObject, getTextColor } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
+import { UiPointerTargets } from "#ui/ui-pointer-targets";
 import { addWindow } from "#ui/ui-theme";
 import { toCamelCase } from "#utils/strings";
 import i18next from "i18next";
@@ -20,6 +21,15 @@ import i18next from "i18next";
  * Abstract class for handling UI elements related to control settings.
  */
 export abstract class BaseControlSettingsUiHandler extends UiHandler {
+  private pointerTargets: UiPointerTargets | null = null;
+  protected footerTargets: { object: Phaser.GameObjects.Text | Phaser.GameObjects.Sprite; action: () => void }[] = [];
+  private activeLayoutConfig: CustomInterfaceConfig | null = null;
+  private pointerDevice: string | undefined;
+
+  protected get supportsControlPointer(): boolean {
+    return this.device === Device.KEYBOARD;
+  }
+
   protected settingsContainer: Phaser.GameObjects.Container;
   protected optionsContainer: Phaser.GameObjects.Container;
   protected tabMenu: TabMenu;
@@ -48,7 +58,7 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
   protected inputsIcons: InputsIcons;
   protected navigationIcons: InputsIcons;
   // list all the setting keys used in the selected layout (because dualshock has more buttons than xbox)
-  protected keys: string[];
+  protected keys: MappingSettingName[];
 
   // Store the specific settings related to key bindings for the current gamepad configuration.
   protected bindingSettings: MappingSettingName[];
@@ -145,6 +155,14 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
       .setOrigin(0, 0.15);
     resetText.setPositionRelative(iconReset, -resetText.width / 6 - 2, 0);
 
+    this.footerTargets = [
+      { object: actionText, action: () => this.getUi().processInput(Button.ACTION) },
+      { object: iconAction, action: () => this.getUi().processInput(Button.ACTION) },
+      { object: cancelText, action: () => this.getUi().processInput(Button.CANCEL) },
+      { object: iconCancel, action: () => this.getUi().processInput(Button.CANCEL) },
+      { object: resetText, action: () => this.resetMappings() },
+      { object: iconReset, action: () => this.resetMappings() },
+    ];
     this.settingsContainer.add([
       this.optionsBg,
       this.actionsBg,
@@ -250,7 +268,7 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
       this.layout[config.padType].settingLabels = settingLabels;
       this.layout[config.padType].optionValueLabels = optionValueLabels;
       this.layout[config.padType].optionCursors = optionCursors;
-      this.layout[config.padType].keys = specificBindingKeys;
+      this.layout[config.padType].keys = settingFiltered.map(key => this.setting[key]);
       this.layout[config.padType].bindingSettings = bindingSettings;
 
       this.settingsContainer.add(optionsContainer);
@@ -281,42 +299,203 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
    * Update the bindings for the current active device configuration.
    */
   public updateBindings(): void {
-    this.layout.keys().forEach(key => this.layout[key].optionsContainer.setVisible(false));
+    const previous = this.activeLayoutConfig;
     const activeConfig = this.getActiveConfig();
-
-    // Set the UI layout for the active configuration. If unsuccessful, exit the function early.
-    // Note: `setLayout` is always invoked here (even when `activeConfig` is null) because it is
-    // responsible for displaying the "no gamepad connected" fallback message in that case.
+    this.activeLayoutConfig = activeConfig;
+    this.pointerDevice = globalScene.inputController.selectedDevice[this.device];
+    this.eraseCursor();
+    Object.values(this.layout).forEach(layout => layout.optionsContainer.setVisible(false));
     if (!this.setLayout(activeConfig)) {
+      this.keys = [];
+      this.settingLabels = [];
+      this.optionValueLabels = [];
+      this.optionCursors = [];
+      this.cursor = 0;
+      this.scrollCursor = 0;
+      this.scrollBar.setTotalRows(0);
+      if (this.active) {
+        this.setupPointerTargets();
+      }
       return;
     }
-
     this.keys.forEach((key, index) => {
       if (key === "enabled") {
-        this.setOptionCursor(index, Number(!settings.gamepad[key]));
+        this.setOptionCursor(index, Number(!settings.gamepad.enabled));
       }
     });
-
-    // If the active configuration has no custom bindings set, exit the function early.
-    // by default, if custom does not exists, a default is assigned to it
-    // it only means the gamepad is not yet initalized
-    if (!activeConfig.custom) {
-      return;
-    }
-
     for (const elm of this.bindingSettings) {
       const icon = getIconWithSettingName(activeConfig, elm);
       if (icon) {
-        this.inputsIcons[elm] //
-          .setFrame(icon)
-          .setAlpha(1);
+        this.inputsIcons[elm].setFrame(icon).setAlpha(1);
       } else {
-        this.inputsIcons[elm].alpha = 0;
+        this.inputsIcons[elm].setAlpha(0);
       }
     }
+    if (previous !== activeConfig) {
+      this.cursor = 0;
+      this.scrollCursor = 0;
+    }
+    this.scrollCursor = Math.max(0, Math.min(this.scrollCursor ?? 0, this.keys.length - this.rowsToDisplay));
+    this.setCursor(this.cursor ?? 0);
+    this.scrollBar.setScrollCursor(this.scrollCursor);
+    this.updateSettingsScroll();
+    if (this.active) {
+      this.setupPointerTargets();
+    }
+  }
 
-    this.setCursor(this.cursor);
-    this.setScrollCursor(this.scrollCursor);
+  /** The same reset action used by the existing HOME shortcut. */
+  public resetMappings(): void {
+    if (!this.getActiveConfig()) {
+      return;
+    }
+    globalScene.gameData.resetMappingToDefault(this.device);
+    this.updateBindings();
+    this.tabMenu.updateIcons();
+  }
+
+  private observePointerLayout(): void {
+    if (!this.active || this.getUi().getHandler() !== this) {
+      return;
+    }
+    if (
+      this.getActiveConfig() !== this.activeLayoutConfig
+      || globalScene.inputController.selectedDevice[this.device] !== this.pointerDevice
+    ) {
+      this.updateBindings();
+    }
+  }
+
+  private setupPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
+    this.tabMenu.disablePointerNavigation();
+    if (!this.supportsControlPointer) {
+      return;
+    }
+    const targets = (this.pointerTargets = new UiPointerTargets(this));
+    targets.add(this.settingsContainer, "controls-page", () => ({
+      x: -1,
+      y: -1,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height,
+    }));
+    const rowArea = (index: number) =>
+      index >= this.scrollCursor && index < this.scrollCursor + this.rowsToDisplay
+        ? {
+            x: 4,
+            y: this.optionsBg.y + 4 + (index - this.scrollCursor) * 16,
+            width: this.optionsBg.width - (this.scrollBar.visible ? 16 : 8),
+            height: 16,
+          }
+        : null;
+    targets.add(
+      this.settingsContainer,
+      "controls-list",
+      () => ({
+        x: this.optionsBg.x,
+        y: this.optionsBg.y,
+        width: this.optionsBg.width,
+        height: this.optionsBg.height,
+      }),
+      undefined,
+      direction => this.movePointerRow(direction),
+    );
+    this.keys.forEach((key, index) => {
+      targets.add(
+        this.settingsContainer,
+        `controls-row-${index}`,
+        () => rowArea(index),
+        () => {
+          if (!this.getActiveConfig()) {
+            return;
+          }
+          if (this.cursor + this.scrollCursor === index) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.selectPointerRow(index);
+          }
+        },
+        direction => this.movePointerRow(direction),
+      );
+      if (key.includes("BUTTON_")) {
+        return;
+      }
+      this.optionValueLabels[index].forEach((label, value) => {
+        targets.add(
+          this.settingsContainer,
+          `controls-value-${index}-${value}`,
+          () => {
+            const row = rowArea(index);
+            if (!row) {
+              return null;
+            }
+            const x = Math.max(row.x, label.x - 2);
+            return {
+              x,
+              y: row.y,
+              width: Math.max(0, Math.min(row.x + row.width, label.x + label.displayWidth + 2) - x),
+              height: row.height,
+            };
+          },
+          () => {
+            if (!this.getActiveConfig()) {
+              return;
+            }
+            if (this.cursor + this.scrollCursor !== index) {
+              this.selectPointerRow(index);
+            } else if (this.optionCursors[index] !== value && this.setOptionCursor(index, value, true)) {
+              this.getUi().playSelect();
+            }
+          },
+          direction => this.movePointerRow(direction),
+        );
+      });
+    });
+    this.footerTargets.forEach(({ object, action }, index) => {
+      targets.add(
+        this.settingsContainer,
+        `controls-footer-${index}`,
+        () =>
+          object.alpha === 0 || object.visible === false
+            ? null
+            : {
+                x: object.x - (object.displayWidth || 16) * (object.originX ?? 0) - 2,
+                y: object.y - (object.displayHeight || 16) * (object.originY ?? 0),
+                width: (object.displayWidth || 16) + 4,
+                height: object.displayHeight || 16,
+              },
+        action,
+      );
+    });
+    this.tabMenu.enablePointerNavigation(
+      () => this.getUi().canProcessPointerInput(this),
+      () => this.getUi().processInput(Button.CANCEL),
+    );
+    this.settingsContainer.bringToTop(this.tabMenu);
+  }
+
+  private selectPointerRow(index: number): void {
+    const changed = index !== this.cursor + this.scrollCursor;
+    const nextScroll = Math.max(
+      0,
+      Math.min(this.scrollCursor, index, Math.max(0, this.keys.length - this.rowsToDisplay)),
+    );
+    this.setScrollCursor(Math.max(nextScroll, index - this.rowsToDisplay + 1));
+    this.setCursor(index - this.scrollCursor);
+    if (changed) {
+      this.getUi().playSelect();
+    }
+  }
+
+  private movePointerRow(direction: number): void {
+    if (!this.getActiveConfig()) {
+      return;
+    }
+    const index = this.cursor + this.scrollCursor + direction;
+    if (index >= 0 && index < this.keys.length) {
+      this.selectPointerRow(index);
+    }
   }
 
   private updateNavigationDisplay(): void {
@@ -363,6 +542,11 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
     ui.moveTo(this.settingsContainer, ui.length - 1);
 
     ui.hideTooltip();
+    this.setupPointerTargets();
+    globalScene.events.off("preupdate", this.observePointerLayout, this);
+    if (this.supportsControlPointer) {
+      globalScene.events.on("preupdate", this.observePointerLayout, this);
+    }
 
     return true;
   }
@@ -415,7 +599,10 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
       globalScene.ui.revertMode();
     } else {
       const cursor = this.cursor + this.scrollCursor;
-      const setting = this.setting[Object.keys(this.setting)[cursor]];
+      const setting = this.keys?.[cursor];
+      if (!this.getActiveConfig() && ![Button.CYCLE_FORM, Button.CYCLE_SHINY].includes(button)) {
+        return false;
+      }
       switch (button) {
         case Button.ACTION:
           if (!this.optionCursors || !this.optionValueLabels) {
@@ -517,8 +704,12 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
    * @returns Whether the cursor was set successfully.
    */
   public override setCursor(cursor: number): boolean {
+    cursor = Math.max(
+      0,
+      Math.min(cursor, Math.min(this.rowsToDisplay, (this.keys?.length ?? 0) - (this.scrollCursor ?? 0)) - 1),
+    );
     const ret = super.setCursor(cursor);
-    if (!this.optionsContainer) {
+    if (!this.optionsContainer || !this.keys?.length) {
       return ret;
     }
 
@@ -542,6 +733,7 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
    * @returns Whether the scroll cursor was set successfully.
    */
   public setScrollCursor(scrollCursor: number): boolean {
+    scrollCursor = Math.max(0, Math.min(scrollCursor, (this.keys?.length ?? 0) - this.rowsToDisplay));
     if (scrollCursor === this.scrollCursor) {
       return false;
     }
@@ -565,7 +757,10 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
    * @returns Whether the option cursor was set successfully.
    */
   public setOptionCursor(settingIndex: number, cursor: number, save?: boolean): boolean {
-    const setting = this.setting[Object.keys(this.setting)[settingIndex]];
+    const setting = this.keys[settingIndex];
+    if (!setting) {
+      return false;
+    }
 
     const lastCursor = this.optionCursors[settingIndex];
 
@@ -609,11 +804,21 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
   }
 
   public override clear(): void {
+    globalScene.events.off("preupdate", this.observePointerLayout, this);
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
+    this.tabMenu.disablePointerNavigation();
     super.clear();
 
     this.settingsContainer.setVisible(false);
 
     this.eraseCursor();
+  }
+
+  public override destroy(): void {
+    this.clear();
+    this.settingsContainer.destroy();
+    super.destroy();
   }
 
   /** Erase the cursor from the UI. */
