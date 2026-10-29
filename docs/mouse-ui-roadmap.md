@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 20 項完成、34 項待辦；EX-01／EX-02 與 UI-21 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 21 項完成、33 項待辦；EX 項目與 UI-22 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -66,7 +66,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 滾輪到首／末項停止，不循環；鍵盤原有循環行為保留。水平滾輪不操作選單。
 - 選單外點擊不觸發操作；UI-01／02／04 在選單列與框內留白右鍵，完全沿用既有 CANCEL，不先選取點擊項目。UI-06 主畫面維持右鍵無作用。
 - 保留確認延遲、取消限制、回呼結果、音效與 `keepOpen` 行為；轉場、教學及上層介面阻擋背景選單輸入。
-- 目前僅對以上四種 UiMode 啟用共用選單的直接滑鼠操作，其他繼承相同基底的頁面仍按清單順序處理。
+- 以上四種 UiMode 已啟用共用選單的直接滑鼠操作；MENU 的頁面背景與入口另依 UI-20 規格，AUTO_COMPLETE 仍待辦。
 - UI-04 包含資料管理、社群與存檔欄位的子選單；不擴充父頁、檔案選擇或後續介面的操作。
 - UI-06 包含繼續、新遊戲、讀取、紀錄及選單入口；只驗證尚未支援的後續頁面能正確開啟，不擴充其操作。主畫面保留既有取消限制，右鍵不取消。
 - 使用者決定 UI-06～UI-08 接續實作，EX-01 留待獨立一批；首次登入與後續教學仍需既有鍵盤／手把輸入。
@@ -231,7 +231,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 ## Phase 3：遊戲選單與設定
 
 - [x] **UI-20** 遊戲內選單 — `MENU`；包含開啟、返回、儲存退出及登出等入口。
-- [ ] **UI-21** 常規設定 — `SETTINGS_GENERAL`。
+- [x] **UI-21** 常規設定 — `SETTINGS_GENERAL`。
 - [ ] **UI-22** 顯示設定 — `SETTINGS_DISPLAY`。
 - [ ] **UI-23** 音效設定 — `SETTINGS_AUDIO`。
 - [ ] **UI-24** 鍵盤設定 — `SETTINGS_KEYBOARD`。
@@ -284,7 +284,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-20；其餘 34 個項目保持待辦。Phase 2 的 UI 項目已完成，EX-02 除外；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-21；其餘 33 個項目保持待辦。Phase 2 的 UI 項目已完成，EX-02 除外；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -316,6 +316,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-19 | 2026-10-29 | `feat(ui): support mouse Pokemon renaming` | 新增 20 項重新命名與 1 項共用放鍵測試，連同輸入與紀錄回歸共 41 項通過。保留單擊表單按鈕、Unicode／空白處理及回呼；本頁 CANCEL 與取消按鈕共用入口，右鍵不另訂語意。清理 DOM 監聽、焦點延遲與進場動畫；修正欄位消耗按下後、關閉時未初始化鍵盤的放鍵錯誤。Chromium default／legacy 實測文字編輯、長度限制、中文文字、合成 IME 組字事件、按鈕／輸入框右鍵、框外阻擋及重開通過；實際隊伍與起始寶可夢選單的命名提交／返回皆通過，使用測試資料及替身儲存，不操作真實資料。另補強 UI-16 浮層僅阻擋覆蓋商品、隱藏繼續文字不可操作兩項案例（商品互動現為 18 項）；兩主題浮層實測通過。隊伍換位回歸顯式等待獎勵揭示完成後輸入，12 項通過。整批 54 檔 756 項相關回歸通過（4 skipped、3 todo）；商品範圍／隱藏文字補強後，商品／命名／輸入 54 項通過。typecheck、build:dev、全量 Biome、Dependency Cruiser、主程式型別、REUSE 與 diff check 通過。未測作業系統實際 IME、實體手把與觸控；EX-01／EX-02 保持待辦。 |
 
 | UI-20 | 2026-10-29 | `feat(ui): support mouse game menu navigation` | 新增 13 項選單／入口測試通過；原選項與輸入回歸共 84 項通過（入口案例補齊後獨立 13 項通過）。Chromium default／legacy 實測右上像素選單入口、選取／確認、滾輪、設定入口與返回、背景右鍵及禁止開選單時隱藏通過；已檢視圖示樣式。沿用原 MENU 條件，預留 HUD 空間，訊息阻擋重複左鍵，重開清理舊訊息與教學回呼。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過。收藏頁後續操作、真實儲存退出／登出與實體手把／觸控未實測；EX 維持待辦。 |
+
+| UI-21 | 2026-10-29 | `feat(ui): support mouse general settings` | 新增 14 項設定互動測試，連同 TabMenu 挑戰頁回歸共 28 項通過。Chromium default／legacy 實測先選列再套用、設定值、長列表逐列滾輪與邊界、分類切換及返回通過；使用替身儲存，未修改真實偏好。共用設定基礎處理確認訊息阻擋、舊回呼失效、底部操作與清理；TabMenu 明確啟用並隨排版更新區域。觸控配置只保留原交接並清理完成監聽，EX-03 未擴充。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；未測實體手把／觸控。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。
