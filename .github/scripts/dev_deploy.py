@@ -112,7 +112,11 @@ def prepare():
     if mode == "deploy":
         previous, status = latest_record()
         if status in ("error", "failure", "in_progress", "pending", "queued") and not resume:
-            raise Failure("Previous deployment is failed or unfinished; inspect it and use a manual resume")
+            raise Failure(
+                f"Previous deployment {previous['id']} is {status}; inspect its statuses at "
+                f"https://api.github.com/repos/{publish.REPOSITORIES[0]}/deployments/{previous['id']}/statuses "
+                "and use a manual resume"
+            )
         if (previous and status == "success"
                 and previous.get("payload", {}).get("pair_key") == state["pair_key"] and not resume):
             publish.output("run", "false")
@@ -164,6 +168,8 @@ def build_matches(images):
 
 def api(path, token=None, form=None, payload=None):
     # The account is dedicated to deployment tests. Never print bodies or auth.
+    route = path.split("?")[0]
+    report(api_check=route)
     time.sleep(0.25)
     headers = {"Origin": SITE, "User-Agent": "PokeRogue-dev-smoke/1.0"}
     if token:
@@ -180,8 +186,15 @@ def api(path, token=None, form=None, payload=None):
         with urllib.request.urlopen(request, timeout=30) as response:
             raw = response.read()
             return response.status, json.loads(raw) if raw else None
-    except (urllib.error.HTTPError, OSError, ValueError):
-        raise Failure("Deployment account/save API check failed: " + path.split("?")[0]) from None
+    except urllib.error.HTTPError as error:
+        error.close()
+        raise Failure(f"Deployment account/save API check failed: {route} (HTTP {error.code})") from None
+    except OSError as error:
+        raise Failure(
+            f"Deployment account/save API check failed: {route} (transport {type(error).__name__})"
+        ) from None
+    except ValueError:
+        raise Failure(f"Deployment account/save API check failed: {route} (invalid JSON response)") from None
 
 def smoke():
     username = publish.require("DEV_SMOKE_USERNAME")
@@ -219,8 +232,16 @@ def smoke():
                 or api(session_path, token)[1].get("timestamp") != stamp):
             raise Failure("Save writes did not round-trip")
     finally:
-        if api("/account/logout", token)[0] != 200:
-            raise Failure("Deployment account logout failed")
+        primary_failure = sys.exc_info()[0] is not None
+        try:
+            if api("/account/logout", token)[0] != 200:
+                raise Failure("Deployment account logout failed")
+        except Failure as error:
+            if not primary_failure:
+                raise
+            # Cleanup must not replace the account/save error that triggered it.
+            report(cleanup_error=str(error))
+            print(f"::warning::{error}", file=sys.stderr)
 
 def execute():
     state = load_state()

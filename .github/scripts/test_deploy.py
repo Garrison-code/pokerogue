@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Garrison-code
 # SPDX-License-Identifier: AGPL-3.0-only
+import io
+import json
 import os
 import tempfile
 import unittest
@@ -54,7 +56,7 @@ class CoordinatorTests(unittest.TestCase):
         with patch.object(d, "snapshot", return_value=IMAGES), patch.object(
             d, "latest_record", return_value=({"id": 4}, "failure")
         ), patch.object(d, "gh") as gh:
-            with self.assertRaises(d.Failure):
+            with self.assertRaisesRegex(d.Failure, r"deployment 4 is failure.*deployments/4/statuses"):
                 d.prepare()
             gh.assert_not_called()
 
@@ -219,6 +221,77 @@ class CoordinatorTests(unittest.TestCase):
         with patch.object(p, "http", return_value=({}, data)):
             with self.assertRaises(d.Failure):
                 d.coolify_status()
+
+    def test_api_reports_http_status_without_response_or_credentials(self):
+        error = d.urllib.error.HTTPError(
+            d.SITE + "/api/account/logout?private-query", 429,
+            "private-reason", {}, io.BytesIO(b"private-response"),
+        )
+        with patch.object(d.time, "sleep"), patch.object(
+            d.urllib.request, "urlopen", side_effect=error
+        ):
+            with self.assertRaises(d.Failure) as caught:
+                d.api("/account/logout?private-query", "private-token")
+        self.assertEqual(str(caught.exception),
+                         "Deployment account/save API check failed: /account/logout (HTTP 429)")
+        self.assertEqual(json.loads(d.temporary("dev-deploy-report.json").read_text())["api_check"],
+                         "/account/logout")
+
+    def test_api_reports_transport_class_without_sensitive_reason(self):
+        with patch.object(d.time, "sleep"), patch.object(
+            d.urllib.request, "urlopen", side_effect=d.urllib.error.URLError("private-reason")
+        ):
+            with self.assertRaisesRegex(d.Failure, r"/account/logout \(transport URLError\)$"):
+                d.api("/account/logout")
+
+    def test_api_distinguishes_invalid_json_from_an_empty_success(self):
+        for body, valid in ((b"not-json-private-body", False), (b"", True)):
+            with self.subTest(valid=valid), patch.object(d.time, "sleep"), patch.object(
+                d.urllib.request, "urlopen"
+            ) as request:
+                response = request.return_value.__enter__.return_value
+                response.status = 200
+                response.read.return_value = body
+                if valid:
+                    self.assertEqual(d.api("/account/logout"), (200, None))
+                else:
+                    with self.assertRaisesRegex(d.Failure, r"/account/logout \(invalid JSON response\)$"):
+                        d.api("/account/logout")
+
+    def test_logout_cleanup_failure_does_not_hide_save_failure(self):
+        def fake(path, token=None, **kwargs):
+            if path == "/account/login":
+                return 200, {"token": "private-token"}
+            if path == "/account/info":
+                return 200, {"username": os.environ["DEV_SMOKE_USERNAME"]}
+            if path == "/account/logout":
+                raise d.Failure("logout transport failure")
+            raise d.Failure("original save HTTP 503")
+        with patch.object(d, "api", side_effect=fake), patch.object(d.sys, "stderr", io.StringIO()):
+            with self.assertRaisesRegex(d.Failure, "^original save HTTP 503$"):
+                d.smoke()
+        report = json.loads(d.temporary("dev-deploy-report.json").read_text())
+        self.assertEqual(report["cleanup_error"], "logout transport failure")
+
+    def test_logout_failure_still_fails_an_otherwise_successful_smoke(self):
+        system = {"trainerId": 12345, "secretId": 54321}
+        session = {"seed": "coolify-develop-smoke", "money": 3456, "waveIndex": 2}
+        def fake(path, token=None, payload=None, **kwargs):
+            route = path.split("?")[0]
+            if route == "/account/login":
+                return 200, {"token": "private-token"}
+            if route == "/account/info":
+                return 200, {"username": os.environ["DEV_SMOKE_USERNAME"]}
+            if route == "/account/logout":
+                raise d.Failure("logout HTTP 429")
+            data = system if "/system/" in route else session
+            if payload is not None:
+                data.update(payload)
+                return (204 if data is system else 200), None
+            return 200, dict(data)
+        with patch.object(d, "api", side_effect=fake):
+            with self.assertRaisesRegex(d.Failure, "^logout HTTP 429$"):
+                d.smoke()
 
 if __name__ == "__main__":
     unittest.main()
