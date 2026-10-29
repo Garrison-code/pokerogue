@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 38 項完成、16 項待辦；EX 項目與 UI-39 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 39 項完成、15 項待辦；EX 項目與 UI-40 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -268,7 +268,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-36** 成就頁 — `ACHIEVEMENTS`。
 - [x] **UI-37** 遊戲統計頁 — `GAME_STATS`。
 - [x] **UI-38** 遊戲紀錄列表 — `RUN_HISTORY`。
-- [ ] **UI-39** 單局紀錄詳細頁 — `RUN_INFO`。
+- [x] **UI-39** 單局紀錄詳細頁 — `RUN_INFO`。
 - [ ] **UI-40** 遊戲紀錄重新命名 — `RENAME_RUN`。
 
 ## Phase 5：帳號、資料管理、狀態與維護工具
@@ -299,7 +299,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-38；其餘 16 個項目保持待辦。Phase 2 與 Phase 3 的 UI 項目已完成，EX-01／EX-02／EX-03 仍待辦；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-39；其餘 15 個項目保持待辦。Phase 2 與 Phase 3 的 UI 項目已完成，EX-01／EX-02／EX-03 仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -362,3 +362,4 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 | UI-36 | 2026-10-29 | `feat(ui): support mouse achievements browsing` | 9 項新增互動測試通過；Chromium default／legacy 驗證圖示只選取、捲動保留身分、捲回恢復與標頭切頁通過。修正離屏選取捲回時負索引，保留鎖定／隱藏描述與鍵盤循環。補齊 headless NineSlice 位置計算以驗證頁面。typecheck、修改檔案 Biome、diff check 通過；測試解鎖資料，不保存真實資料，未測實體裝置。 |
 | UI-37 | 2026-10-29 | `feat(ui): support mouse game statistics` | 4 項新增互動測試通過；Chromium default／legacy 實測內容區滾輪、可見上下箭頭與右鍵返回通過。純資訊不新增確認；沿用 UP／DOWN 邊界，清理監聽與單次退出回呼。修改檔案 Biome、型別與 diff check 通過，整批型別另於最終 HEAD 驗證；未測實體裝置。 |
 | UI-38 | 2026-10-29 | `feat(ui): support mouse run history navigation` | 11 項新增互動測試通過，包含舊載入結果失效、連續捲動時舊 tween 回呼不解除新鎖定。Chromium default／legacy 實測卡片選取、連續滾輪、首末邊界及正確紀錄開啟通過。清理卡片、捲動與載入身分，保留原鍵盤循環／CANCEL；補齊 headless 文字 append 模擬。typecheck、修改檔案 Biome、build:dev、diff check 通過；測試紀錄及替身資料來源，未讀寫真實存檔。 |
+| UI-39 | 2026-10-29 | `feat(ui): support mouse run information views` | 8 項新增互動測試通過；Chromium default／legacy 實測名人堂／結局圖、右鍵先關覆蓋層、存檔預覽及持有道具切換通過。僅沿用原循環輸入與 CANCEL；清理所有容器與監聽，過期訓練家／名人堂素材不回填；預覽不沿用上一局勝利狀態，結局容器可重用並隨清除銷毀。typecheck、修改檔案 Biome、build:dev、diff check 通過；使用測試紀錄／隊伍與替身資料，不讀寫真實存檔。 |

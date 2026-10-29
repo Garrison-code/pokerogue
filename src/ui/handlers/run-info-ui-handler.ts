@@ -24,6 +24,7 @@ import type { SessionSaveData } from "#types/save-data";
 import { addBBCodeTextObject, addTextObject, getTextColor, RAINBOW_TINT } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import { formatFancyLargeNumber, formatLargeNumber, formatMoney, getBiomeName, getPlayTimeString } from "#utils/common";
 import { toCamelCase } from "#utils/strings";
 import i18next from "i18next";
@@ -52,6 +53,23 @@ export enum RunDisplayMode {
  * For now, I leave as is.
  */
 export class RunInfoUiHandler extends UiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
+  private displayId = 0;
+
+  override clear(): void {
+    this.displayId++;
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    this.runContainer.removeAll(true).setVisible(false);
+    super.clear();
+  }
+
+  override destroy(): void {
+    this.clear();
+    this.runContainer.destroy();
+    super.destroy();
+  }
+
   protected runDisplayMode: RunDisplayMode;
   protected runInfo: SessionSaveData;
   protected isVictory: boolean;
@@ -89,6 +107,7 @@ export class RunInfoUiHandler extends UiHandler {
    * this.isVictory === true --> Hall of Fame Container:
    */
   override show(args: any[]): boolean {
+    this.clear();
     super.show(args);
 
     const gameStatsBg = globalScene.add.rectangle(
@@ -102,6 +121,7 @@ export class RunInfoUiHandler extends UiHandler {
     this.runContainer.add(gameStatsBg);
 
     const run = args[0];
+    this.isVictory = false;
     this.runDisplayMode = args[1];
     if (this.runDisplayMode === RunDisplayMode.RUN_HISTORY) {
       this.runInfo = globalScene.gameData.parseSessionData(JSON.stringify(run.entry));
@@ -160,7 +180,49 @@ export class RunInfoUiHandler extends UiHandler {
     this.getUi().add(this.runContainer);
 
     this.getUi().hideTooltip();
-
+    this.pointerTargets = new UiPointerTargets(this);
+    const page = this.pointerTargets.add(this.runContainer, "run-info-page", () => ({
+      x: 0,
+      y: 0,
+      width: 318,
+      height: 178,
+    }));
+    this.runContainer.moveTo(page, 1);
+    const items = this.runContainer.getByName("run-info-items") as Phaser.GameObjects.Container | null;
+    if (items) {
+      this.pointerTargets.add(
+        items,
+        "run-info-items",
+        () => (this.pageMode === RunInfoUiMode.MAIN ? { x: 0, y: 0, width: items.width, height: 14 } : null),
+        () => this.getUi().processInput(Button.CYCLE_ABILITY),
+      );
+    }
+    const actions = this.runResultContainer.getByName(
+      "run-info-victory-actions",
+    ) as Phaser.GameObjects.Container | null;
+    if (actions) {
+      for (const [row, button, name] of [
+        [0, Button.CYCLE_SHINY, "hall"],
+        [1, Button.CYCLE_FORM, "ending"],
+      ] as const) {
+        this.pointerTargets.add(
+          actions,
+          `run-info-${name}`,
+          () =>
+            this.isVictory && this.pageMode === RunInfoUiMode.MAIN
+              ? { x: 0, y: row * 12, width: this.statsBgWidth - 24, height: 12 }
+              : null,
+          () => this.getUi().processInput(button),
+        );
+      }
+    }
+    for (const container of [this.hallofFameContainer, this.endCardContainer]) {
+      if (container?.scene) {
+        this.pointerTargets.add(container, "run-info-overlay", () =>
+          this.pageMode !== RunInfoUiMode.MAIN && container.visible ? { x: 0, y: 0, width: 320, height: 180 } : null,
+        );
+      }
+    }
     return true;
   }
 
@@ -181,7 +243,10 @@ export class RunInfoUiHandler extends UiHandler {
       });
       const gamepadType = this.getUi().getGamepadType();
       let abilityButtonElement: Phaser.GameObjects.Sprite;
-      if (gamepadType === "touch") {
+      if (
+        gamepadType === "touch"
+        || !globalScene.inputController?.getIconForLatestInputRecorded(SettingKeyboard.BUTTON_CYCLE_ABILITY)
+      ) {
         abilityButtonElement = new Phaser.GameObjects.Sprite(globalScene, 0, 2, "keyboard", "E.png");
       } else {
         abilityButtonElement = new Phaser.GameObjects.Sprite(
@@ -193,10 +258,12 @@ export class RunInfoUiHandler extends UiHandler {
         );
       }
       abilityButtonContainer.add([abilityButtonText, abilityButtonElement]);
+      abilityButtonContainer.setSize(abilityButtonText.displayWidth + abilityButtonElement.displayWidth + 8, 14);
       abilityButtonContainer.setPosition(
         headerBgCoords.x - abilityButtonText.displayWidth - abilityButtonElement.displayWidth - 8,
         10,
       );
+      abilityButtonContainer.setName("run-info-items");
       this.runContainer.add(abilityButtonContainer);
     }
     const headerText = addTextObject(0, 0, i18next.t("runHistory:runInfo"), TextStyle.HEADER_LABEL);
@@ -244,7 +311,10 @@ export class RunInfoUiHandler extends UiHandler {
       const gamepadType = this.getUi().getGamepadType();
       let shinyButtonElement: Phaser.GameObjects.Sprite;
       let formButtonElement: Phaser.GameObjects.Sprite;
-      if (gamepadType === "touch") {
+      if (
+        gamepadType === "touch"
+        || !globalScene.inputController?.getIconForLatestInputRecorded(SettingKeyboard.BUTTON_CYCLE_SHINY)
+      ) {
         shinyButtonElement = new Phaser.GameObjects.Sprite(globalScene, 0, 4, "keyboard", "R.png");
         formButtonElement = new Phaser.GameObjects.Sprite(globalScene, 0, 16, "keyboard", "F.png");
       } else {
@@ -268,6 +338,7 @@ export class RunInfoUiHandler extends UiHandler {
       hallofFameInstructionContainer.add([formButtonText, formButtonElement]);
 
       hallofFameInstructionContainer.setPosition(12, 25);
+      hallofFameInstructionContainer.setName("run-info-victory-actions");
       this.runResultContainer.add(hallofFameInstructionContainer);
     }
 
@@ -469,7 +540,11 @@ export class RunInfoUiHandler extends UiHandler {
     // Creating the trainer sprite and adding it to enemyContainer
     const tObj = this.runInfo.trainer.toTrainer();
     // Loads trainer assets on demand, as they are not loaded by default in the scene
+    const displayId = this.displayId;
     tObj.config.loadAssets(this.runInfo.trainer.variant).then(() => {
+      if (displayId !== this.displayId || !this.active) {
+        return;
+      }
       const tObjSpriteKey = tObj.config.getSpriteKey(this.runInfo.trainer.variant === TrainerVariant.FEMALE, false);
       const tObjSprite = globalScene.add.sprite(0, 5, tObjSpriteKey);
       if (this.runInfo.trainer.variant === TrainerVariant.DOUBLE && !tObj.config.doubleOnly) {
@@ -1036,7 +1111,11 @@ export class RunInfoUiHandler extends UiHandler {
       speciesLoaded.set(id, false);
 
       const female = pkmn.gender === 1;
+      const displayId = this.displayId;
       species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
+        if (displayId !== this.displayId || !this.active) {
+          return;
+        }
         speciesLoaded.set(id, true);
         pokemonSprite.play(species.getSpriteKey(female, formIndex, shiny, variant));
         pokemonSprite.setPipelineData("shiny", shiny);
@@ -1074,22 +1153,13 @@ export class RunInfoUiHandler extends UiHandler {
       case Button.LEFT:
         success = true;
         if (this.pageMode === RunInfoUiMode.MAIN) {
-          this.runInfoContainer.removeAll(true);
-          this.runResultContainer.removeAll(true);
-          this.partyContainer.removeAll(true);
-          this.runContainer.removeAll(true);
-          if (this.isVictory) {
-            this.hallofFameContainer.removeAll(true);
-          }
-          super.clear();
-          this.runContainer.setVisible(false);
+          this.clear();
           ui.revertMode();
         } else if (this.pageMode === RunInfoUiMode.HALL_OF_FAME) {
           this.hallofFameContainer.setVisible(false);
           this.pageMode = RunInfoUiMode.MAIN;
         } else if (this.pageMode === RunInfoUiMode.ENDING_ART) {
           this.endCardContainer.setVisible(false);
-          this.runContainer.remove(this.endCardContainer);
           this.pageMode = RunInfoUiMode.MAIN;
         }
         break;
@@ -1123,13 +1193,17 @@ export class RunInfoUiHandler extends UiHandler {
       case Button.CYCLE_FORM:
         if (this.isVictory && this.pageMode !== RunInfoUiMode.HALL_OF_FAME) {
           if (!this.endCardContainer || !this.endCardContainer.visible) {
-            this.createVictorySplash();
+            if (!this.endCardContainer?.scene) {
+              this.createVictorySplash();
+              this.pointerTargets?.add(this.endCardContainer, "run-info-ending-overlay", () =>
+                this.endCardContainer.visible ? { x: 0, y: 0, width: 320, height: 180 } : null,
+              );
+            }
             this.endCardContainer.setVisible(true);
             this.runContainer.add(this.endCardContainer);
             this.pageMode = RunInfoUiMode.ENDING_ART;
           } else {
             this.endCardContainer.setVisible(false);
-            this.runContainer.remove(this.endCardContainer);
             this.pageMode = RunInfoUiMode.MAIN;
           }
         }
