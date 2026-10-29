@@ -25,9 +25,16 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 初始規劃 commit 不代表任何頁面的滑鼠操作已完成。
 - CI 驗證須包含 REUSE 授權檢查；新增文件也要提供 SPDX 版權與授權標記，不能只檢查 Biome。
 
+## 階段交付紀錄
+
+- 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
+- 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
+- 目前維持 48 項完成、6 項待辦；六個 EX 項目仍待個別規劃、實作與驗證。
+
 ## 已確認的方向
 
 - 保留現有鍵盤操作，分階段增加滑鼠操作。
+- 新增按鈕、箭頭與互動標示須遵循既有美術風格：優先重用現有像素素材、配色、比例與主題樣式，不引入風格不同的網頁按鈕。
 - 點擊不同選項是「選取」；點擊目前選取的選項是「確認」，不是限定時間內的雙擊。
 - 滑鼠移入不改變選取。按鈕文字已提供資訊時，不額外新增提示。
 - 滾輪不必全面模擬方向鍵；各頁的操作方式在實作該頁前再確認。
@@ -59,7 +66,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 滾輪到首／末項停止，不循環；鍵盤原有循環行為保留。水平滾輪不操作選單。
 - 選單外點擊不觸發操作；UI-01／02／04 在選單列與框內留白右鍵，完全沿用既有 CANCEL，不先選取點擊項目。UI-06 主畫面維持右鍵無作用。
 - 保留確認延遲、取消限制、回呼結果、音效與 `keepOpen` 行為；轉場、教學及上層介面阻擋背景選單輸入。
-- 目前僅對以上四種 UiMode 啟用共用選單的直接滑鼠操作，其他繼承相同基底的頁面仍按清單順序處理。
+- 以上四種 UiMode 已啟用共用選單的直接滑鼠操作；MENU 的頁面背景與入口另依 UI-20 規格，AUTO_COMPLETE 已依 UI-35 啟用，確認仍送其原 SUBMIT。
 - UI-04 包含資料管理、社群與存檔欄位的子選單；不擴充父頁、檔案選擇或後續介面的操作。
 - UI-06 包含繼續、新遊戲、讀取、紀錄及選單入口；只驗證尚未支援的後續頁面能正確開啟，不擴充其操作。主畫面保留既有取消限制，右鍵不取消。
 - 使用者決定 UI-06～UI-08 接續實作，EX-01 留待獨立一批；首次登入與後續教學仍需既有鍵盤／手把輸入。
@@ -151,6 +158,27 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 已有滑鼠操作的頁面以補齊或驗證為主；純狀態頁若確認無需互動，可記錄理由後標 done。
 - 未在「已定案」段落記錄的項目只定義盤點範圍與順序，尚未決定互動細節。
 
+## 已定案：UI-10～UI-15 戰鬥與隊伍
+
+- 依 UI-10 → UI-15 分別驗證、提交並 push 至 PR #12；本節定案不代表項目已完成。EX-01／EX-02 仍待辦。
+- COMMAND／FIGHT 採整格兩階段點擊；太晶化只在可見且可用時操作。兩頁滾輪無作用，面板內右鍵完全沿用 CANCEL。
+- BALL 採整列兩階段點擊，包含零數量及取消列；框內垂直滾輪逐列選取，到邊界停止，右鍵沿用 CANCEL，框外不操作。
+- TARGET_SELECT 可點有效目標的寶可夢與血量框：單體兩階段，整組高亮的多目標點任一有效目標即確認整組。血量框優先於重疊精靈，無效目標不操作；戰場右鍵沿用 CANCEL，滾輪無作用。
+- PARTY 隊員整卡與頁內子選單採兩階段點擊；卡片滾輪只逐隻選取隊員，子選單逐個實際選項並捲動，均不循環。捲動箭頭單擊一步；可調道具數量旁新增既有風格左右箭頭，立即選取該列並沿用 LEFT／RIGHT，保留數量循環。訊息點擊走 ACTION，頁面右鍵完全沿用 CANCEL 與強制換人等限制。
+- SUMMARY 新增既有風格的左右分頁箭頭，沿用 LEFT／RIGHT；不新增隊員切換按鈕。頁面垂直滾輪完整沿用當下 UP／DOWN：一般瀏覽換隊員，招式選取／學習時移動招式游標，循環與邊界亦沿用鍵盤。招式列兩階段點擊，特性／被動與能力值／IV 區域單擊 ACTION，頁面右鍵完全沿用 CANCEL。
+- 所有新操作先消耗事件再檢查目前 handler、啟用、教學與轉場；不穿透上層或新頁，不新增 hover 選取，中鍵／水平滾輪／觸控不啟用。保留各模式回呼、錯誤與音效，不修改遊戲規則或公開介面。
+- 驗證含單雙打、全部 PartyUiMode、招式學習／排序／刪除與 default／legacy；測試使用替身與測試隊伍，不讀寫真實存檔或修改真實隊伍。未測的入口與裝置如實記錄。
+
+## 已定案：Phase 2 收尾（UI-16～UI-19，EX 除外）
+
+- 依 UI-16 → UI-19 分別實作、驗證、提交並 push 至同一 draft PR；定案本身不代表完成。EX-01／EX-02 維持待辦；Phase 3 進度依下方清單。
+- 四頁均不新增滾輪導航；事件先消耗再檢查目前 handler、教學與轉場。中鍵／觸控不走新增操作，保留既有資訊 hover。
+- MODIFIER_SELECT 的獎勵、商店商品、重抽、鎖定稀有度、管理道具、查看隊伍及繼續採兩階段點擊，更新既有游標與資訊；確認走 ACTION，頁面右鍵完全沿用 CANCEL（含放棄確認）。揭示／升級與教學完成前不允許左鍵操作，資訊浮層遮住的商品不可點。處理商店反向列索引、返回重新啟用與舊動畫／非同步回呼失效。
+- MYSTERY_ENCOUNTER 的二／三／四選項與查看隊伍採兩階段點擊；固定格範圍不跟隨長文字捲動，選取更新既有說明。未達需求仍可查看，確認沿用 optionMode 判定；右鍵只送 CANCEL，目前不新增離開事件能力。管理入場／返回延遲、捲動動畫及 hover 清理。
+- EVOLUTION_SCENE 的可見訊息框在文字／提示完成且等待確認時，左鍵走 ACTION；不快轉逐字訊息或動畫。頁面右鍵完整沿用 CANCEL 的取消進化優先順序、不可取消限制與訊息推進。進化、形態變化、暫停確認及學招保留原流程。
+- RENAME_POKEMON 保留既有表單單擊提交／取消與原生文字編輯，不改成選項兩階段操作。本 handler 補齊 CANCEL 並與取消按鈕共用入口，右鍵只送 CANCEL；彈窗本體含輸入框生效，框外僅阻擋背景。保留 SUBMIT、空白修剪、Unicode 編碼與呼叫端回呼；清理 focus 延遲、DOM 監聽與進場 tween，不擴及其他表單。
+- 新增互動測試並以 Chromium default／legacy 驗證；使用測試隊伍與替身，不讀寫真實存檔。UI-16～UI-19 已依下方完成紀錄驗證，該批完成時累計 19 項完成、35 項待辦，Phase 2 的 UI 項目完成，EX-02 仍待辦。
+
 ## Phase 0：共用選項、確認與訊息
 
 這些元件被多個頁面重用，先處理可減少後續重複工作。
@@ -175,61 +203,103 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## Phase 2：戰鬥、隊伍與戰後流程
 
-- [ ] **UI-10** 戰鬥指令 — `COMMAND`；戰鬥、精靈球、寶可夢、逃跑及太晶化入口。
-- [ ] **UI-11** 招式選擇 — `FIGHT`。
-- [ ] **UI-12** 精靈球選擇 — `BALL`。
-- [ ] **UI-13** 戰鬥目標選擇 — `TARGET_SELECT`；包含雙打與有效目標限制。
-- [ ] **UI-14** 隊伍頁 — `PARTY`；包含換人、查看、放生、道具管理、招式回憶等既有模式與子選單。
-- [ ] **UI-15** 寶可夢詳細資料 — `SUMMARY`；包含分頁與招式學習／替換等既有用途。
-- [ ] **UI-16** 戰後獎勵／商店 — `MODIFIER_SELECT`；包含獎勵、購買、重抽、隊伍及道具轉移入口。
-- [ ] **UI-17** 神秘事件 — `MYSTERY_ENCOUNTER`；包含事件選項與結果流程。
-- [ ] **UI-18** 進化畫面 — `EVOLUTION_SCENE`。
-- [ ] **UI-19** 寶可夢重新命名 — `RENAME_POKEMON`。
+- [x] **UI-10** 戰鬥指令 — `COMMAND`；戰鬥、精靈球、寶可夢、逃跑及太晶化入口。
+- [x] **UI-11** 招式選擇 — `FIGHT`。
+- [x] **UI-12** 精靈球選擇 — `BALL`。
+- [x] **UI-13** 戰鬥目標選擇 — `TARGET_SELECT`；包含雙打與有效目標限制。
+- [x] **UI-14** 隊伍頁 — `PARTY`；包含換人、查看、放生、道具管理、招式回憶等既有模式與子選單。
+- [x] **UI-15** 寶可夢詳細資料 — `SUMMARY`；包含分頁與招式學習／替換等既有用途。
+- [x] **UI-16** 戰後獎勵／商店 — `MODIFIER_SELECT`；包含獎勵、購買、重抽、隊伍及道具轉移入口。
+- [x] **UI-17** 神秘事件 — `MYSTERY_ENCOUNTER`；包含事件選項與結果流程。
+- [x] **UI-18** 進化畫面 — `EVOLUTION_SCENE`。
+- [x] **UI-19** 寶可夢重新命名 — `RENAME_POKEMON`。
 - [ ] **EX-02** 戰鬥資訊與招式資訊浮層／展開面板；依附各頁，沒有獨立 UiMode。
+
+## 已定案：Phase 3 遊戲選單與設定（UI-20～UI-27）
+
+- 依 UI-20 → UI-27 分別驗證、更新完成紀錄、提交並 push；EX-03 不在本批，定案本身不變更完成狀態。
+- MENU 沿用整列兩階段選取／確認、逐個可選項滾輪與原 CANCEL；頁面背景左鍵／滾輪只消耗，右鍵送 CANCEL。訊息與確認等待期間阻擋重複左鍵，保留原自動訊息。
+- 畫布右上新增約 20×20 的既有視窗風格三橫線圖示，預留 HUD 空間；單擊沿用 MENU 開啟條件。只在原本允許的 TITLE／COMMAND／MODIFIER_SELECT／MYSTERY_ENCOUNTER／MESSAGE 狀態顯示，教學、轉場及上層介面期間停用；圖示右鍵仍為當前頁 CANCEL。
+- 常規／顯示／音效設定：點未選列（包含值）只選取，已選列點指定值立即沿用既有儲存／確認／重載流程；同值不重複儲存，音量不新增滑桿。
+- 五個設定頁列表內垂直滾輪每事件逐列選取，到首末停止並視需要捲動；不調值、不切分類，鍵盤循環保留。分類及導覽圖示單擊切頁，底部既有 ACTION／返回／重設／刪除入口單擊沿用原操作。
+- 鍵盤／手把綁定列兩階段開原彈窗，鎖定列不可修改。以實際設定鍵識別列，不依翻譯標籤；無裝置時保留提示、分類及返回。鍵盤沿用既有預設初始化，裝置切換後更新區域。
+- 綁定彈窗保留實體裝置輸入、黑名單、倒數與衝突交換；等待時不新增關閉入口。收到按鍵後，返回／指派／交換採兩階段點擊。右鍵完全送原 CANCEL，維持無法關閉的結果及音效；外側只消耗，滾輪無操作。
+- 清理延後監聽、倒數、訊息回呼與區域，過期回呼不更新新畫面；一次確認／倒數最多關閉一次，同次裝置輸入不得同時擷取新綁定並確認。
+- 新操作先消耗事件，再檢查目前 handler、啟用、教學與轉場；不新增 hover 選取，中鍵、水平滾輪與觸控不走新路徑。觸控配置入口只驗證交接，EX-03 仍待辦；不修改公開設定型別、呼叫端介面、存檔格式或遊戲／綁定限制。
+- default／legacy 逐頁瀏覽器驗證；保存、登出、重載與綁定持久化使用替身，手把使用模擬輸入，未測實體裝置如實記錄。
 
 ## Phase 3：遊戲選單與設定
 
-- [ ] **UI-20** 遊戲內選單 — `MENU`；包含開啟、返回、儲存退出及登出等入口。
-- [ ] **UI-21** 常規設定 — `SETTINGS_GENERAL`。
-- [ ] **UI-22** 顯示設定 — `SETTINGS_DISPLAY`。
-- [ ] **UI-23** 音效設定 — `SETTINGS_AUDIO`。
-- [ ] **UI-24** 鍵盤設定 — `SETTINGS_KEYBOARD`。
-- [ ] **UI-25** 鍵盤按鍵綁定彈窗 — `KEYBOARD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
-- [ ] **UI-26** 手把設定 — `SETTINGS_GAMEPAD`。
-- [ ] **UI-27** 手把按鍵綁定彈窗 — `GAMEPAD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
+- [x] **UI-20** 遊戲內選單 — `MENU`；包含開啟、返回、儲存退出及登出等入口。
+- [x] **UI-21** 常規設定 — `SETTINGS_GENERAL`。
+- [x] **UI-22** 顯示設定 — `SETTINGS_DISPLAY`。
+- [x] **UI-23** 音效設定 — `SETTINGS_AUDIO`。
+- [x] **UI-24** 鍵盤設定 — `SETTINGS_KEYBOARD`。
+- [x] **UI-25** 鍵盤按鍵綁定彈窗 — `KEYBOARD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
+- [x] **UI-26** 手把設定 — `SETTINGS_GAMEPAD`。
+- [x] **UI-27** 手把按鍵綁定彈窗 — `GAMEPAD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
 - [ ] **EX-03** 移動觸控控制按鈕的配置畫面；`src/ui/settings/move-touch-controls-handler.ts`，已有 pointer 操作，需驗證整合。
+
+## 已定案：Phase 4 收藏、圖鑑與紀錄（UI-28～UI-40）
+
+- 依 UI-28 → UI-40 逐項實作、驗證、更新紀錄、commit 並 push；所有 EX 與 Phase 5 保持待辦，定案不代表完成。
+- 有確認動作的選項採先選取、再點目前項目確認；蛋列表、孵化結果與成就格僅選取查看，重複點擊不送 ACTION。移入不選取，保留既有資訊 hover。
+- 蛋列表／孵化結果／成就格與圖鑑格滾輪每事件捲一列，邊界停止並保留實際項目身分；捲出畫面隱藏游標、捲回恢復。鍵盤方向操作先讓原選取回到畫面再沿用原導航。篩選移除選取時清除過期資料。
+- 抽蛋機新增既有風格左右箭頭，單擊切機台；抽取列兩階段確認，滾輪逐列選取。動畫區左鍵沿用 ACTION 加速，完成結果左鍵收起；孵蛋場景左鍵沿用原 ACTION／trySkip／訊息流程，不改略過限制或資料規則。孵化結果保留原 1／2 秒退出限制。
+- 圖鑑篩選下拉沿用 UI-09 規則；文字篩選列兩階段開搜尋。形態盤兩階段選取／確認且阻擋背景，盤內滾輪無作用；裝飾與可見提示單擊沿用對應輸入。
+- 圖鑑詳細頁九個操作列兩階段確認，操作區滾輪逐列選取並停在邊界；新增左右物種箭頭沿用 LEFT／RIGHT。可見異色、形態、性別、IV、糖果及正反面入口沿用原輸入；能力值層單擊 ACTION 關閉、勳章格單擊查看，覆蓋期間攔截背景及滾輪。
+- 搜尋與紀錄命名保留單擊表單與原生文字編輯；比照 UI-19 補齊 CANCEL，取消按鈕、Escape／鍵盤與彈窗內右鍵共用入口，框外僅消耗。組字期間 Enter 不提交，保留各自原編碼與回呼。
+- AUTO_COMPLETE 沿用整列兩階段點擊，但確認送 SUBMIT；右鍵送原 CANCEL，維持無作用，保留 Escape／空白收起候選及焦點。候選確認只填文字、不提交表單；父欄可繼續編輯，父按鈕阻擋。共用測試工具只驗證候選整合、不完成 UI-48。
+- 成就標頭單擊 ACTION 切成就／券頁；統計內容滾輪及可見箭頭沿用 UP／DOWN。紀錄卡兩階段、列表滾輪逐筆選取並停在邊界，捲動動畫期間不確認；單局紀錄原道具／名人堂／結局入口單擊，滾輪無作用，同時驗證存檔預覽。RENAME_RUN 從存檔管理入口驗收。
+- 右鍵完全送 UI.processInput(Button.CANCEL)，保留每種狀態的限制、返回、回呼與音效。事件先消耗再檢查目前 handler、啟用、教學及全域轉場；不穿透上層／新頁，中鍵、水平滾輪及觸控不走新增路徑。
+- 清理區域、監聽、UI 計時器／動畫，過期載入與儲存後回呼不更新新頁；既有資料操作照原流程完成。抽蛋保留目前免費規則與容量／保底，不修改公開設定型別、存檔或遊戲規則。
+- 全部頁面 Chromium default／legacy 驗證，搭配互動測試、舊 UI／鍵盤／模擬手把回歸、型別／Biome／build／REUSE／Dependency Cruiser 與最終 HEAD CI。使用測試資料與替身持久化，未測實體裝置／OS IME 如實記錄；13 項全數驗證後才為 40 完成、14 待辦。
 
 ## Phase 4：收藏、圖鑑與紀錄
 
-- [ ] **UI-28** 蛋列表 — `EGG_LIST`。
-- [ ] **UI-29** 蛋抽獎機 — `EGG_GACHA`。
-- [ ] **UI-30** 孵蛋畫面 — `EGG_HATCH_SCENE`。
-- [ ] **UI-31** 孵蛋結果／詳細資料 — `EGG_HATCH_SUMMARY`。
-- [ ] **UI-32** 圖鑑列表 — `POKEDEX`；包含頁內篩選與裝飾／形態入口。
-- [ ] **UI-33** 圖鑑單隻詳細頁 — `POKEDEX_PAGE`。
-- [ ] **UI-34** 圖鑑搜尋／篩選輸入彈窗 — `POKEDEX_SCAN`；也供共用文字篩選使用。
-- [ ] **UI-35** 自動完成候選選單 — `AUTO_COMPLETE`；供搜尋與測試工具共用。
-- [ ] **UI-36** 成就頁 — `ACHIEVEMENTS`。
-- [ ] **UI-37** 遊戲統計頁 — `GAME_STATS`。
-- [ ] **UI-38** 遊戲紀錄列表 — `RUN_HISTORY`。
-- [ ] **UI-39** 單局紀錄詳細頁 — `RUN_INFO`。
-- [ ] **UI-40** 遊戲紀錄重新命名 — `RENAME_RUN`。
+- [x] **UI-28** 蛋列表 — `EGG_LIST`。
+- [x] **UI-29** 蛋抽獎機 — `EGG_GACHA`。
+- [x] **UI-30** 孵蛋畫面 — `EGG_HATCH_SCENE`。
+- [x] **UI-31** 孵蛋結果／詳細資料 — `EGG_HATCH_SUMMARY`。
+- [x] **UI-32** 圖鑑列表 — `POKEDEX`；包含頁內篩選與裝飾／形態入口。
+- [x] **UI-33** 圖鑑單隻詳細頁 — `POKEDEX_PAGE`。
+- [x] **UI-34** 圖鑑搜尋／篩選輸入彈窗 — `POKEDEX_SCAN`；也供共用文字篩選使用。
+- [x] **UI-35** 自動完成候選選單 — `AUTO_COMPLETE`；供搜尋與測試工具共用。
+- [x] **UI-36** 成就頁 — `ACHIEVEMENTS`。
+- [x] **UI-37** 遊戲統計頁 — `GAME_STATS`。
+- [x] **UI-38** 遊戲紀錄列表 — `RUN_HISTORY`。
+- [x] **UI-39** 單局紀錄詳細頁 — `RUN_INFO`。
+- [x] **UI-40** 遊戲紀錄重新命名 — `RENAME_RUN`。
 
 ## Phase 5：帳號、資料管理、狀態與維護工具
 
-部分介面已有滑鼠操作，仍須逐項確認；管理員／測試專用畫面排在玩家主要流程之後。
+### UI-41～UI-48 決策（2026-10-29）
 
-- [ ] **UI-41** 登入／註冊入口 — `LOGIN_OR_REGISTER`。
-- [ ] **UI-42** 登入表單 — `LOGIN_FORM`。
-- [ ] **UI-43** 註冊表單 — `REGISTRATION_FORM`。
-- [ ] **UI-44** 修改密碼 — `CHANGE_PASSWORD_FORM`。
+- 依 UI-41 → UI-48 實作、驗證、更新紀錄、各自 commit 並 push；所有 EX 保持待辦，定案不代表完成。
+- 既有表單與按鈕保留單擊執行，不新增選取游標。登入／註冊入口第二個按鈕為註冊，不能當成取消；該入口 CANCEL 維持無作用。
+- 登入、註冊、改密碼、管理員與對話測試補齊共用 CANCEL；取消按鈕、Escape／鍵盤 CANCEL 與框內右鍵共用原回呼與音效。右鍵只送 UI.processInput(Button.CANCEL)。
+- 先消耗事件，再檢查目前 handler、啟用、教學及轉場；框外只阻擋，上層不得穿透。中鍵、觸控及滾輪不走新增操作，候選仍沿用 UI-35。
+- 共用表單處理所有輸入欄位、密碼／唯讀、原生編輯與組字保護；按鈕以實際索引分派。清理 DOM／Phaser 監聽、焦點延遲、動態欄位與進場動畫。
+- 提交擷取當次欄位值及回呼，防止連點／Enter 重複。非同步工作核對操作與當次 LOADING 身分，正常進入 LOADING 保留工作，過期結果不得切頁、發聲或啟動後續請求。
+- 保留登入／註冊／改密碼驗證與原 API；註冊後登入失敗仍 2 秒重試一次，保存並清理重試計時器。
+- LOADING／UNAVAILABLE 不新增操作，右鍵 CANCEL 維持無作用。重連保持 5 秒起始、倍增至 5 分鐘、最多額外 10 秒隨機間隔及原狀態碼處理；只保留單一有效請求，清理計時器與晚到結果。
+- ADMIN 驗證 LINK／SEARCH／ADMIN、唯讀、服務連結／解除、Stats／Pokedex 與原返回層級；子頁返回可再次操作，無資料保留原錯誤，不放寬權限。
+- TEST_DIALOGUE 保留 255 字元、空白參數與原 Unicode 編碼；候選只替換最後一段、不提交 Check，Enter／Escape／空白與焦點沿用 UI-35。預覽保留鍵盤／手把推進，滑鼠待 EX-01。
+- 帳號側欄維持功能與層級，必要生命週期修正不完成 EX-04；第三方授權、下載、匯入皆不擴充。本批不修改公開設定型別、呼叫端、API 契約、驗證規則或存檔格式。
+- 各頁以互動測試及 Chromium default／legacy 驗證，使用假帳號／替身 API 與持久化。回歸 UI-01～40、鍵盤／模擬手把及 API；執行型別、Biome、Vitest、build、REUSE、Dependency Cruiser、diff check 及最終 HEAD CI。未測實體裝置／OS IME 如實記錄。
+- 八項完成後才為 48 完成、6 待辦；六個 EX 仍未完成，不合併或發布 PR。
+
+- [x] **UI-41** 登入／註冊入口 — `LOGIN_OR_REGISTER`。
+- [x] **UI-42** 登入表單 — `LOGIN_FORM`。
+- [x] **UI-43** 註冊表單 — `REGISTRATION_FORM`。
+- [x] **UI-44** 修改密碼 — `CHANGE_PASSWORD_FORM`。
 - [ ] **EX-04** 第三方登入與帳號資訊／存檔下載區；`oauth-providers-ui-handler.ts`、`login-register-info-container-ui-handler.ts`，已有部分點擊。
 - [ ] **EX-05** 合併匯入資料視窗 — `src/ui/system-merge-dialog.ts`；包含檔案來源、預覽、移除、取消與確認，已有 DOM 操作。
 - [ ] **EX-06** 一般資料匯入選檔入口／iOS 上傳覆蓋層 — `src/system/game-data.ts` 的 `importData`；資料管理選單本身由 UI-04 涵蓋。
-- [ ] **UI-45** 載入中彈窗 — `LOADING`；確認等待期間的輸入行為即可，不預設需要新增操作。
-- [ ] **UI-46** 功能不可用提示 — `UNAVAILABLE`。
-- [ ] **UI-47** 管理員工具 — `ADMIN`。
-- [ ] **UI-48** 翻譯／對話測試工具 — `TEST_DIALOGUE`。
+- [x] **UI-45** 載入中彈窗 — `LOADING`；確認等待期間的輸入行為即可，不預設需要新增操作。
+- [x] **UI-46** 功能不可用提示 — `UNAVAILABLE`。
+- [x] **UI-47** 管理員工具 — `ADMIN`。
+- [x] **UI-48** 翻譯／對話測試工具 — `TEST_DIALOGUE`。
 
 ## 盤點依據與範圍
 
@@ -243,7 +313,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01、UI-02、UI-03、UI-04、UI-05、UI-06、UI-07、UI-08、UI-09；其餘 45 個項目保持待辦。
+目前已完成 UI-01～UI-48；其餘 6 個項目保持待辦。全部 48 個 UI 項目已完成，六個 EX 仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -259,9 +329,68 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-08 | 2026-10-28 | `feat(ui): support mouse controls for challenge selection` | 新增 14 個挑戰互動測試；連同 UI-01～UI-07 及既有輸入回歸共 105 項通過。typecheck、build:dev、修改檔案 Biome 錯誤級檢查與 diff check 通過。Chromium default／legacy 實測列選取不確認、箭頭調整、單屬性圖示、分類與導覽圖示、重設、開始兩階段與禁用狀態、右鍵兩階段取消及瀏覽器選單阻擋、長清單逐列滾輪與邊界、鍵盤交替、上層確認／轉場阻擋及反覆開關通過。空分類、數值上下限、觸控忽略與銷毀由自動測試驗證；長列表與開始／返回使用替身，未啟動真實遊戲。未測實體手把與觸控；EX-01 未實作。 |
 | UI-01～05（右鍵補強） | 2026-10-28 | `feat(ui): map right clicks to existing cancel input` | 將右鍵完全沿用既有 CANCEL 定為適用所有現有／後續 UI 與 EX 項目的全域規則，並補齊 UI-01～05。新增 36 個右鍵與左右鍵共用案例，連同 UI-06～08 及鍵盤／模擬手把／觸控輸入回歸共 141 項測試通過；typecheck、build:dev、修改檔案 Biome 與 diff check 通過。Chromium default／legacy 實測選單列（含不可選列）／框內留白右鍵、框外無效、取消限制、延遲及明確允許的略過、鍵盤交替、上層介面／教學／轉場阻擋、確認選單否回呼、訊息逐頁推進與不套用左鍵提示限制、彈窗延遲／禁止關閉、遮罩阻擋、連點及反覆開關通過；UI-06 維持右鍵無作用。使用本機替身回呼，未操作真實存檔或資料；未測實體手把與觸控。原完成數與其餘 46 項待辦不變。 |
 | UI-09 | 2026-10-28 | `feat(ui): support mouse starter selection` | 新增 41 個互動測試，連同 UI-01～08 與鍵盤／模擬手把／觸控輸入回歸共 182 項通過；typecheck、build:dev、修改檔案 Biome 與 diff check 通過。Chromium default／legacy 實測格子兩階段點選、子選單返回、篩選展開／選取／背景關閉與滾輪隔離、長列表逐列連續捲動及物種身分、隊伍加入／選取、隨機加入、開始確認與取消、轉場／教學阻擋、IV 右鍵退出、最後隊員取消及重開清理通過；六個資料切換說明入口以替身輸入逐一驗證點擊範圍與路由。自動測試另涵蓋六隻上限、無合法隨機結果、挑戰限制、開始單次回呼、素材過期／失敗及輸入鎖定。存檔與啟動使用替身回呼，未操作真實資料；教學、重新命名及圖鑑詳細頁仍按後續項目處理，未測實體手把與觸控。 |
+| UI-10 | 2026-10-29 | `feat(ui): support mouse battle commands` | 新增 9 項互動測試通過；Chromium default／legacy 實測整格選取／確認、精靈球入口、逃跑替身回呼、右鍵 CANCEL、轉場阻擋及滾輪無作用通過。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過。雙出戰游標由替身測試驗證；太晶化可見／資格沿用原判定，未實測實體手把與觸控。新增美術及 UI-10～15 操作決策，其餘項目仍待個別完成。 |
+| UI-11 | 2026-10-29 | `feat(ui): support mouse move selection` | 新增 9 項互動測試通過，含太晶化來源、確認失敗、空格／隱藏招式、神秘事件取消限制及清理；Chromium default／legacy 實測兩階段選取、既有確認替身、右鍵返回與滾輪無作用通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。未新增資訊浮層操作，未測實體手把與觸控。 |
+| UI-12 | 2026-10-29 | `feat(ui): support mouse ball selection` | 新增 9 項互動測試通過，涵蓋選取／確認、零數量錯誤、命令失敗、滾輪邊界、取消與重開；Chromium default／legacy 實測整列範圍、數量、取消列、逐列滾輪與右鍵返回通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。捕捉命令使用替身，未消耗真實資料，未測實體手把與觸控。 |
+| UI-13 | 2026-10-29 | `feat(ui): support mouse battle target selection` | 新增 9 項互動測試通過，涵蓋單體兩階段、無效目標、多目標整組確認、取消、阻擋及高亮清理；Chromium default／legacy 實測目標血量框、整組回呼與右鍵空陣列取消通過。命中範圍取可見血量框背景，排除隱藏資訊面板，重疊順序跟隨畫面圖層。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。雙打隊伍／回呼使用測試資料，未測實體手把與觸控。 |
+| UI-14 | 2026-10-29 | `feat(ui): support mouse party controls` | 新增 32 項互動測試通過，含全部 PartyUiMode 選取路由、子選單、強制取消限制、等待訊息、長回憶清單、道具數量循環與捲動後原道具數量重設；既有換位／鍵盤與模擬手把／雙打回歸通過。Chromium default／legacy 實測整卡兩階段、子選單選取／右鍵返回、卡片滾輪及道具數量箭頭通過。typecheck、build:dev、Biome、diff check 通過；最終整批相關測試共 281 項通過。確認與資料操作沿用既有路由，使用測試隊伍與替身回呼；未讀寫真實存檔，未測實體手把與觸控。 |
+| UI-15 | 2026-10-29 | `feat(ui): support mouse summary controls` | 新增 17 項互動測試通過，涵蓋分頁、滾輪沿用上下鍵、隊員切換限制、招式選取／排序／既有子選單、學習及放棄索引、IV、取消、轉場與清理；整批相關測試共 281 項通過。Chromium default／legacy 實測新分頁箭頭、IV、滾輪切換隊員、招式兩階段與子選單返回、學習／放棄替身回呼通過。保留既有 tooltip，移除重開後累積監聽，清理分頁／說明動畫與游標計時器。typecheck、build:dev、全量 Biome、Dependency Cruiser、主程式型別、REUSE 及 diff check 通過。fixture 使用測試隊伍／素材與替身回呼，不操作真實資料；未測實體手把與觸控。EX-01／EX-02 仍待辦。 |
+
+| UI-16 | 2026-10-29 | `feat(ui): support mouse reward and shop selection` | 新增 16 項互動測試；連同商店游標與獎勵 Phase 回歸共 24 項通過，另有 2 項既有 todo。涵蓋商品／按鈕兩階段、回呼失敗、單／雙排商店索引、空獎勵繼續、原 CANCEL、上層／教學／轉場阻擋、舊延遲失效及清理。Chromium default／legacy 實測獎勵／商店／隊伍按鈕選取與替身確認、滾輪無作用、右鍵回傳及重開通過；資料操作用替身，未執行真實購買或重抽扣款。修正揭示動畫完成等待，保留既有資訊浮層入口。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過；未測實體手把與觸控。 |
+
+| UI-17 | 2026-10-29 | `feat(ui): support mouse mystery encounter options` | 新增 16 項互動測試與 18 項既有事件 Phase 回歸共 34 項通過，涵蓋二／三／四選項、需求模式、預選／失敗重試／單次接受、入場限制、原 CANCEL、重開延遲失效、遮罩與監聽清理。Chromium default／legacy 實測固定選項格、長文字、禁用項目、查看隊伍往返、右鍵不新增離開能力及重開通過；事件選擇使用替身回呼，不執行真實事件效果。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。既有資訊 hover 保留，EX-02 仍待辦；未測實體手把與觸控。 |
+
+| UI-18 | 2026-10-29 | `feat(ui): support mouse evolution prompts` | 新增 15 項互動測試；連同進化、形態變化與安靜形態變化回歸共 31 項通過。涵蓋提示就緒、逐字／自動訊息阻擋、舊逐字狀態被新提示取代、延遲／重開清理、同步下一提示、防穿透及右鍵原取消優先順序。Chromium default／legacy 實測訊息框、場景左鍵無操作、可取消旗標、不可取消時推進、逐字阻擋及重開通過；瀏覽器使用進化訊息情境與替身回呼，實際進化／形態規則由既有測試回歸。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；未測實體手把與觸控。 |
+
+| UI-19 | 2026-10-29 | `feat(ui): support mouse Pokemon renaming` | 新增 20 項重新命名與 1 項共用放鍵測試，連同輸入與紀錄回歸共 41 項通過。保留單擊表單按鈕、Unicode／空白處理及回呼；本頁 CANCEL 與取消按鈕共用入口，右鍵不另訂語意。清理 DOM 監聽、焦點延遲與進場動畫；修正欄位消耗按下後、關閉時未初始化鍵盤的放鍵錯誤。Chromium default／legacy 實測文字編輯、長度限制、中文文字、合成 IME 組字事件、按鈕／輸入框右鍵、框外阻擋及重開通過；實際隊伍與起始寶可夢選單的命名提交／返回皆通過，使用測試資料及替身儲存，不操作真實資料。另補強 UI-16 浮層僅阻擋覆蓋商品、隱藏繼續文字不可操作兩項案例（商品互動現為 18 項）；兩主題浮層實測通過。隊伍換位回歸顯式等待獎勵揭示完成後輸入，12 項通過。整批 54 檔 756 項相關回歸通過（4 skipped、3 todo）；商品範圍／隱藏文字補強後，商品／命名／輸入 54 項通過。typecheck、build:dev、全量 Biome、Dependency Cruiser、主程式型別、REUSE 與 diff check 通過。未測作業系統實際 IME、實體手把與觸控；EX-01／EX-02 保持待辦。 |
+
+| UI-20 | 2026-10-29 | `feat(ui): support mouse game menu navigation` | 新增 13 項選單／入口測試通過；原選項與輸入回歸共 84 項通過（入口案例補齊後獨立 13 項通過）。Chromium default／legacy 實測右上像素選單入口、選取／確認、滾輪、設定入口與返回、背景右鍵及禁止開選單時隱藏通過；已檢視圖示樣式。沿用原 MENU 條件，預留 HUD 空間，訊息阻擋重複左鍵，重開清理舊訊息與教學回呼。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過。收藏頁後續操作、真實儲存退出／登出與實體手把／觸控未實測；EX 維持待辦。 |
+
+| UI-21 | 2026-10-29 | `feat(ui): support mouse general settings` | 新增 14 項設定互動測試，連同 TabMenu 挑戰頁回歸共 28 項通過。Chromium default／legacy 實測先選列再套用、設定值、長列表逐列滾輪與邊界、分類切換及返回通過；使用替身儲存，未修改真實偏好。共用設定基礎處理確認訊息阻擋、舊回呼失效、底部操作與清理；TabMenu 明確啟用並隨排版更新區域。觸控配置只保留原交接並清理完成監聽，EX-03 未擴充。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；未測實體手把／觸控。 |
+
+| UI-22 | 2026-10-29 | `feat(ui): support mouse display settings` | 共用設定案例擴及顯示頁，新增語言取消與主題重載案例，共 30 項通過。Chromium default／legacy 實測直接值套用、長列表與逐列滾輪、語言選單開啟／取消還原、分類及返回通過。重載以自動測試替身驗證，不實際重載或改寫真實偏好。修正共用設定測試替身的兩處型別，typecheck、build:dev、修改檔案 Biome 與 diff check 通過；UI-21 共用基礎亦以本次型別結果為準。未測實體手把／觸控。 |
+
+| UI-23 | 2026-10-29 | `feat(ui): support mouse audio settings` | 共用設定案例擴及音效頁，另驗證全部 11 個音量刻度及既有鍵盤 clamping，共 45 項設定測試通過。Chromium default／legacy 實測音量兩階段值套用、七列列表滾輪邊界、分類與返回通過；沿用原音效與重載入口，不新增滑桿。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。設定持久化使用替身，不改寫真實偏好；未測實體手把／觸控。 |
+
+| UI-24 | 2026-10-29 | `feat(ui): support mouse keyboard settings` | 新增 14 項鍵盤設定互動測試，連同既有重新綁定回歸共 47 項通過。Chromium default／legacy 實測綁定列兩階段、實際 W 鍵擷取及原返回、底部刪除／重設、長列表逐列滾輪與右鍵返回通過；使用測試配置與替身保存／重設。共用裝置基礎改以實際設定鍵識別列，修正翻譯刪除與不同 layout 索引，配置更新後重建區域，無配置仍可分類／返回。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；綁定彈窗直接滑鼠操作於 UI-25 接續，手把設定尚未啟用，未測實體裝置。 |
+
+| UI-25 | 2026-10-29 | `feat(ui): support mouse keyboard binding dialogs` | 新增 15 項綁定互動測試，連同鍵盤設定及原重新綁定回歸共 62 項通過。Chromium default／legacy 實測原鍵盤 A 輸入、返回／指派兩階段、成功單次保存、預選返回、倒數返回與等待／確認時右鍵無法關閉通過；使用測試配置與替身保存。保留原 CANCEL 回傳與音效，外側事件只消耗；清理延後監聽與倒數，避免舊計時器／重複回呼，擷取新鍵後停止原按鍵重複輸入。共用裝置身分保護亦供後續手把使用，手把彈窗尚未啟用直接滑鼠。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；未測實體裝置。 |
+
+| UI-26 | 2026-10-29 | `feat(ui): support mouse gamepad settings` | 新增 18 項手把設定測試，連同鍵盤設定回歸共 32 項通過；涵蓋 Xbox、Generic、Dualshock、Pro Controller 與 SNES 的實際列身分。修正共用 xbox 素材導致排版覆蓋，改依配置 padID 分開排版並顯示目前裝置名稱；斷線後清除舊列與區域，無裝置仍可返回。Chromium default／legacy 以模擬裝置實測啟用值兩階段、原裝置清單與切換、長列表滾輪、斷線提示及返回通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。使用模擬配置與替身持久化；未測實體手把／觸控，EX-03 未實作。 |
+
+| UI-27 | 2026-10-29 | `feat(ui): support mouse gamepad binding dialogs` | 新增 15 項手把綁定測試；手把／鍵盤綁定、選單及輸入共 63 項通過。Chromium default／legacy 以模擬手把實測實際 down 事件、選取／確認分離、原 A／B 交換、單次保存、預選返回、倒數及右鍵 CANCEL 無法關閉通過。擷取／確認保留裝置身分、方向鍵黑名單與原錯誤／音效；清理舊監聽、計時器與區域。另補強 UI-20 警告首字前鎖定、取消／重開子選單後過期匯出無效與訊息回呼，新增 3 項案例；無上次手把配置時安全隱藏圖示，新增 1 項輸入案例，並還原模擬裝置測試來源狀態。整批新增 124 項測試；58 檔 900 項及另 2 檔 13 項回歸共 60 檔 913 項通過（4 skipped、3 todo）。typecheck、build:dev、全量 Biome、Dependency Cruiser、main／github／js 型別、REUSE 與 diff check 通過。使用測試配置及替身保存，未測實體手把／觸控；Phase 3 UI 完成，所有 EX 及 UI-28 起維持待辦。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。
 pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或修改 lockfile。
 
 新增紀錄時同步更新上方完成數量，避免文字與勾選狀態矛盾。
+| UI-28 | 2026-10-29 | `feat(ui): support mouse egg list browsing` | 11 項互動測試通過；Chromium default／legacy 驗證點格、捲動保留身分、鍵盤接續、右鍵及重開通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。共用格子新增明確啟用的滑鼠選取／捲動方法；測試蛋資料，不寫入真實存檔，未測實體手把與觸控。 |
+| UI-29 | 2026-10-29 | `feat(ui): support mouse egg gacha controls` | 11 項新增互動及 10 項既有免費抽蛋測試通過。Chromium default／legacy 實測抽取列兩階段、滾輪、機台箭頭、原 ACTION 加速、右鍵及返回通過；抽取以替身驗證，不保存真實資料。清理舊儲存後畫面、落蛋 Promise 與 tween／timer。typecheck、開發建置、修改檔案 Biome 及 diff check 通過；未測實體裝置。 |
+| UI-30 | 2026-10-29 | `feat(ui): support mouse egg hatch scenes` | 8 項新互動及 4 項既有蛋階段測試通過；Chromium default／legacy 驗證單次 ACTION、右鍵 CANCEL 與重開清理通過。略過及訊息交給原 handler／Phase，沒有新增略過規則。typecheck、修改檔案 Biome 及 diff check 通過；畫面輸入以替身 Phase 驗證，未測實體裝置。 |
+| UI-31 | 2026-10-29 | `feat(ui): support mouse egg hatch results` | 10 項互動測試通過；Chromium default／legacy 實測結果格選取、捲動保留身分及空結果通過。保留原退出延遲／CANCEL，舊退出 timer 與素材載入回呼失效，重開清理區域與圖示。typecheck、修改檔案 Biome 與 diff check 通過；測試孵化資料，不儲存真實資料，未測實體裝置。 |
+| UI-32 | 2026-10-29 | `feat(ui): support mouse pokedex browsing` | 13 項新互動、12 項既有圖鑑測試通過（2 todo）；與命名／孵化結果共 43 項回歸通過。Chromium default／legacy 實測格子、身分保留、下拉阻擋及文字搜尋入口通過。重開清理下拉、過期素材與退出提示；typecheck、修改檔案 Biome、diff check 通過。另確認 UI-31 實作為 d9a2e7325b：該項完成紀錄因提交時序誤隨 UI-30 文件先入版，本列補記正確實作識別，不改寫已推送歷史。使用測試圖鑑，未測實體裝置。 |
+| UI-33 | 2026-10-29 | `feat(ui): support mouse pokedex details` | 10 項新增互動測試及既有圖鑑回歸通過；Chromium default／legacy 實測操作列、滾輪及原物種切換流程通過。保留解鎖／糖果操作，能力值與勳章盤阻擋背景；新增清理、素材／模式回呼身分檢查並防止糖果 tooltip 監聽累積。typecheck、修改檔案 Biome 與 diff check 通過；持久化／糖果未操作真實資料，未測實體裝置。 |
+| UI-34 | 2026-10-29 | `feat(ui): support mouse pokedex search forms` | 13 項搜尋互動及 20 項原寶可夢命名回歸共 33 項通過。Chromium default／legacy 以實際文字輸入、Enter 接受候選而不提交、Escape 取消及焦點往返通過。從 UI-19 抽出明確啟用的共用表單基礎，搜尋補齊 CANCEL；清理舊輸入欄、DOM／文字事件與候選回呼。保留有效值及原 Unicode 編碼；typecheck、修改檔案 Biome、diff check 通過。OS 原生 IME 未實測，組字以事件模擬驗證。 |
+| UI-35 | 2026-10-29 | `feat(ui): support mouse autocomplete candidates` | 11 項新增互動測試及共用選項回歸通過。Chromium default／legacy 實測候選右鍵 CANCEL 無作用、預選候選單擊 SUBMIT 回填及返回文字欄通過。共用確認按鈕改為內部可覆寫入口，其餘選單仍為 ACTION；框外攔截、父容器身分與區域隨清理失效。typecheck、修改檔案 Biome、diff check 通過。測試工具共用候選僅維持原回呼整合，UI-48 不標完成；未測實體裝置。 |
+| UI-36 | 2026-10-29 | `feat(ui): support mouse achievements browsing` | 9 項新增互動測試通過；Chromium default／legacy 驗證圖示只選取、捲動保留身分、捲回恢復與標頭切頁通過。修正離屏選取捲回時負索引，保留鎖定／隱藏描述與鍵盤循環。補齊 headless NineSlice 位置計算以驗證頁面。typecheck、修改檔案 Biome、diff check 通過；測試解鎖資料，不保存真實資料，未測實體裝置。 |
+| UI-37 | 2026-10-29 | `feat(ui): support mouse game statistics` | 4 項新增互動測試通過；Chromium default／legacy 實測內容區滾輪、可見上下箭頭與右鍵返回通過。純資訊不新增確認；沿用 UP／DOWN 邊界，清理監聽與單次退出回呼。修改檔案 Biome、型別與 diff check 通過，整批型別另於最終 HEAD 驗證；未測實體裝置。 |
+| UI-38 | 2026-10-29 | `feat(ui): support mouse run history navigation` | 11 項新增互動測試通過，包含舊載入結果失效、連續捲動時舊 tween 回呼不解除新鎖定。Chromium default／legacy 實測卡片選取、連續滾輪、首末邊界及正確紀錄開啟通過。清理卡片、捲動與載入身分，保留原鍵盤循環／CANCEL；補齊 headless 文字 append 模擬。typecheck、修改檔案 Biome、build:dev、diff check 通過；測試紀錄及替身資料來源，未讀寫真實存檔。 |
+| UI-39 | 2026-10-29 | `feat(ui): support mouse run information views` | 8 項新增互動測試通過；Chromium default／legacy 實測名人堂／結局圖、右鍵先關覆蓋層、存檔預覽及持有道具切換通過。僅沿用原循環輸入與 CANCEL；清理所有容器與監聽，過期訓練家／名人堂素材不回填；預覽不沿用上一局勝利狀態，結局容器可重用並隨清除銷毀。typecheck、修改檔案 Biome、build:dev、diff check 通過；使用測試紀錄／隊伍與替身資料，不讀寫真實存檔。 |
+| UI-40 | 2026-10-29 | `feat(ui): support mouse run renaming` | 19 項命名互動與 5 項既有紀錄命名測試通過；Chromium default／legacy 從實際存檔管理入口實測 Unicode 名稱、原編碼、替身 renameSession 與返回通過。沿用共用表單的單擊提交／取消、鍵盤／右鍵 CANCEL、組字保護與單次回呼。整批新增 145 項測試：54 檔回歸 759 項通過（4 檔 skipped、22 todo），另 24 項收尾回歸補齊 1 項新案例，累計 760 個不同案例。收尾一併補強 UI-28／31 重用格子資訊與圖示身分、離屏／空列表清理、UI-30 保留既有資訊 hover 的場景及訊息點擊分層、UI-33 箭頭避開操作列與晚到 cry 失效、UI-36 離屏切頁／退出；新增抽蛋等待 Promise 清理及 UI-48 共用候選整合測試（UI-48 本身仍待辦）。13 頁 Chromium default／legacy 與實際抽蛋動畫通過；孵蛋略過／訊息由原 Phase 與替身回呼驗證。typecheck、main／github／js 型別、build:dev、全量 Biome、Dependency Cruiser、REUSE 及 diff check 通過，GitHub CI 以最終 HEAD 為準。測試資料與替身保存，未測實體手把／觸控及 OS 原生 IME；Phase 4 UI 完成，40 完成、14 待辦，所有 EX 與 Phase 5 保持待辦，不合併或發布 PR。 |
+
+| UI-41 | 2026-10-29 | `feat(ui): support mouse login entry` | 新增 10 項入口互動測試與搜尋／兩種命名 52 項回歸通過。Chromium default／legacy 實測登入／註冊獨立單擊、連點防重複、右鍵無作用與重開通過；沿用現有側欄層級，未擴充 EX-04。共用表單改為所有欄位 DOM 監聽與可覆寫按鈕分派，側欄監聽去重及動畫清理。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。使用替身入口，未操作真實帳號；未測實體裝置／OS IME。 |
+
+| UI-42 | 2026-10-29 | `feat(ui): support mouse account login` | 新增 17 項登入互動測試，連同入口共 27 項通過；涵蓋所有欄位取消／組字、單次提交、空帳號、錯誤重試及離頁／另一個 LOADING／銷毀後舊結果失效。Chromium default／legacy 實測原生帳密編輯、密碼遮罩、單擊提交與右鍵／Escape 返回通過。加入內部 LOADING 顯示身分與表單操作識別，正常進入等待不取消當次工作；OAuth 動畫生命週期清理，不擴充 EX-04。typecheck、build:dev、修改檔案 Biome、diff check 通過。全部登入使用替身 API／回呼，未測真實授權與實體裝置。 |
+
+| UI-43 | 2026-10-29 | `feat(ui): support mouse account registration` | 新增 22 項註冊互動測試，連同登入共 39 項通過；涵蓋三欄 DOM、確認密碼、註冊／登入舊結果、原兩秒重試一次與最終返回登入。重試由當次 LOADING 管理，清除／重開／銷毀移除計時器；共用工作在讓出執行前擷取等待身分。Chromium default／legacy 實測三欄編輯、密碼遮罩、單次註冊與右鍵／Escape 取消通過；首次重開測試曾動畫等待逾時，獨立重跑兩主題通過。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過。使用替身 API，不註冊真實帳號；未測實體裝置與 OS 原生 IME。 |
+
+| UI-44 | 2026-10-29 | `feat(ui): support mouse password changes` | 新增 20 項互動測試通過，涵蓋單次提交、全部欄位組字／取消、空密碼／不符、錯誤重試、成功與取消清空、晚到結果失效。Chromium default／legacy 實測兩個密碼欄編輯、單擊提交、右鍵與 Escape 返回通過。沿用原 API、錯誤映射及音效，共用 LOADING 身分保護；typecheck、build:dev、修改檔案 Biome 與 diff check 通過。全部請求為替身，不修改真實密碼；未測實體裝置／OS IME。 |
+
+| UI-45 | 2026-10-29 | `feat(ui): shield loading modal pointer input` | 新增 12 項等待畫面測試通過；與登入／註冊首輪 50 項、收尾等待／登入 30 項通過，另補齊同輪微任務替換 LOADING 不取得新流程的案例。Chromium default／legacy 實測本體／框外阻擋、右鍵 CANCEL 無作用、重開與原 fadeOut 工作單次開始通過。新增明確啟用的狀態 modal 基礎；清理互動、舊淡出遮罩／tween 與計時器，過期淡出回呼失效。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。未新增關閉能力，資料操作為替身；未測實體裝置。 |
+
+| UI-46 | 2026-10-29 | `feat(ui): guard unavailable modal reconnect lifecycle` | 新增 17 項互動／假時間測試通過，涵蓋原 5 秒起始、倍增上限與隨機間隔、成功／200／400、401 原 session 重設、拒絕、單一有效請求及 clear／重開／destroy 舊結果失效。Chromium default／legacy 實測左鍵／滾輪無作用、右鍵原 CANCEL、單次重連成功與重開通過；使用隔離 Guest fixture，不連真實帳號。沿用 UI-45 遮罩，保存並移除重連計時器；typecheck、build:dev 與 UI-45 共用同次已驗證工作樹，修改檔案 Biome、diff check 通過。未新增重試按鈕或取消能力；未測實體裝置。 |
+
+| UI-47 | 2026-10-29 | `feat(ui): support mouse admin tools` | 新增 22 項管理員互動測試通過，涵蓋 LINK／SEARCH／ADMIN、穩定欄位身分、取消、服務映射、單次請求、失敗重試、舊回應與動態欄位／圖示清理。Chromium default／legacy 實測查詢、唯讀、Stats／Pokedex 往返、圖鑑原退出確認、服務圖示及 LINK 返回通過；按鈕尺寸與點擊範圍同步，子頁返回解除操作鎖。使用替身 API 與隔離 Guest 資料；不放寬權限、不操作真實帳號。補齊 Image mock 事件與 NineSlice 型別供真實事件清理驗證。typecheck、build:dev、全量 Biome、Dependency Cruiser、REUSE、diff check 通過；未測實體裝置。 |
+
+| UI-48 | 2026-10-29 | `feat(ui): support mouse dialogue testing` | 新增 24 項對話表單測試；候選／搜尋首輪 47 項、搜尋與兩種命名收尾 76 項通過。Chromium default／legacy 從實際資料管理入口實測候選 SUBMIT 只回填、Check 原預覽、滑鼠不推進教學、鍵盤結束預覽、Escape／右鍵取消與重開通過。保留原 255 字元、Unicode 編碼與空白參數；處理貼上／刪除／組字、空白收起候選及過期回呼。收尾補強共用表單上層原生編輯阻擋、銷毀容器、帳號側欄焦點延遲／OAuth 監聽清理，修正 UI-41 側欄在遮罩上方並兩主題實測語言入口開啟／取消；不擴充 EX-04。整批新增 147 項互動測試，最新來源 65 檔回歸 61 檔、943 項通過（4 檔 skipped、22 todo）。typecheck、main／github／js 型別、build:dev、全量 Biome、Dependency Cruiser、REUSE 與 diff check 通過；GitHub CI 以最終 HEAD 為準。八項各自提交並 push；48 項完成、六個 EX 待辦，不代表整份 roadmap 完成。使用假帳號／替身 API 與隔離 Guest 資料，未測真實授權、實體裝置與 OS 原生 IME；不合併或發布 PR。 |

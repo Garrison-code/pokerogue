@@ -3,7 +3,7 @@ import { LANGUAGE_MAX_OPTIONS } from "#constants/app-constants";
 import { UiMode } from "#enums/ui-mode";
 import { SUPPORTED_LANGUAGE_ENTRIES } from "#system/supported-languages";
 import type { ModalConfig, OptionSelectItem, OptionSelectModeConfig } from "#types/ui-types";
-import { FormModalUiHandler } from "#ui/form-modal-ui-handler";
+import { PointerFormModalUiHandler } from "#ui/pointer-form-modal-ui-handler";
 import { fixedInt } from "#utils/common";
 import i18next from "i18next";
 import JSZip from "jszip";
@@ -31,12 +31,23 @@ const MAX_SAVES_FOR_USERNAME_PANEL = 7;
 const ERR_NO_SAVES: string = "No save files found";
 const ERR_TOO_MANY_SAVES: string = "Too many save files found";
 
-export abstract class LoginRegisterInfoContainerUiHandler extends FormModalUiHandler {
+export abstract class LoginRegisterInfoContainerUiHandler extends PointerFormModalUiHandler {
+  protected override get pointerFormEnabled(): boolean {
+    return false;
+  }
+
   private usernameInfoImage: Phaser.GameObjects.Image;
   private saveDownloadImage: Phaser.GameObjects.Image;
   private changeLanguageImage: Phaser.GameObjects.Image;
   private infoContainer: Phaser.GameObjects.Container;
   private lastFocusedInput: InputText | null = null;
+  private restoreFocusTimer: ReturnType<typeof setTimeout> | undefined;
+
+  private stopFocusRestore(): void {
+    clearTimeout(this.restoreFocusTimer);
+    this.restoreFocusTimer = undefined;
+    this.lastFocusedInput = null;
+  }
 
   public override getReadableErrorMessage(error: string): string {
     if (!error) {
@@ -64,7 +75,12 @@ export abstract class LoginRegisterInfoContainerUiHandler extends FormModalUiHan
   }
 
   public override clear(): void {
+    this.stopFocusRestore();
     super.clear();
+    for (const image of [this.usernameInfoImage, this.saveDownloadImage, this.changeLanguageImage]) {
+      image.off("pointerdown");
+    }
+    globalScene.tweens.killTweensOf(this.infoContainer);
     this.infoContainer //
       .setVisible(false)
       .setActive(false);
@@ -72,6 +88,7 @@ export abstract class LoginRegisterInfoContainerUiHandler extends FormModalUiHan
   }
 
   public override destroy(): void {
+    this.stopFocusRestore();
     super.destroy();
     this.infoContainer.destroy();
   }
@@ -94,11 +111,16 @@ export abstract class LoginRegisterInfoContainerUiHandler extends FormModalUiHan
   }
 
   protected showInfoContainer(config: ModalConfig) {
+    this.stopFocusRestore();
     this.infoContainer //
       .setPosition(5, -76)
       .setVisible(true);
     this.getUi().moveTo(this.infoContainer, this.getUi().length - 1);
 
+    for (const image of [this.usernameInfoImage, this.saveDownloadImage, this.changeLanguageImage]) {
+      image.off("pointerdown");
+    }
+    globalScene.tweens.killTweensOf(this.infoContainer);
     this.usernameInfoImage //
       .setPositionRelative(this.infoContainer, 0, 0)
       .on("pointerdown", () => this.showUsernames(config));
@@ -303,11 +325,17 @@ export abstract class LoginRegisterInfoContainerUiHandler extends FormModalUiHan
    * @param active - Whether to enable or disable interactivity
    */
   private setInteractiveInputs(active: boolean): void {
+    clearTimeout(this.restoreFocusTimer);
+    this.restoreFocusTimer = undefined;
     if (active) {
-      // `setFocus` doesn't focus without a timeout
-      setTimeout(() => {
-        this.lastFocusedInput?.setFocus();
-        this.lastFocusedInput = null;
+      const input = this.lastFocusedInput;
+      this.lastFocusedInput = null;
+      // Restore only this display's previous field after the overlay has returned.
+      this.restoreFocusTimer = setTimeout(() => {
+        this.restoreFocusTimer = undefined;
+        if (input && this.active && this.getUi().getHandler() === this && this.inputs.includes(input)) {
+          input.setFocus();
+        }
       }, 50);
     } else {
       this.lastFocusedInput = this.inputs.find(input => input.isFocused) ?? null;

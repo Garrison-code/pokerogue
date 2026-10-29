@@ -33,6 +33,7 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokemonIconAnimHelper } from "#ui/pokemon-icon-anim-helper";
 import { addBBCodeTextObject, addTextObject, getTextColor } from "#ui/text";
+import { UiPointerTargets } from "#ui/ui-pointer-targets";
 import { addWindow } from "#ui/ui-theme";
 import { applyChallenges } from "#utils/challenge-utils";
 import { BooleanHolder, getLocalizedSpriteKey, randInt } from "#utils/common";
@@ -89,6 +90,9 @@ export type PokemonModifierTransferSelectFilter = (
 export type PokemonMoveSelectFilter = (pokemonMove: PokemonMove) => string | null;
 
 export class PartyUiHandler extends MessageUiHandler {
+  private pointerTargets: UiPointerTargets | null = null;
+  private optionPointerTargets: UiPointerTargets | null = null;
+  private pointerAllOptions: number[] = [];
   private partyUiMode: PartyUiMode;
   private fieldIndex: number;
 
@@ -315,7 +319,207 @@ export class PartyUiHandler extends MessageUiHandler {
     this.showPartyText();
     this.setCursor(0);
 
+    this.createPointerTargets();
     return true;
+  }
+
+  private pointerReady(): boolean {
+    return !this.pendingPrompt && !this.blockInput && !this.awaitingActionInput;
+  }
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const wheel = (direction: number) => {
+      if (!this.pointerReady() || this.optionsMode || this.cursor >= this.partySlots.length) {
+        return;
+      }
+      const next = Math.max(0, Math.min(this.partySlots.length - 1, this.cursor + direction));
+      if (next !== this.cursor && this.setCursor(next)) {
+        this.getUi().playSelect();
+      }
+    };
+    targets.add(this.partyContainer, "party-page", () => ({
+      x: 0,
+      y: -globalScene.scaledCanvas.height,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height,
+    }));
+    for (let index = 0; index < this.partySlots.length; index++) {
+      targets.add(
+        this.partyContainer,
+        `party-slot-${index}`,
+        () => this.partySlots[index]?.getPointerArea() ?? null,
+        () => this.selectPointerPartyEntry(index),
+        wheel,
+      );
+    }
+    targets.add(
+      this.partyContainer,
+      "party-cancel",
+      () => ({ x: this.partyCancelButton.x - 27, y: this.partyCancelButton.y - 13, width: 54, height: 26 }),
+      () => this.selectPointerPartyEntry(6),
+    );
+    targets.add(
+      this.partyContainer,
+      "party-manage",
+      () =>
+        this.isItemManageMode() || this.partySwitchCursor >= 0
+          ? { x: this.partyDiscardModeButton.x - 27, y: this.partyDiscardModeButton.y - 13, width: 54, height: 26 }
+          : null,
+      () => this.selectPointerPartyEntry(7),
+    );
+    targets.add(
+      this.partyContainer,
+      "party-message",
+      () => ({
+        x: 1,
+        y: -this.partyMessageBox.height - 1,
+        width: this.partyMessageBox.width,
+        height: this.partyMessageBox.height,
+      }),
+      () => {
+        if (this.awaitingActionInput) {
+          this.getUi().processInput(Button.ACTION);
+        }
+      },
+    );
+    // The page consumes background input below the independently rebuilt option menu.
+    this.partyContainer.bringToTop(this.optionsContainer);
+    this.createOptionPointerTargets();
+  }
+
+  private selectPointerPartyEntry(index: number): void {
+    if (!this.pointerReady() || this.optionsMode) {
+      return;
+    }
+    if (index === this.cursor) {
+      this.getUi().processInput(Button.ACTION);
+    } else if (this.setCursor(index)) {
+      this.getUi().playSelect();
+    }
+  }
+
+  private selectPointerOption(index: number, previous = this.options[this.optionsCursor]): void {
+    if (index === this.optionsCursor && previous === this.options[index]) {
+      this.setOptionsCursor(index, true);
+      return;
+    }
+    if (this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER) {
+      if (previous !== PartyOption.ALL) {
+        this.transferQuantities[previous] = this.transferQuantitiesMax[previous];
+      }
+      this.updateOptions();
+    }
+    this.setOptionsCursor(index, true);
+    if (this.partyUiMode === PartyUiMode.REMEMBER_MOVE_MODIFIER) {
+      this.updateRememberMoveInfo();
+    }
+    this.getUi().playSelect();
+  }
+
+  private pointerOptionStep(direction: number): void {
+    if (!this.pointerReady() || !this.optionsMode) {
+      return;
+    }
+    const selected = this.options[this.optionsCursor];
+    const absolute = this.pointerAllOptions.indexOf(selected);
+    const next = absolute + direction;
+    if (next < 0 || next >= this.pointerAllOptions.length) {
+      return;
+    }
+    const option = this.pointerAllOptions[next];
+    for (let attempts = 0; !this.options.includes(option) && attempts < this.pointerAllOptions.length; attempts++) {
+      this.optionsScrollCursor = Math.max(0, this.optionsScrollCursor + direction);
+      this.updateOptions();
+    }
+    const index = this.options.indexOf(option);
+    if (index >= 0) {
+      this.selectPointerOption(index, selected);
+    }
+  }
+
+  private createOptionPointerTargets(): void {
+    this.optionPointerTargets?.destroy();
+    this.optionPointerTargets = null;
+    if (!this.optionsMode || !this.optionsBg) {
+      return;
+    }
+    const targets = new UiPointerTargets(this);
+    this.optionPointerTargets = targets;
+    const wheel = (direction: number) => this.pointerOptionStep(direction);
+    const bounds = () => ({
+      x: -this.optionsBg.width,
+      y: -this.optionsBg.height,
+      width: this.optionsBg.width,
+      height: this.optionsBg.height,
+    });
+    targets.add(this.optionsContainer, "party-options", bounds, undefined, wheel);
+    for (let index = 0; index < this.options.length; index++) {
+      const option = this.options[index];
+      const y = -22 - 16 * (this.options.length - 1 - index);
+      targets.add(
+        this.optionsContainer,
+        `party-option-${index}`,
+        () => ({ x: bounds().x + 4, y, width: bounds().width - 8, height: 16 }),
+        () => {
+          if (!this.pointerReady()) {
+            return;
+          }
+          if (option === PartyOption.SCROLL_UP || option === PartyOption.SCROLL_DOWN) {
+            const previous = this.options[this.optionsCursor];
+            const direction = option === PartyOption.SCROLL_UP ? -1 : 1;
+            this.optionsScrollCursor = Math.max(0, this.optionsScrollCursor + direction);
+            this.updateOptions();
+            const next =
+              direction < 0
+                ? this.options[0] === PartyOption.SCROLL_UP
+                  ? 1
+                  : 0
+                : this.options.length - (this.options.includes(PartyOption.SCROLL_DOWN) ? 3 : 2);
+            this.selectPointerOption(next, previous);
+          } else if (index === this.optionsCursor) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.selectPointerOption(index);
+          }
+        },
+        wheel,
+      );
+      if (!this.isItemManageMode() || this.transferMode || !(this.transferQuantitiesMax[option] > 1)) {
+        continue;
+      }
+      for (const direction of [-1, 1]) {
+        const x = direction < 0 ? -20 : -8;
+        const arrow = globalScene.add
+          .sprite(x, y + 8, "cursor")
+          .setScale(0.5)
+          .setFlipX(direction < 0);
+        this.optionsContainer.add(arrow);
+        targets.add(
+          this.optionsContainer,
+          `party-quantity-${index}-${direction}`,
+          () => ({ x: x - 5, y, width: 10, height: 16 }),
+          () => {
+            if (!this.pointerReady()) {
+              return;
+            }
+            this.selectPointerOption(index);
+            this.getUi().processInput(direction < 0 ? Button.LEFT : Button.RIGHT);
+          },
+          wheel,
+        );
+      }
+    }
+  }
+
+  override destroy(): void {
+    this.pointerTargets?.destroy();
+    this.optionPointerTargets?.destroy();
+    this.pointerTargets = null;
+    this.optionPointerTargets = null;
+    super.destroy();
   }
 
   private processSummaryOption(pokemon: Pokemon): boolean {
@@ -702,6 +906,12 @@ export class PartyUiHandler extends MessageUiHandler {
 
     success = this.moveOptionCursor(button);
 
+    this.updateRememberMoveInfo();
+
+    return success;
+  }
+
+  private updateRememberMoveInfo(): void {
     // show move description
     const option = this.options[this.optionsCursor];
     const pokemon = globalScene.getPlayerParty()[this.cursor];
@@ -714,8 +924,6 @@ export class PartyUiHandler extends MessageUiHandler {
       // or hide the overlay, in case it's the cancel button
       this.moveInfoOverlay.clear();
     }
-
-    return success;
   }
 
   private getTransferrableItemsFromPokemon(pokemon: PlayerPokemon) {
@@ -1243,10 +1451,10 @@ export class PartyUiHandler extends MessageUiHandler {
     return changed;
   }
 
-  private setOptionsCursor(cursor: number): boolean {
+  private setOptionsCursor(cursor: number, pointer = false): boolean {
     const changed = this.optionsCursor !== cursor;
     let isScroll = false;
-    if (changed && this.optionsScroll) {
+    if (changed && this.optionsScroll && !pointer) {
       if (Math.abs(cursor - this.optionsCursor) === this.options.length - 1) {
         this.optionsScrollCursor = cursor ? this.optionsScrollTotal - 8 : 0;
         this.updateOptions();
@@ -1431,6 +1639,7 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   private addCancelAndScrollOptions(): void {
+    this.pointerAllOptions = [...this.options, PartyOption.CANCEL];
     this.optionsScrollTotal = this.options.length;
     const optionStartIndex = this.optionsScrollCursor;
     const optionEndIndex = Math.min(
@@ -1769,12 +1978,13 @@ export class PartyUiHandler extends MessageUiHandler {
       this.optionsContainer.add(optionText);
     }
 
+    const quantityWidth = this.isItemManageMode() && !this.transferMode ? 28 : 0;
     widestOptionWidth = Math.max(
       widestOptionWidth,
       optionTexts.reduce((max, t) => Math.max(max, t.displayWidth), 0) + widestPrefixWidth,
     );
 
-    this.optionsBg.width = Math.max(widestOptionWidth + 24, 94);
+    this.optionsBg.width = Math.max(widestOptionWidth + 24 + quantityWidth, 94);
     const prefixBaseX = 14;
     const optionTextBaseX = 19;
     for (let i = 0; i < optionTexts.length; i++) {
@@ -1788,6 +1998,7 @@ export class PartyUiHandler extends MessageUiHandler {
             : prefixBaseX - this.optionsBg.width;
       }
     }
+    this.createOptionPointerTargets();
   }
   startTransfer(): void {
     this.transferMode = true;
@@ -1949,6 +2160,8 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   clearOptions() {
+    this.optionPointerTargets?.destroy();
+    this.optionPointerTargets = null;
     // hide the overlay
     this.moveInfoOverlay.clear();
     this.optionsMode = false;
@@ -1976,6 +2189,16 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   clear() {
+    this.pointerTargets?.destroy();
+    this.optionPointerTargets?.destroy();
+    this.pointerTargets = null;
+    this.optionPointerTargets = null;
+    this.clearOptions();
+    this.pendingPrompt = false;
+    this.blockInput = false;
+    this.awaitingActionInput = false;
+    this.onActionInput = null;
+    this.transferMode = false;
     super.clear();
     // hide the overlay
     this.moveInfoOverlay.clear();
@@ -2049,6 +2272,10 @@ class PartySlot extends Phaser.GameObjects.Container {
     this.iconAnimHandler = iconAnimHandler;
 
     this.setup(partyUiMode, tmMoveId, modifierItemId);
+  }
+
+  getPointerArea() {
+    return { x: this.x, y: this.y, width: this.slotBg.displayWidth, height: this.slotBg.displayHeight };
   }
 
   getPokemon(): PlayerPokemon {

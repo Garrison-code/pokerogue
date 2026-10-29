@@ -9,16 +9,40 @@ import { GameData } from "#system/game-data";
 import type { AdminUiHandlerService, AdminUiHandlerServiceMode, SearchAccountResponse } from "#types/api";
 import type { ModalConfig } from "#types/ui-types";
 import type { InputFieldConfig } from "#ui/form-modal-ui-handler";
-import { FormModalUiHandler } from "#ui/form-modal-ui-handler";
+import { PointerFormModalUiHandler } from "#ui/pointer-form-modal-ui-handler";
 import { getTextColor } from "#ui/text";
 import { toTitleCase } from "#utils/strings";
+import Phaser from "phaser";
 
-export class AdminUiHandler extends FormModalUiHandler {
+export class AdminUiHandler extends PointerFormModalUiHandler {
   private adminMode: AdminMode;
   private adminResult: SearchAccountResponse;
   private config: ModalConfig;
 
   private tempGameData: GameData | null = null;
+  private dataUsername: string | undefined;
+
+  protected override processFormButton(index: number): void {
+    if (!this.buttonContainers[index]?.visible) {
+      return;
+    }
+    if (index < 2) {
+      super.processFormButton(index);
+      return;
+    }
+    this.invokeFormAction(() => {
+      this.config.buttonActions[index]?.();
+      // Failed information entry stays available; a hidden modal unlocks on unhide instead.
+      if (this.active && this.modalContainer.visible) {
+        this.releaseFormInput();
+      }
+    });
+  }
+
+  override unhide(): void {
+    super.unhide();
+    this.releaseFormInput();
+  }
 
   private readonly buttonGap = 10;
   /** @returns "[field] is required" */
@@ -85,15 +109,6 @@ export class AdminUiHandler extends FormModalUiHandler {
     }
   }
 
-  processInput(button: Button): boolean {
-    if (button === Button.SUBMIT && this.submitAction) {
-      this.submitAction();
-      return true;
-    }
-
-    return false;
-  }
-
   show(args: any[]): boolean {
     this.config = args[0] as ModalConfig; // config
     this.adminMode = args[1] as AdminMode; // admin mode
@@ -109,12 +124,21 @@ export class AdminUiHandler extends FormModalUiHandler {
     const fields = this.getInputFieldConfigs();
     const hasTitle = !!this.getModalTitle();
 
+    this.stopPointerInput();
+    this.removeAdminFields();
+    if (this.dataUsername !== this.adminResult.username || this.adminMode !== AdminMode.ADMIN) {
+      this.tempGameData = null;
+    }
     this.updateFields(fields, hasTitle);
     this.updateContainer(this.config);
 
     const labels = this.getButtonLabels();
     for (let i = 0; i < labels.length; i++) {
-      this.buttonLabels[i].setText(labels[i]); // sets the label text
+      this.buttonLabels[i].setText(labels[i]);
+      const width = this.buttonLabels[i].displayWidth + 8;
+      this.buttonBgs[i]
+        .setSize(width, 16)
+        .setInteractive(new Phaser.Geom.Rectangle(0, 0, width, 16), Phaser.Geom.Rectangle.Contains);
     }
 
     const msgColor = isMessageError ? TextStyle.SUMMARY_PINK : TextStyle.SUMMARY_GREEN;
@@ -131,39 +155,11 @@ export class AdminUiHandler extends FormModalUiHandler {
     this.hideLastButtons(this.adminMode === AdminMode.ADMIN ? 0 : 2);
 
     this.populateFields(this.adminMode, this.adminResult);
-    const originalSubmitAction = this.submitAction;
     this.submitAction = () => {
-      this.submitAction = originalSubmitAction;
-      const adminSearchResult: SearchAccountResponse = this.convertInputsToAdmin(); // this converts the input texts into a single object for use later
-      const validFields = this.areFieldsValid(this.adminMode);
-      if (validFields.error) {
-        globalScene.ui.setMode(UiMode.LOADING, { buttonActions: [] }); // this is here to force a loading screen to allow the admin tool to reopen again if there's an error
-        return this.showMessage(validFields.errorMessage ?? "", adminSearchResult, true);
-      }
-      globalScene.ui.setMode(UiMode.LOADING, { buttonActions: [] });
-      switch (this.adminMode) {
-        case AdminMode.LINK:
-          this.adminLinkUnlink(adminSearchResult, "discord", "Link") // calls server to link discord
-            .then(response => {
-              if (response.error) {
-                return this.showMessage(response.errorType, adminSearchResult, true); // error or some kind
-              }
-              return this.showMessage(AdminUiHandler.SUCCESS_SERVICE_MODE("discord", "link"), adminSearchResult, false); // success
-            });
-          break;
-        case AdminMode.SEARCH:
-          this.adminSearch(adminSearchResult) // admin search for username
-            .then(response => {
-              if (response.error) {
-                return this.showMessage(response.errorType, adminSearchResult, true); // failure
-              }
-              this.updateAdminPanelInfo(response.adminSearchResult ?? adminSearchResult); // success
-            });
-          break;
-        case AdminMode.ADMIN:
-          this.updateAdminPanelInfo(adminSearchResult, AdminMode.SEARCH);
-          break;
-      }
+      const adminResult = this.convertInputsToAdmin();
+      const mode = this.adminMode;
+      const validFields = this.areFieldsValid(mode);
+      void this.submitAdminOperation(adminResult, mode, validFields);
     };
     return true;
   }
@@ -171,7 +167,7 @@ export class AdminUiHandler extends FormModalUiHandler {
   showMessage(message: string, adminResult: SearchAccountResponse, isError: boolean) {
     globalScene.ui.setMode(
       UiMode.ADMIN,
-      Object.assign(this.config, { errorMessage: message?.trim() }),
+      { ...this.config, errorMessage: String(message ?? "").trim() },
       this.adminMode,
       adminResult,
       isError,
@@ -183,57 +179,102 @@ export class AdminUiHandler extends FormModalUiHandler {
     }
   }
 
-  private populateAdminFields(adminResult: SearchAccountResponse) {
-    for (const [i, aR] of Object.keys(adminResult).entries()) {
-      if (aR === "systemData") {
-        continue;
+  private populateAdminFields(adminResult: SearchAccountResponse): void {
+    const keys = ["username", "discordId", "googleId", "lastLoggedIn", "registered"] as const;
+    keys.forEach((key, index) => {
+      this.inputs[index].setText(adminResult[key] ?? "");
+      if (key !== "discordId" && key !== "googleId") {
+        return;
       }
-      this.inputs[i].setText(adminResult[aR]);
-      if (aR === "discordId" || aR === "googleId") {
-        // this is here to add the icons for linking/unlinking of google/discord IDs
-        const nineSlice = this.inputContainers[i].list.find(
-          (iC): iC is Phaser.GameObjects.NineSlice => iC.type === "NineSlice",
-        );
-        const img = globalScene.add.image(
-          this.inputContainers[i].x + nineSlice!.width + this.buttonGap,
-          this.inputContainers[i].y + Math.floor(nineSlice!.height / 2),
-          adminResult[aR] === "" ? "link_icon" : "unlink_icon",
-        );
-        img
-          .setName(`adminBtn_${aR}`)
-          .setOrigin()
-          .setInteractive()
-          .on("pointerdown", () => {
-            const service = aR.toLowerCase().replace("id", ""); // this takes our key (discordId or googleId) and removes the "Id" at the end to make it more url friendly
-            const mode = adminResult[aR] === "" ? "Link" : "Unlink"; // this figures out if we're linking or unlinking a service
-            const validFields = this.areFieldsValid(this.adminMode, service);
-            if (validFields.error) {
-              globalScene.ui.setMode(UiMode.LOADING, { buttonActions: [] }); // this is here to force a loading screen to allow the admin tool to reopen again if there's an error
-              return this.showMessage(validFields.errorMessage ?? "", adminResult, true);
+      const background = this.inputContainers[index].list.find(
+        (object): object is Phaser.GameObjects.NineSlice => object.type === "NineSlice",
+      );
+      const service: AdminUiHandlerService = key === "discordId" ? "discord" : "google";
+      const mode: AdminUiHandlerServiceMode = adminResult[key] ? "Unlink" : "Link";
+      const image = globalScene.add.image(
+        this.inputContainers[index].x + background!.width + this.buttonGap,
+        this.inputContainers[index].y + Math.floor(background!.height / 2),
+        mode === "Link" ? "link_icon" : "unlink_icon",
+      );
+      image
+        .setName(`adminBtn_${key}`)
+        .setOrigin()
+        .setInteractive()
+        .on(
+          "pointerdown",
+          (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+            event.stopPropagation();
+            if (pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
+              return;
             }
-            this.adminLinkUnlink(this.convertInputsToAdmin(), service as AdminUiHandlerService, mode).then(response => {
-              // attempts to link/unlink depending on the service
-              if (response.error) {
-                globalScene.ui.setMode(UiMode.LOADING, { buttonActions: [] });
-                return this.showMessage(response.errorType, adminResult, true); // fail
-              }
-              // success, reload panel with new results
-              globalScene.ui.setMode(UiMode.LOADING, { buttonActions: [] });
-              this.adminSearch(adminResult).then(searchResponse => {
-                if (searchResponse.error) {
-                  return this.showMessage(searchResponse.errorType, adminResult, true);
-                }
-                return this.showMessage(
-                  AdminUiHandler.SUCCESS_SERVICE_MODE(service, mode),
-                  searchResponse.adminSearchResult ?? adminResult,
-                  false,
-                );
+            if (pointer.rightButtonDown()) {
+              this.getUi().processInput(Button.CANCEL);
+            } else if (pointer.leftButtonDown()) {
+              this.invokeFormAction(() => {
+                const result = this.convertInputsToAdmin();
+                const valid = this.areFieldsValid(this.adminMode, service);
+                void this.submitAdminOperation(result, this.adminMode, valid, { service, mode });
               });
-            });
-          });
-        this.addInteractionHoverEffect(img);
-        this.modalContainer.add(img);
+            }
+          },
+        );
+      this.addInteractionHoverEffect(image);
+      this.modalContainer.add(image);
+    });
+  }
+
+  private async submitAdminOperation(
+    result: SearchAccountResponse,
+    mode: AdminMode,
+    valid: { error: boolean; errorMessage?: string },
+    link?: { service: AdminUiHandlerService; mode: AdminUiHandlerServiceMode },
+  ): Promise<void> {
+    const current = await this.beginLoadingOperation();
+    if (!current()) {
+      return;
+    }
+    if (valid.error) {
+      this.showMessage(valid.errorMessage ?? "", result, true);
+      return;
+    }
+    if (mode === AdminMode.ADMIN && !link) {
+      this.updateAdminPanelInfo(result, AdminMode.SEARCH);
+      return;
+    }
+    if (mode === AdminMode.LINK || link) {
+      const service = link?.service ?? "discord";
+      const action = link?.mode ?? "Link";
+      const response = await this.adminLinkUnlink(result, service, action);
+      if (!current()) {
+        return;
       }
+      if (response.error) {
+        this.showMessage(response.errorType ?? "", result, true);
+        return;
+      }
+      if (!link) {
+        this.showMessage(AdminUiHandler.SUCCESS_SERVICE_MODE(service, action), result, false);
+        return;
+      }
+      const refreshed = await this.adminSearch(result, current);
+      if (!current()) {
+        return;
+      }
+      this.showMessage(
+        refreshed.error ? (refreshed.errorType ?? "") : AdminUiHandler.SUCCESS_SERVICE_MODE(service, action),
+        refreshed.adminSearchResult ?? result,
+        refreshed.error,
+      );
+      return;
+    }
+    const response = await this.adminSearch(result, current);
+    if (!current()) {
+      return;
+    }
+    if (response.error) {
+      this.showMessage(response.errorType ?? "", result, true);
+    } else {
+      this.updateAdminPanelInfo(response.adminSearchResult ?? result);
     }
   }
 
@@ -318,8 +359,9 @@ export class AdminUiHandler extends FormModalUiHandler {
     };
   }
 
-  private async adminSearch(adminSearchResult: SearchAccountResponse) {
+  private async adminSearch(adminSearchResult: SearchAccountResponse, current: () => boolean) {
     this.tempGameData = null;
+    this.dataUsername = undefined;
     // Mocking response, solely for local testing
     if (bypassLogin) {
       const fakeResponse: SearchAccountResponse = {
@@ -329,7 +371,10 @@ export class AdminUiHandler extends FormModalUiHandler {
         lastLoggedIn: "",
         registered: "",
       };
-      this.tempGameData = globalScene.gameData;
+      if (current()) {
+        this.tempGameData = globalScene.gameData;
+        this.dataUsername = adminSearchResult.username;
+      }
       return { adminSearchResult: fakeResponse, error: false };
     }
 
@@ -341,10 +386,11 @@ export class AdminUiHandler extends FormModalUiHandler {
         // error - if adminInfo.status === this.httpUserNotFoundErrorCode that means the username can't be found in the db
         return { adminSearchResult, error: true, errorType };
       }
-      if (adminInfo.systemData) {
+      if (current() && adminInfo.systemData) {
         const rawSystem = JSON.stringify(adminInfo.systemData);
         try {
           this.tempGameData = GameData.fromRawSystem(rawSystem);
+          this.dataUsername = adminInfo.username;
         } catch {
           console.warn("Could not parse system data for admin panel, stats/pokedex will be unavailable!");
         }
@@ -352,7 +398,7 @@ export class AdminUiHandler extends FormModalUiHandler {
       return { adminSearchResult: adminInfo, error: false };
     } catch (err) {
       console.error(err);
-      return { error: true, errorType: err };
+      return { error: true, errorType: String(err) };
     }
   }
 
@@ -368,7 +414,7 @@ export class AdminUiHandler extends FormModalUiHandler {
       }
     } catch (err) {
       console.error(err);
-      return { error: true, errorType: err };
+      return { error: true, errorType: String(err) };
     }
     return { adminSearchResult, error: false };
   }
@@ -416,31 +462,22 @@ export class AdminUiHandler extends FormModalUiHandler {
     );
   }
 
-  clear(): void {
+  override clear(): void {
     super.clear();
+    this.removeAdminFields();
+  }
 
-    // this is used to remove the existing fields on the admin panel so they can be updated
-
-    const itemsToRemove: string[] = ["formLabel", "adminBtn"]; // this is the start of the names for each element we want to remove
-    const removeArray: any[] = [];
-    const mC = this.modalContainer.list;
-    for (let i = mC.length - 1; i >= 0; i--) {
-      /* This code looks for a few things before destroying the specific field; first it looks to see if the name of the element is %like% the itemsToRemove labels
-       * this means that anything with, for example, "formLabel", will be true.
-       * It then also checks for any containers that are within this.modalContainer, and checks if any of its child elements are of type rexInputText
-       * and if either of these conditions are met, the element is destroyed.
-       */
-      if (
-        itemsToRemove.some(iTR => mC[i].name.includes(iTR))
-        || (mC[i].type === "Container"
-          && (mC[i] as Phaser.GameObjects.Container).list.find(m => m.type === "rexInputText"))
-      ) {
-        removeArray.push(mC[i]);
-      }
+  private removeAdminFields(): void {
+    const fields = [
+      ...this.inputContainers,
+      ...this.formLabels,
+      ...this.modalContainer.list.filter(object => object.name?.startsWith("adminBtn_")),
+    ];
+    for (const field of fields) {
+      this.modalContainer.remove(field, true);
     }
-
-    while (removeArray.length > 0) {
-      this.modalContainer.remove(removeArray.pop(), true);
-    }
+    this.inputs = [];
+    this.inputContainers = [];
+    this.formLabels = [];
   }
 }

@@ -7,6 +7,7 @@ import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 
 export class KeyboardBindingUiHandler extends BaseBindingUiHandler {
+  protected readonly device = Device.KEYBOARD;
   constructor() {
     super();
 
@@ -47,7 +48,7 @@ export class KeyboardBindingUiHandler extends BaseBindingUiHandler {
     ];
     const key = event.keyCode;
     // // Check conditions before processing the button press.
-    if (!this.listening || this.buttonPressed !== null || blacklist.includes(key)) {
+    if (!this.canCaptureInput() || event.repeat || blacklist.includes(key)) {
       return;
     }
     const activeConfig = globalScene.inputController.getActiveConfig(Device.KEYBOARD)!;
@@ -61,10 +62,16 @@ export class KeyboardBindingUiHandler extends BaseBindingUiHandler {
     this.onInputDown(buttonIcon, null, "keyboard");
   }
 
+  public override destroy(): void {
+    globalScene.input.keyboard?.off("keydown", this.onKeyDown, this);
+    super.destroy();
+  }
+
   swapAction(): boolean {
     const activeConfig = globalScene.inputController.getActiveConfig(Device.KEYBOARD);
     if (
-      activeConfig != null
+      this.isCurrentDevice()
+      && activeConfig != null
       && this.buttonPressed != null
       && globalScene.inputController.assignBinding(activeConfig, this.target, this.buttonPressed)
     ) {

@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { Button } from "#enums/buttons";
 import type { ModalConfig } from "#types/ui-types";
 import type { InputFieldConfig } from "#ui/form-modal-ui-handler";
 import { LoginRegisterInfoContainerUiHandler } from "#ui/login-register-info-container-ui-handler";
@@ -6,6 +7,22 @@ import i18next from "i18next";
 import type Phaser from "phaser";
 
 export class LoginOrRegisterUiHandler extends LoginRegisterInfoContainerUiHandler {
+  protected override get pointerFormEnabled(): boolean {
+    return true;
+  }
+
+  protected override processFormButton(index: number): void {
+    if (index === 1) {
+      this.invokeFormAction(this.cancelAction);
+    } else {
+      super.processFormButton(index);
+    }
+  }
+
+  override processInput(button: Button): boolean {
+    return button === Button.CANCEL ? false : super.processInput(button);
+  }
+
   private logo: Phaser.GameObjects.Image;
 
   public override getModalTitle(): string {
@@ -49,10 +66,12 @@ export class LoginOrRegisterUiHandler extends LoginRegisterInfoContainerUiHandle
       .setVisible(true)
       .setActive(true);
 
-    const config = args[0];
-    this.showInfoContainer(config);
-
-    return super.show(args);
+    if (!super.show(args)) {
+      return false;
+    }
+    // The account sidebar must stay above the modal's background input shield.
+    this.showInfoContainer(args[0]);
+    return true;
   }
 
   public override clear(): void {

@@ -221,12 +221,8 @@ describe("UI - option selection with a mouse", () => {
       expect(selected).toHaveBeenCalledOnce();
     });
 
-    it("does not enable other menus that inherit the same base", () => {
-      for (const unsupportedMode of [UiMode.MENU, UiMode.AUTO_COMPLETE]) {
-        const otherHandler = game.scene.ui.handlers[unsupportedMode] as OptionSelectUiHandler;
-        expect(otherHandler["supportsPointerInput"]).toBe(false);
-        expect(otherHandler["pointerRows"]).toHaveLength(0);
-      }
+    it("keeps ACTION confirmation for ordinary option modes", () => {
+      expect(handler["pointerConfirmButton"]).toBe(Button.ACTION);
     });
   });
 

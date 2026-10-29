@@ -13,6 +13,7 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import { RunDisplayMode } from "#ui/run-info-ui-handler";
 import { addTextObject } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import { fixedInt, formatLargeNumber } from "#utils/common";
 import i18next from "i18next";
 
@@ -25,6 +26,72 @@ export const RUN_HISTORY_LIMIT: number = 25;
  * The only valid input buttons are Button.ACTION and Button.CANCEL.
  */
 export class RunHistoryUiHandler extends MessageUiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
+  private displayId = 0;
+  private loaded = false;
+  private scrollId = 0;
+  private scrollTween: Phaser.Tweens.Tween | undefined;
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const page = targets.add(this.runSelectContainer, "run-history-page", () => ({
+      x: 0,
+      y: -globalScene.scaledCanvas.height,
+      width: 320,
+      height: 180,
+    }));
+    this.runSelectContainer.moveTo(page, 1);
+    const wheel = (direction: number) => {
+      if (!this.loaded || this.runs.length === 0) {
+        return;
+      }
+      const next = Phaser.Math.Clamp(this.cursor + this.scrollCursor + direction, 0, this.runs.length - 1);
+      if (next === this.cursor + this.scrollCursor) {
+        return;
+      }
+      const scroll =
+        next < this.scrollCursor
+          ? next
+          : next >= this.scrollCursor + this.maxRows
+            ? next - this.maxRows + 1
+            : this.scrollCursor;
+      this.setCursor(next - scroll);
+      this.setScrollCursor(scroll);
+      this.getUi().playSelect();
+    };
+    targets.add(
+      this.runSelectContainer,
+      "run-history-list",
+      () => ({ x: 8, y: this.runContainerInitialY, width: 304, height: 168 }),
+      undefined,
+      wheel,
+    );
+    for (let row = 0; row < this.maxRows; row++) {
+      targets.add(
+        this.runSelectContainer,
+        `run-history-card-${row}`,
+        () =>
+          this.loaded && this.runs[this.scrollCursor + row]
+            ? { x: 8, y: this.runContainerInitialY + row * 56, width: 304, height: 52 }
+            : null,
+        () => {
+          if (this.scrollTween) {
+            return;
+          }
+          if (this.cursor === row) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.setCursor(row);
+            this.getUi().playSelect();
+          }
+        },
+        wheel,
+      );
+    }
+  }
+
   private readonly maxRows = 3;
 
   private runSelectContainer: Phaser.GameObjects.Container;
@@ -71,11 +138,25 @@ export class RunHistoryUiHandler extends MessageUiHandler {
   }
 
   override show(args: any[]): boolean {
+    this.displayId++;
+    this.loaded = false;
+    this.scrollTween?.remove();
+    this.scrollTween = undefined;
+    this.scrollCursor = 0;
+    this.runsContainer.y = this.runContainerInitialY;
+    this.clearCursor();
+    this.clearRuns();
     super.show(args);
 
     this.getUi().bringToTop(this.runSelectContainer);
     this.runSelectContainer.setVisible(true);
-    this.populateRuns().then(() => {
+    const displayId = this.displayId;
+    this.createPointerTargets();
+    this.populateRuns(displayId).then(() => {
+      if (displayId !== this.displayId || !this.active) {
+        return;
+      }
+      this.loaded = true;
       this.setScrollCursor(0);
       this.setCursor(0);
 
@@ -154,8 +235,11 @@ export class RunHistoryUiHandler extends MessageUiHandler {
    * Runs are displayed from newest --> oldest in descending order.
    * In the for loop, each run is processed to create an RunEntryContainer used to display and store the run's unique information
    */
-  private async populateRuns() {
+  private async populateRuns(displayId: number) {
     const response = await globalScene.gameData.getRunHistoryData();
+    if (displayId !== this.displayId || !this.active) {
+      return;
+    }
     const timestamps = Object.keys(response);
     if (timestamps.length === 0) {
       this.showEmpty();
@@ -209,12 +293,23 @@ export class RunHistoryUiHandler extends MessageUiHandler {
     if (changed) {
       this.scrollCursor = scrollCursor;
       this.setCursor(this.cursor);
-      globalScene.tweens.add({
+      this.scrollTween?.remove();
+      const displayId = this.displayId;
+      const scrollId = ++this.scrollId;
+      let completed = false;
+      const tween = globalScene.tweens.add({
         targets: this.runsContainer,
         y: this.runContainerInitialY - 56 * scrollCursor,
         duration: fixedInt(325),
         ease: "Sine.easeInOut",
+        onComplete: () => {
+          if (displayId === this.displayId && scrollId === this.scrollId) {
+            completed = true;
+            this.scrollTween = undefined;
+          }
+        },
       });
+      this.scrollTween = completed ? undefined : tween;
     }
     return changed;
   }
@@ -223,10 +318,23 @@ export class RunHistoryUiHandler extends MessageUiHandler {
    * Called when the player returns back to the menu
    * Uses the functions clearCursor() and clearRuns()
    */
+  override destroy(): void {
+    this.clear();
+    this.runSelectContainer.destroy();
+    super.destroy();
+  }
+
   override clear() {
+    this.displayId++;
+    this.loaded = false;
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    this.scrollTween?.remove();
+    this.scrollTween = undefined;
     super.clear();
     this.runSelectContainer.setVisible(false);
-    this.setScrollCursor(0);
+    this.scrollCursor = 0;
+    this.runsContainer.y = this.runContainerInitialY;
     this.clearCursor();
     this.clearRuns();
   }

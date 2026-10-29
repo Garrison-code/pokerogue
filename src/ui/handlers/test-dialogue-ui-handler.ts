@@ -1,13 +1,133 @@
+import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { ModalConfig, OptionSelectItem } from "#types/ui-types";
+import type { AutoCompleteUiHandler } from "#ui/autocomplete-ui-handler";
 import type { InputFieldConfig } from "#ui/form-modal-ui-handler";
-import { FormModalUiHandler } from "#ui/form-modal-ui-handler";
+import { PointerFormModalUiHandler } from "#ui/pointer-form-modal-ui-handler";
 import i18next from "i18next";
 
 /** Handler for the i18n testing menu used by the localization team. */
-export class TestDialogueUiHandler extends FormModalUiHandler {
+export class TestDialogueUiHandler extends PointerFormModalUiHandler {
   keys: string[];
+  private displayId = 0;
+  private candidateId = 0;
+  private acceptingCandidate = false;
+  private dismissSpace = false;
+  private inputCleanups: (() => void)[] = [];
+
+  private ownsCandidate(): boolean {
+    return (
+      this.getUi().mode === UiMode.AUTO_COMPLETE
+      && (this.getUi().getHandler() as AutoCompleteUiHandler).parentModal === this.modalContainer
+    );
+  }
+
+  protected override handleFormKeyDown(event: KeyboardEvent): boolean {
+    if (!this.ownsCandidate()) {
+      return false;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      this.getUi().processInput(Button.SUBMIT);
+      return true;
+    }
+    if (event.key === "Escape" || event.code === "Space") {
+      if (event.key === "Escape") {
+        event.preventDefault();
+      } else {
+        this.dismissSpace = true;
+      }
+      const displayId = this.displayId;
+      this.candidateId++;
+      this.getUi()
+        .revertMode()
+        .then(() => {
+          if (this.active && this.displayId === displayId && this.getUi().getHandler() === this) {
+            this.inputs[0]?.setFocus();
+          }
+        });
+      return true;
+    }
+    return false;
+  }
+
+  protected override onFormCompositionEnd(): void {
+    this.updateCandidates();
+  }
+
+  private stopInputListeners(): void {
+    this.displayId++;
+    this.candidateId++;
+    this.dismissSpace = false;
+    for (const cleanup of this.inputCleanups) {
+      cleanup();
+    }
+    this.inputCleanups = [];
+  }
+
+  private updateCandidates(): void {
+    if (this.dismissSpace) {
+      this.dismissSpace = false;
+      return;
+    }
+    if (this.composing || this.acceptingCandidate || !this.active) {
+      return;
+    }
+    const ui = this.getUi();
+    if (ui.getHandler() !== this && !this.ownsCandidate()) {
+      return;
+    }
+    const displayId = this.displayId;
+    const candidateId = ++this.candidateId;
+    const input = this.inputs[0];
+    const text = input.text;
+    const open = () => {
+      if (
+        !this.active
+        || displayId !== this.displayId
+        || candidateId !== this.candidateId
+        || ui.getHandler() !== this
+      ) {
+        return;
+      }
+      const token = text.split(" ").at(-1)!.toLowerCase();
+      const options: OptionSelectItem[] = (text ? this.keys.filter(key => key.toLowerCase().includes(token)) : []).map(
+        value => ({
+          label: value,
+          handler: () => {
+            if (
+              !this.active
+              || displayId !== this.displayId
+              || candidateId !== this.candidateId
+              || !this.ownsCandidate()
+            ) {
+              return false;
+            }
+            const words = input.text.split(" ");
+            words[words.length - 1] = value;
+            this.acceptingCandidate = true;
+            input.setText(words.join(" "));
+            this.acceptingCandidate = false;
+            ui.revertMode().then(() => {
+              if (this.active && displayId === this.displayId && ui.getHandler() === this) {
+                input.setFocus();
+              }
+            });
+            return true;
+          },
+        }),
+      );
+      if (options.length > 0) {
+        ui.setOverlayMode(UiMode.AUTO_COMPLETE, { options, maxOptions: 5, modalContainer: this.modalContainer });
+      }
+    };
+    if (this.ownsCandidate()) {
+      ui.revertMode().then(open);
+    } else {
+      open();
+    }
+  }
 
   setup() {
     super.setup();
@@ -73,85 +193,52 @@ export class TestDialogueUiHandler extends FormModalUiHandler {
   }
 
   show(args: any[]): boolean {
-    const ui = this.getUi();
-    const hasTitle = !!this.getModalTitle();
-    this.updateFields(this.getInputFieldConfigs(), hasTitle);
-    this.updateContainer(args[0] as ModalConfig);
+    this.stopInputListeners();
+    this.stopPointerInput();
+    for (const container of this.inputContainers) {
+      container.destroy();
+    }
+    for (const label of this.formLabels) {
+      label.destroy();
+    }
+    this.updateFields(this.getInputFieldConfigs(), !!this.getModalTitle());
     const input = this.inputs[0];
     input.setMaxLength(255);
-
-    input.on("keydown", (inputObject, evt: KeyboardEvent) => {
-      if (
-        ["escape", "space"].some(v => v === evt.key.toLowerCase() || v === evt.code.toLowerCase())
-        && ui.mode === UiMode.AUTO_COMPLETE
-      ) {
-        // Delete autocomplete list and recovery focus.
-        inputObject.on("blur", () => inputObject.node.focus(), { once: true });
-        ui.revertMode();
-      }
-    });
-
-    input.on("textchange", (inputObject, evt: InputEvent) => {
-      // Delete autocomplete.
-      if (ui.mode === UiMode.AUTO_COMPLETE) {
-        ui.revertMode();
-      }
-
-      let options: OptionSelectItem[] = [];
-      const splitArr = inputObject.text.split(" ");
-      const filteredKeys = this.keys.filter(command => command.toLowerCase().includes(splitArr.at(-1)!.toLowerCase()));
-      if (inputObject.text !== "" && filteredKeys.length > 0) {
-        // if performance is required, you could reduce the number of total results by changing the slice below to not have all ~8000 inputs going
-        options = filteredKeys.slice(0).map(value => {
-          return {
-            label: value,
-            handler: () => {
-              // this is here to make sure that if you try to backspace then enter, the last known evt.data (backspace) is picked up
-              // this is because evt.data is null for backspace, so without this, the autocomplete windows just closes
-              if (evt.data != null || evt.inputType?.toLowerCase() === "deletecontentbackward") {
-                const separatedArray = inputObject.text.split(" ");
-                separatedArray[separatedArray.length - 1] = value;
-                inputObject.setText(separatedArray.join(" "));
-              }
-              ui.revertMode();
-              return true;
-            },
-          };
-        });
-      }
-
-      if (options.length > 0) {
-        const modalOpts = {
-          options,
-          maxOptions: 5,
-          modalContainer: this.modalContainer,
-        };
-        ui.setOverlayMode(UiMode.AUTO_COMPLETE, modalOpts);
-      }
-    });
-
-    if (super.show(args)) {
-      const config = args[0] as ModalConfig;
-      this.inputs[0].resize(1150, 116);
-      // TODO: Figure out what the type of `this.inputContainers.list` is
-      this.inputContainers[0].list[0]["width"] = 200;
-      // TODO: shouldn't this be `const playerPokemon: PlayerPokemon | undefined = args[1];` and `if (playerPokemon)`?
-      if (args[1] && typeof (args[1] as PlayerPokemon).getNameToRender === "function") {
-        this.inputs[0].text = (args[1] as PlayerPokemon).getNameToRender();
-      } else {
-        this.inputs[0].text = args[1];
-      }
-      this.submitAction = () => {
-        if (ui.mode === UiMode.TEST_DIALOGUE) {
-          this.sanitizeInputs();
-          const sanitizedName = btoa(unescape(encodeURIComponent(this.inputs[0].text)));
-          config.buttonActions[0](sanitizedName);
-          return true;
-        }
-        return false;
-      };
-      return true;
+    if (!super.show(args)) {
+      return false;
     }
-    return false;
+    const changed = () => this.updateCandidates();
+    input.on("textchange", changed);
+    this.inputCleanups.push(() => input.off("textchange", changed));
+    const node = input.node;
+    const keyup = () => {
+      this.dismissSpace = false;
+    };
+    node.addEventListener("keyup", keyup);
+    this.inputCleanups.push(() => node.removeEventListener("keyup", keyup));
+    input.resize(1150, 116);
+    (this.inputContainers[0].list[0] as Phaser.GameObjects.NineSlice).setSize(200, 16);
+    const initial: PlayerPokemon | string | undefined = args[1];
+    input.text =
+      initial && typeof (initial as PlayerPokemon).getNameToRender === "function"
+        ? (initial as PlayerPokemon).getNameToRender()
+        : ((initial as string | undefined) ?? "");
+    const config = args[0] as ModalConfig;
+    this.submitAction = () => {
+      this.sanitizeInputs();
+      const encoded = btoa(unescape(encodeURIComponent(input.text)));
+      config.buttonActions[0](encoded);
+    };
+    return true;
+  }
+
+  override clear(): void {
+    this.stopInputListeners();
+    super.clear();
+  }
+
+  override destroy(): void {
+    this.stopInputListeners();
+    super.destroy();
   }
 }

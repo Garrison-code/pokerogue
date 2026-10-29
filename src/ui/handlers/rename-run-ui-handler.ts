@@ -1,8 +1,9 @@
 import type { ModalConfig } from "#types/ui-types";
-import { FormModalUiHandler, type InputFieldConfig } from "#ui/form-modal-ui-handler";
+import type { InputFieldConfig } from "#ui/form-modal-ui-handler";
+import { PointerFormModalUiHandler } from "#ui/pointer-form-modal-ui-handler";
 import i18next from "i18next";
 
-export class RenameRunFormUiHandler extends FormModalUiHandler {
+export class RenameRunFormUiHandler extends PointerFormModalUiHandler {
   getModalTitle(_config?: ModalConfig): string {
     return i18next.t("menu:renameRun");
   }

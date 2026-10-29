@@ -14,6 +14,7 @@ import type { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { BgmBar } from "#ui/bgm-bar";
 import { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
 import { addTextObject } from "#ui/text";
+import { UiPointerTargets } from "#ui/ui-pointer-targets";
 import { addWindow, WindowVariant } from "#ui/ui-theme";
 import { fixedInt, sessionIdKey } from "#utils/common";
 import { getCookie } from "#utils/cookies";
@@ -56,6 +57,14 @@ const { VITE_DISCORD_URL, VITE_GITHUB_URL, VITE_REDDIT_URL, VITE_DONATE_URL } = 
 
 export class MenuUiHandler extends OptionSelectUiHandler {
   private readonly textPadding = 8;
+  private displayId = 0;
+  private messageId = 0;
+  private pointerMessageBlocked = false;
+  private pointerTargets: UiPointerTargets | null = null;
+
+  protected override get canSelectWithPointer(): boolean {
+    return !this.pointerMessageBlocked;
+  }
 
   private menuContainer: Phaser.GameObjects.Container;
   private menuMessageBoxContainer: Phaser.GameObjects.Container;
@@ -157,9 +166,20 @@ export class MenuUiHandler extends OptionSelectUiHandler {
   }
 
   public override show(): boolean {
+    const displayId = ++this.displayId;
+    this.pointerTargets?.destroy();
+    this.showText("", 0);
     const config: OptionSelectModeConfig = this.getMenuOptionsConfig();
 
     super.show([config]);
+
+    this.pointerTargets = new UiPointerTargets(this);
+    this.pointerTargets.add(this.menuContainer, "menu-page", () => ({
+      x: -1,
+      y: -1,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height,
+    }));
 
     // Make sure the tutorial overlay sits above everything, but below the message box
     this.menuContainer.bringToTop(this.tutorialOverlay);
@@ -171,6 +191,9 @@ export class MenuUiHandler extends OptionSelectUiHandler {
 
     this.cursorObj?.setVisible(false);
     handleTutorial(Tutorial.MENU).then(() => {
+      if (!this.active || displayId !== this.displayId) {
+        return;
+      }
       this.cursorObj?.setVisible(true);
       this.bgmBar.toggleBgmBar(true);
     });
@@ -275,6 +298,9 @@ export class MenuUiHandler extends OptionSelectUiHandler {
     manageDataOptions.push({
       label: i18next.t("menuUiHandler:exportSession"),
       handler: () => {
+        const displayId = this.displayId;
+        const sourceHandler = ui.getHandler<OptionSelectUiHandler>();
+        const sourceToken = sourceHandler.displayToken;
         const dataSlots: number[] = [];
         Promise.all(
           new Array(5).fill(null).map((_, i) => {
@@ -286,6 +312,15 @@ export class MenuUiHandler extends OptionSelectUiHandler {
             });
           }),
         ).then(() => {
+          if (
+            !this.active
+            || displayId !== this.displayId
+            || ui.getHandler() !== sourceHandler
+            || !sourceHandler.active
+            || sourceHandler.displayToken !== sourceToken
+          ) {
+            return;
+          }
           confirmSlot(
             i18next.t("menuUiHandler:exportSlotSelect"),
             i => dataSlots.indexOf(i) > -1,
@@ -787,12 +822,39 @@ export class MenuUiHandler extends OptionSelectUiHandler {
     prompt?: boolean,
     promptDelay?: number,
   ): void {
+    this.pointerMessageBlocked = !!text;
     this.menuMessageBoxContainer.setVisible(!!text);
 
-    super.showText(text, delay, callback, callbackDelay, prompt, promptDelay);
+    const displayId = this.displayId;
+    const messageId = ++this.messageId;
+    super.showText(
+      text,
+      delay,
+      callback
+        && (() => {
+          if (
+            this.active
+            && this.displayId === displayId
+            && this.messageId === messageId
+            && this.getUi().getHandler() === this
+          ) {
+            callback();
+          }
+        }),
+      callbackDelay,
+      prompt,
+      promptDelay,
+    );
   }
 
   public override clear(): void {
+    ++this.displayId;
+    ++this.messageId;
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
+    this.textTimer?.remove();
+    this.textCallbackTimer?.remove();
+    this.showText("", 0);
     super.clear();
 
     this.bgmBar.toggleBgmBar(false);

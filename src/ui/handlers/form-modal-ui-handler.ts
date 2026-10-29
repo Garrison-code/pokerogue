@@ -11,6 +11,7 @@ import type InputText from "phaser3-rex-plugins/plugins/inputtext";
 
 export abstract class FormModalUiHandler extends ModalUiHandler {
   protected editing = false;
+  private focusTimer: ReturnType<typeof setTimeout> | undefined;
   protected inputContainers: Phaser.GameObjects.Container[] = [];
   protected inputs: InputText[] = [];
   protected errorMessage: Phaser.GameObjects.Text;
@@ -110,6 +111,7 @@ export abstract class FormModalUiHandler extends ModalUiHandler {
 
   public override show(args: any[]): boolean {
     if (super.show(args)) {
+      this.stopFormAnimation();
       for (const ic of this.inputContainers) {
         ic.setActive(true).setVisible(true);
       }
@@ -120,8 +122,11 @@ export abstract class FormModalUiHandler extends ModalUiHandler {
       [this.submitAction, this.cancelAction] = buttonActions;
 
       // Auto focus the first input field after a short delay, to prevent accidental inputs
-      setTimeout(() => {
-        this.inputs[0]?.setFocus();
+      this.focusTimer = setTimeout(() => {
+        this.focusTimer = undefined;
+        if (this.active && this.getUi().getHandler() === this) {
+          this.inputs[0]?.setFocus();
+        }
       }, 50);
 
       // Override the pointerDown event for the buttonBgs to call the `submitAction` and `cancelAction`
@@ -197,6 +202,17 @@ export abstract class FormModalUiHandler extends ModalUiHandler {
     }
   }
 
+  private stopFormAnimation(): void {
+    clearTimeout(this.focusTimer);
+    this.focusTimer = undefined;
+    this.tween?.remove().destroy();
+    this.tween = undefined;
+  }
+
+  public override destroy(): void {
+    this.stopFormAnimation();
+  }
+
   public override clear(): void {
     super.clear();
     this.modalContainer.setVisible(false);
@@ -206,9 +222,8 @@ export abstract class FormModalUiHandler extends ModalUiHandler {
     }
 
     this.submitAction = undefined;
-
-    this.tween?.remove().destroy();
-    this.tween = undefined;
+    this.cancelAction = undefined;
+    this.stopFormAnimation();
   }
 }
 

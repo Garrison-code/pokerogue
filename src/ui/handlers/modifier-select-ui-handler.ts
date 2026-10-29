@@ -16,6 +16,7 @@ import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
 import { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject, getModifierTierTextTint, getTextColor, getTextStyleOptions, getTextWithColors } from "#ui/text";
+import { getPointerBounds, UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import { fixedInt, formatMoney, NumberHolder } from "#utils/common";
 import i18next from "i18next";
 import Phaser from "phaser";
@@ -37,6 +38,12 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
   private moveInfoOverlay: MoveInfoOverlay;
   private moveInfoOverlayActive = false;
   declare protected onActionInput: ModifierSelectCallback | null;
+
+  private pointerTargets: UiPointerTargets | undefined;
+  private displayId = 0;
+  private retiringOptions = new Set<ModifierOption>();
+  private appearanceTween: Phaser.Tweens.Tween | undefined;
+  private displayTimers: Phaser.Time.TimerEvent[] = [];
 
   private rowCursor = 0;
   private player: boolean;
@@ -169,6 +176,11 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     }
 
     super.show(args);
+    const displayId = ++this.displayId;
+    const current = () => this.active && this.displayId === displayId;
+    for (const button of this.getButtons()) {
+      globalScene.tweens.killTweensOf(button);
+    }
 
     this.getUi().clearText();
 
@@ -251,6 +263,8 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
       this.shopOptionsRows[row].push(option);
     }
 
+    this.createPointerTargets();
+
     const maxUpgradeCount = typeOptions.map(to => to.upgradeCount).reduce((max, current) => Math.max(current, max), 0);
 
     /* Force updateModifiers without pokemonSpecificModifiers */
@@ -283,10 +297,13 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
      * for each reward has finished playing, allowing for the next set of animations to
      * start to appear.
      */
-    globalScene.tweens.addCounter({
+    this.appearanceTween = globalScene.tweens.addCounter({
       ease: "Sine.easeIn",
       duration: 1250,
       onUpdate: t => {
+        if (!current()) {
+          return;
+        }
         // The bang here is safe, as `getValue()` only returns null if the tween has been destroyed (which obviously isn't the case inside onUpdate)
         const value = t.getValue()!;
         const index = Math.floor(value * typeOptions.length);
@@ -311,7 +328,10 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     /** Holds promises that resolve once each shop item has finished animating */
     const shopAnimPromises: Promise<void>[] = [];
-    globalScene.time.delayedCall(1000 + maxUpgradeCount * 2000, () => {
+    this.delayDisplay(1000 + maxUpgradeCount * 2000, () => {
+      if (!current()) {
+        return;
+      }
       for (const shopOption of this.shopOptionsRows.flat()) {
         // It is safe to skip awaiting the `show` method here,
         // as the promise it returns is also part of the promise appended to `shopAnimPromises`,
@@ -321,7 +341,13 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     });
 
     tweenPromise.then(() => {
-      globalScene.time.delayedCall(500, () => {
+      if (!current()) {
+        return;
+      }
+      this.delayDisplay(500, () => {
+        if (!current()) {
+          return;
+        }
         if (partyHasHeldItem) {
           this.transferButtonContainer.setAlpha(0);
           this.transferButtonContainer.setVisible(true);
@@ -358,6 +384,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         // have completed, (which, among other things, would allow the GameObjects to be destroyed
         // before the animations have completed, causing errors).
         Promise.allSettled([...shopAnimPromises, ...rewardAnimAllSettledPromises]).then(() => {
+          if (!current()) {
+            return;
+          }
           const updateCursorTarget = () => {
             if (settings.display.shopCursorTarget === ShopCursorTarget.CHECK_TEAM) {
               this.setRowCursor(0);
@@ -380,6 +409,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
           updateCursorTarget();
 
           handleTutorial(Tutorial.SELECT_ITEM).then(res => {
+            if (!current()) {
+              return;
+            }
             if (res) {
               updateCursorTarget();
             }
@@ -393,6 +425,115 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     // #endregion animation
 
     return true;
+  }
+
+  private getButtons(): Phaser.GameObjects.Container[] {
+    return [
+      this.rerollButtonContainer,
+      this.transferButtonContainer,
+      this.checkButtonContainer,
+      this.lockRarityButtonContainer,
+      this.continueButtonContainer,
+    ];
+  }
+
+  private delayDisplay(delay: number, callback: () => void): void {
+    this.displayTimers.push(globalScene.time.delayedCall(delay, callback));
+  }
+
+  private stopDisplay(): void {
+    ++this.displayId;
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    this.appearanceTween?.remove();
+    this.appearanceTween = undefined;
+    for (const timer of this.displayTimers) {
+      timer.remove(false);
+    }
+    this.displayTimers.length = 0;
+    for (const button of this.getButtons()) {
+      globalScene.tweens.killTweensOf(button);
+    }
+    for (const option of [...this.options, ...this.shopOptionsRows.flat()]) {
+      option.stopAnimation();
+    }
+  }
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = (this.pointerTargets = new UiPointerTargets(this));
+    const ui = this.getUi();
+    const page = targets.add(ui, "modifier-page", () => ({
+      x: 0,
+      y: -globalScene.scaledCanvas.height,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height,
+    }));
+    ui.moveTo(page, ui.getIndex(this.modifierContainer));
+    const select = (row: number, cursor: number) => {
+      if (!this.awaitingActionInput) {
+        return;
+      }
+      if (this.rowCursor === row && this.cursor === cursor) {
+        ui.processInput(Button.ACTION);
+      } else {
+        // Pointer selection uses the actual row identity, not keyboard's proportional remapping.
+        this.rowCursor = row;
+        this.setCursor(cursor);
+        ui.playSelect();
+      }
+    };
+    const addOptions = (options: ModifierOption[], row: number) => {
+      options.forEach((option, cursor) => {
+        targets.add(
+          ui,
+          `modifier-${row}-${cursor}`,
+          () => {
+            const area = option.getPointerArea(options.length);
+            const overlay = this.moveInfoOverlay;
+            if (
+              overlay.visible
+              && area.x + area.width > overlay.x
+              && area.x < overlay.x + globalScene.scaledCanvas.width - 2
+              && area.y + area.height > overlay.y
+              && area.y < overlay.y + MoveInfoOverlay.getHeight(true)
+            ) {
+              return null;
+            }
+            return area;
+          },
+          () => select(row, cursor),
+        );
+      });
+    };
+    addOptions(this.options, 1);
+    this.shopOptionsRows.forEach((options, index) => addOptions(options, this.shopOptionsRows.length - index + 1));
+    this.getButtons().forEach((button, cursor) => {
+      targets.add(
+        ui,
+        `modifier-button-${cursor}`,
+        () => {
+          if (!button.visible || !button.alpha || button.getAt<Phaser.GameObjects.Text>(0).visible === false) {
+            return null;
+          }
+          const bounds = getPointerBounds(button, ui);
+          return bounds && { x: bounds.x - 3, y: bounds.y - 2, width: bounds.width + 6, height: bounds.height + 4 };
+        },
+        () => select(cursor === 4 ? 1 : 0, cursor === 4 ? 0 : cursor),
+      );
+    });
+  }
+
+  override destroy(): void {
+    this.stopDisplay();
+    this.active = false;
+    this.awaitingActionInput = false;
+    this.onActionInput = null;
+    for (const option of [...this.options, ...this.shopOptionsRows.flat(), ...this.retiringOptions]) {
+      option.destroy();
+    }
+    this.retiringOptions.clear();
+    this.moveInfoOverlay.clear();
   }
 
   processInput(button: Button): boolean {
@@ -711,6 +852,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
   }
 
   clear() {
+    this.stopDisplay();
     super.clear();
 
     this.moveInfoOverlay.clear();
@@ -731,7 +873,11 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     /* Normally already called just after the shop, but not sure if it happens in 100% of cases */
     globalScene.getModifierBar().updateModifiers(globalScene.modifiers);
 
+    const displayId = this.displayId;
     const options = this.options.concat(this.shopOptionsRows.flat());
+    for (const option of options) {
+      this.retiringOptions.add(option);
+    }
     this.options.splice(0, this.options.length);
     this.shopOptionsRows.splice(0, this.shopOptionsRows.length);
 
@@ -743,6 +889,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
       onComplete: () => {
         options.forEach(o => {
           o.destroy();
+          this.retiringOptions.delete(o);
         });
       },
     });
@@ -761,6 +908,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
           duration: 250,
           ease: "Cubic.easeIn",
           onComplete: () => {
+            if (displayId !== this.displayId) {
+              return;
+            }
             if (this.options.length === 0) {
               container.setVisible(false);
             } else {
@@ -781,6 +931,33 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 }
 
 class ModifierOption extends Phaser.GameObjects.Container {
+  private revealTimer: Phaser.Time.TimerEvent | undefined;
+  private bounceTween?: Phaser.Tweens.Tween;
+  private stopped = false;
+
+  getPointerArea(count: number) {
+    const width = Math.min(globalScene.scaledCanvas.width / (count + 2), 70);
+    return { x: this.x - width / 2, y: this.y - 12, width, height: this.modifierTypeOption.cost ? 33 : 30 };
+  }
+
+  stopAnimation(): void {
+    if (!this.scene) {
+      return;
+    }
+    this.stopped = true;
+    this.revealTimer?.remove(false);
+    this.revealTimer = undefined;
+    this.bounceTween?.remove();
+    for (const object of [this, ...this.getAll(), ...this.itemContainer.getAll()]) {
+      globalScene.tweens.killTweensOf(object);
+    }
+  }
+
+  override destroy(fromScene?: boolean): void {
+    this.stopAnimation();
+    super.destroy(fromScene);
+  }
+
   public modifierTypeOption: ModifierTypeOption;
   private pb: Phaser.GameObjects.Sprite;
   private pbTint: Phaser.GameObjects.Sprite;
@@ -898,7 +1075,7 @@ class ModifierOption extends Phaser.GameObjects.Container {
       let bounceCount = 0;
       let bounce = false;
 
-      globalScene.tweens.addCounter({
+      this.bounceTween = globalScene.tweens.addCounter({
         from: 1,
         to: 0,
         duration: 1250,
@@ -960,7 +1137,12 @@ class ModifierOption extends Phaser.GameObjects.Container {
     }
 
     const finalPromises: Promise<void>[] = [];
-    globalScene.time.delayedCall(remainingDuration + 2000, () => {
+    const { promise: revealPromise, resolve: resolveReveal } = Promise.withResolvers<void>();
+    this.revealTimer = globalScene.time.delayedCall(remainingDuration + 2000, () => {
+      if (this.stopped) {
+        resolveReveal();
+        return;
+      }
       if (isReward) {
         this.pb.setTexture("pb", `${this.getPbAtlasKey(0)}_open`);
         audioManager.playSound("se/pb_rel");
@@ -973,7 +1155,11 @@ class ModifierOption extends Phaser.GameObjects.Container {
           ease: "Sine.easeIn",
           alpha: 0,
           onComplete: () => {
-            Promise.allSettled(animPromises).then(() => this.pb.destroy());
+            Promise.allSettled(animPromises).then(() => {
+              if (!this.stopped) {
+                this.pb.destroy();
+              }
+            });
             pbResolve();
           },
         });
@@ -1038,10 +1224,10 @@ class ModifierOption extends Phaser.GameObjects.Container {
         });
         finalPromises.push(itemCostPromise);
       }
+      Promise.allSettled(finalPromises).then(() => resolveReveal());
     });
     // The `.then` suppresses the return type for the Promise.allSettled so that it returns void.
-    // TODO `finalPromises` is empty when it's spread here, so it isn't respected
-    promiseHolder.push(Promise.allSettled([...animPromises, ...finalPromises]).then());
+    promiseHolder.push(Promise.allSettled([...animPromises, revealPromise]).then(() => {}));
 
     await Promise.allSettled(animPromises);
   }

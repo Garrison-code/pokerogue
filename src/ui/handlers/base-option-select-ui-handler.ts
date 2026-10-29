@@ -37,6 +37,13 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   private options: (UIOptionSelectItem & T)[] = [];
   private maxOptions: number;
 
+  private displayGeneration = 0;
+
+  /** Internal lifetime token for async work initiated by a menu option. */
+  public get displayToken(): number {
+    return this.displayGeneration;
+  }
+
   private repeatInput = false;
   private maxIconWidth = 0;
 
@@ -44,11 +51,32 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   private inputDelayTimer: Phaser.Time.TimerEvent | null = null;
 
   protected get supportsPointerInput(): boolean {
-    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT, UiMode.TITLE].includes(this.mode);
+    return [
+      UiMode.OPTION_SELECT,
+      UiMode.CONFIRM,
+      UiMode.MENU_OPTION_SELECT,
+      UiMode.TITLE,
+      UiMode.MENU,
+      UiMode.AUTO_COMPLETE,
+    ].includes(this.mode);
   }
 
   private get supportsPointerCancel(): boolean {
-    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT].includes(this.mode);
+    return [
+      UiMode.OPTION_SELECT,
+      UiMode.CONFIRM,
+      UiMode.MENU_OPTION_SELECT,
+      UiMode.MENU,
+      UiMode.AUTO_COMPLETE,
+    ].includes(this.mode);
+  }
+
+  protected get pointerConfirmButton(): Button {
+    return Button.ACTION;
+  }
+
+  protected get canSelectWithPointer(): boolean {
+    return true;
   }
 
   protected fullyInitialized: boolean;
@@ -116,6 +144,7 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
       return false;
     }
 
+    ++this.displayGeneration;
     super.show(args);
 
     this.resetInputDelay();
@@ -435,7 +464,12 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
       this.processPointerCancel(pointer);
       return;
     }
-    if (!pointer.leftButtonDown() || pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
+    if (
+      !pointer.leftButtonDown()
+      || pointer.wasTouch
+      || !this.canSelectWithPointer
+      || !this.getUi().canProcessPointerInput(this)
+    ) {
       return;
     }
     const index = this.scrollCursor + row;
@@ -443,7 +477,7 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
       return;
     }
     if (index === this.cursor + this.scrollCursor) {
-      this.getUi().processInput(Button.ACTION);
+      this.getUi().processInput(this.pointerConfirmButton);
     } else if (this.setCursor(row)) {
       this.getUi().playSelect();
     }
@@ -471,14 +505,14 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   }
 
   private onPointerWheel(
-    _pointer: Phaser.Input.Pointer,
+    pointer: Phaser.Input.Pointer,
     _deltaX: number,
     deltaY: number,
     _deltaZ: number,
     event: Phaser.Types.Input.EventData,
   ): void {
     event.stopPropagation();
-    if (!deltaY || !this.getUi().canProcessPointerInput(this)) {
+    if (pointer.wasTouch || !deltaY || !this.canSelectWithPointer || !this.getUi().canProcessPointerInput(this)) {
       return;
     }
 
@@ -685,6 +719,7 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   }
 
   public override clear(): void {
+    ++this.displayGeneration;
     super.clear();
 
     this.clearPointerTargets();

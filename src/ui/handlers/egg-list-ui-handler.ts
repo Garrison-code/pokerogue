@@ -8,9 +8,12 @@ import { ScrollBar } from "#ui/scroll-bar";
 import { ScrollableGridHelper } from "#ui/scrollable-grid-helper";
 import { addTextObject } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import i18next from "i18next";
 
 export class EggListUiHandler extends MessageUiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
+
   private readonly ROWS = 9;
   private readonly COLUMNS = 11;
 
@@ -60,6 +63,7 @@ export class EggListUiHandler extends MessageUiHandler {
     const scrollBar = new ScrollBar(310, 5, 4, 170, this.ROWS);
 
     this.scrollGridHandler = new ScrollableGridHelper(this, this.ROWS, this.COLUMNS)
+      .withPointerSelection(visible => this.cursorObj.setVisible(visible))
       .withScrollBar(scrollBar)
       .withUpdateGridCallBack(() => this.updateEggIcons())
       .withUpdateSingleElementCallback((i: number) => this.setEggDetails(i));
@@ -95,6 +99,10 @@ export class EggListUiHandler extends MessageUiHandler {
   override show(args: any[]): boolean {
     super.show(args);
 
+    this.pointerTargets?.destroy();
+    this.eggListIconContainer.removeAll(true);
+    this.iconAnimHandler.removeAll();
+    this.cursor = -1;
     this.initEggIcons();
 
     this.getUi().bringToTop(this.eggListContainer);
@@ -104,7 +112,47 @@ export class EggListUiHandler extends MessageUiHandler {
     this.scrollGridHandler.setTotalElements(globalScene.gameData.eggs.length);
 
     this.updateEggIcons();
-    this.setCursor(0);
+    if (this.eggIcons.length > 0) {
+      this.scrollGridHandler.selectIndex(0);
+    } else {
+      this.cursorObj.setVisible(false);
+      this.eggSprite.setVisible(false);
+      for (const text of [this.eggNameText, this.eggDateText, this.eggHatchWavesText, this.eggGachaInfoText]) {
+        text.setText("");
+      }
+    }
+    this.pointerTargets = new UiPointerTargets(this);
+    const page = this.pointerTargets.add(this.eggListContainer, "egg-list-page", () => ({
+      x: 0,
+      y: 0,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height,
+    }));
+    this.eggListContainer.moveTo(page, 1);
+    const wheel = (direction: number) => this.scrollGridHandler.scrollByPointer(direction);
+    this.pointerTargets.add(
+      this.eggListIconContainer,
+      "egg-list-grid",
+      () => ({ x: -3, y: 0, width: 198, height: 162 }),
+      undefined,
+      wheel,
+    );
+    this.eggIcons.forEach((_icon, i) =>
+      this.pointerTargets!.add(
+        this.eggListIconContainer,
+        `egg-list-cell-${i}`,
+        () =>
+          i + this.scrollGridHandler.getItemOffset() < globalScene.gameData.eggs.length
+            ? { x: (i % this.COLUMNS) * 18 - 3, y: Math.floor(i / this.COLUMNS) * 18, width: 18, height: 18 }
+            : null,
+        () => {
+          if (this.scrollGridHandler.selectIndex(i + this.scrollGridHandler.getItemOffset())) {
+            this.getUi().playSelect();
+          }
+        },
+        wheel,
+      ),
+    );
 
     return true;
   }
@@ -133,9 +181,12 @@ export class EggListUiHandler extends MessageUiHandler {
     const indexOffset = this.scrollGridHandler.getItemOffset();
     const eggsToShow = Math.min(this.eggIcons.length, globalScene.gameData.eggs.length - indexOffset);
     this.eggIcons.forEach((icon, i) => {
-      if (i !== this.cursor) {
-        this.iconAnimHandler.addOrUpdate(icon, PokemonIconAnimMode.NONE);
-      }
+      this.iconAnimHandler.addOrUpdate(
+        icon,
+        i + indexOffset === this.scrollGridHandler.getSelectedIndex()
+          ? PokemonIconAnimMode.ACTIVE
+          : PokemonIconAnimMode.NONE,
+      );
       if (i < eggsToShow) {
         const egg = globalScene.gameData.eggs[i + indexOffset];
         icon.setFrame(egg.getKey()).setVisible(true);
@@ -151,6 +202,10 @@ export class EggListUiHandler extends MessageUiHandler {
    */
   private setEggDetails(index: number): void {
     const egg = globalScene.gameData.eggs[index];
+    if (!egg) {
+      return;
+    }
+    this.eggSprite.setVisible(true);
     this.eggSprite.setFrame(`egg_${egg.getKey()}`);
     this.eggNameText.setText(`${i18next.t("egg:egg")} (${egg.getEggDescriptor()})`);
     this.eggDateText.setText(
@@ -185,6 +240,9 @@ export class EggListUiHandler extends MessageUiHandler {
   }
 
   setCursor(cursor: number): boolean {
+    if (cursor < 0 || !this.eggIcons[cursor]) {
+      return false;
+    }
     let changed = false;
 
     const lastCursor = this.cursor;
@@ -206,7 +264,15 @@ export class EggListUiHandler extends MessageUiHandler {
     return changed;
   }
 
+  override destroy(): void {
+    this.clear();
+    this.eggListContainer.destroy();
+    super.destroy();
+  }
+
   clear(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
     super.clear();
     this.scrollGridHandler.reset();
     this.cursor = -1;

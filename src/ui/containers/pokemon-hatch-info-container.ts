@@ -19,6 +19,7 @@ import { PokemonInfoContainer } from "./pokemon-info-container";
  * Holds an info container as well as an additional egg sprite, name, egg moves and main sprite
  */
 export class PokemonHatchInfoContainer extends PokemonInfoContainer {
+  private displayId = 0;
   private currentPokemonSprite: Phaser.GameObjects.Sprite;
   private pokemonNumberText: Phaser.GameObjects.Text;
   private pokemonNameText: Phaser.GameObjects.Text;
@@ -121,6 +122,7 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
    * Disable the sprite (and replace with substitute)
    */
   hideDisplayPokemon() {
+    this.displayId++;
     this.currentPokemonSprite.setVisible(false);
   }
 
@@ -129,6 +131,7 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
    * assumes the specific pokemon sprite has already been loaded
    */
   displayPokemon(pokemon: PlayerPokemon) {
+    const displayId = ++this.displayId;
     const species = pokemon.species;
     const female = pokemon.gender === Gender.FEMALE;
     const formIndex = pokemon.formIndex;
@@ -136,6 +139,9 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
     const variant = pokemon.variant;
     this.currentPokemonSprite.setVisible(false);
     species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
+      if (displayId !== this.displayId || !this.currentPokemonSprite.scene) {
+        return;
+      }
       speciesDataRegistry.getPokemonSpeciesForm(species.speciesId, pokemon.formIndex).cry();
       this.currentPokemonSprite.play(species.getSpriteKey(female, formIndex, shiny, variant));
       this.currentPokemonSprite.setPipelineData("shiny", shiny);

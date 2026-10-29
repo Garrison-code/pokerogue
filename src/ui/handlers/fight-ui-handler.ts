@@ -17,12 +17,14 @@ import type { CommandPhase } from "#phases/command-phase";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject, getTextColor } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
+import { UiPointerTargets } from "#ui/ui-pointer-targets";
 import { fixedInt, getLocalizedSpriteKey, padInt } from "#utils/common";
 import i18next from "i18next";
 
 export class FightUiHandler extends UiHandler implements InfoToggle {
   public static readonly MOVES_CONTAINER_NAME = "moves";
 
+  private pointerTargets: UiPointerTargets | null = null;
   private movesContainer: Phaser.GameObjects.Container;
   private moveInfoContainer: Phaser.GameObjects.Container;
   private typeIcon: Phaser.GameObjects.Sprite;
@@ -137,7 +139,49 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     this.displayMoves();
     this.toggleInfo(false); // in case cancel was pressed while info toggle is active
     this.active = true;
+    this.createPointerTargets();
     return true;
+  }
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const ui = this.getUi();
+    const background = targets.add(ui, "fight-panel", () => ({
+      x: 0,
+      y: -49,
+      width: globalScene.scaledCanvas.width,
+      height: 49,
+    }));
+    ui.moveBelow<Phaser.GameObjects.GameObject>(background, this.movesContainer);
+    for (let index = 0; index < 4; index++) {
+      targets.add(
+        this.movesContainer,
+        `fight-${index}`,
+        () =>
+          this.movesContainer.visible
+            ? { x: -5 + (index % 2) * 114, y: -2 + Math.floor(index / 2) * 16, width: 114, height: 16 }
+            : null,
+        () => {
+          const pokemon = (globalScene.phaseManager.getCurrentPhase() as CommandPhase).getPokemon();
+          if (index >= pokemon.getMoveset().length) {
+            return;
+          }
+          if (index === this.getCursor()) {
+            ui.processInput(Button.ACTION);
+          } else if (this.setCursor(index)) {
+            ui.playSelect();
+          }
+        },
+      );
+    }
+  }
+
+  override destroy(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
+    super.destroy();
   }
 
   /**
@@ -406,6 +450,8 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   }
 
   clear() {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
     super.clear();
     const messageHandler = this.getUi().getMessageHandler();
     this.clearMoves();
