@@ -1,4 +1,8 @@
+import { eventBus } from "#app/event-bus";
+import { settings } from "#app/global-settings-manager";
 import { PokemonType } from "#enums/pokemon-type";
+import { UiTheme } from "#enums/ui-theme";
+import { UiWindowStyle } from "#enums/ui-window-style";
 import { createTypeChartPanel } from "#ui/type-chart-panel";
 import i18next from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,11 +12,15 @@ describe("UI - Type chart panel", () => {
   let container: HTMLDivElement;
   let focus: ReturnType<typeof vi.fn<() => void>>;
   let resize: ReturnType<typeof vi.fn<(width: number, height: number) => void>>;
+  let originalTheme: UiTheme;
+  let originalWindowStyle: UiWindowStyle;
   const element = <T extends HTMLElement>(selector: string) => container.querySelector<T>(selector)!;
   const choice = (type: PokemonType) => element<HTMLButtonElement>(`[data-type="${type}"]`);
   const toggle = () => element<HTMLButtonElement>(".game-tools button");
 
   beforeEach(async () => {
+    originalTheme = settings.display.uiTheme;
+    originalWindowStyle = settings.display.uiWindowStyle;
     await i18next.changeLanguage("en");
     vi.stubGlobal(
       "ResizeObserver",
@@ -31,8 +39,57 @@ describe("UI - Type chart panel", () => {
 
   afterEach(() => {
     panel.destroy();
+    settings.display.uiTheme = originalTheme;
+    settings.display.uiWindowStyle = originalWindowStyle;
     container.remove();
     vi.unstubAllGlobals();
+  });
+
+  it.each([UiTheme.DEFAULT, UiTheme.LEGACY])("initializes theme %s from settings without touch controls", theme => {
+    panel.destroy();
+    settings.display.uiTheme = theme;
+    settings.display.uiWindowStyle = UiWindowStyle.TEAL;
+    panel = createTypeChartPanel({ onToolFocus: focus, onResize: resize });
+    const layout = element("#game-layout");
+    const legacy = theme === UiTheme.LEGACY;
+    expect(layout.dataset.theme).toBe(legacy ? "legacy" : "default");
+    expect(layout.style.getPropertyValue("--chart-window")).toContain(
+      `images/ui/${legacy ? "legacy/" : ""}windows/window_2.png`,
+    );
+    expect(layout.style.getPropertyValue("--chart-window-slice")).toBe(legacy ? "6" : "8");
+    expect(layout.style.getPropertyValue("--chart-text")).toBe(legacy ? "#484848" : "#f8f8f8");
+  });
+
+  it("follows display setting changes without losing the query", () => {
+    toggle().click();
+    choice(PokemonType.WATER).click();
+    for (const theme of [UiTheme.DEFAULT, UiTheme.LEGACY]) {
+      settings.display.uiTheme = theme;
+      eventBus.emit("settings/update/success", { category: "display", key: "uiTheme", value: theme });
+      for (const style of Object.values(UiWindowStyle)) {
+        settings.display.uiWindowStyle = style;
+        eventBus.emit("settings/update/success", { category: "display", key: "uiWindowStyle", value: style });
+        expect(element("#game-layout").style.getPropertyValue("--chart-window")).toContain(
+          `images/ui/${theme === UiTheme.LEGACY ? "legacy/" : ""}windows/window_${style}.png`,
+        );
+        expect(choice(PokemonType.WATER).getAttribute("aria-pressed")).toBe("true");
+        expect(element("aside").hidden).toBe(false);
+      }
+    }
+  });
+
+  it("removes its settings listener on destroy", () => {
+    const layout = element("#game-layout");
+    const originalStyles = layout.getAttribute("style");
+    const count = eventBus.listenerCount("settings/update/success");
+    panel.destroy();
+    expect(eventBus.listenerCount("settings/update/success")).toBe(count - 1);
+    settings.display.uiWindowStyle = UiWindowStyle.TEAL;
+    eventBus.emit("settings/update/success", { category: "display", key: "uiWindowStyle", value: UiWindowStyle.TEAL });
+    expect(layout.getAttribute("style")).toBe(originalStyles);
+    // Recreate so the shared cleanup still exercises a live instance.
+    panel = createTypeChartPanel({ onToolFocus: focus, onResize: resize });
+    expect(eventBus.listenerCount("settings/update/success")).toBe(count);
   });
 
   it("keeps the game and controls, opens and closes, and retains the query", () => {
