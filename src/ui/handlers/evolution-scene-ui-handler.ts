@@ -4,6 +4,7 @@ import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { addTextObject } from "#ui/text";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 
 export class EvolutionSceneUiHandler extends MessageUiHandler {
   public evolutionContainer: Phaser.GameObjects.Container;
@@ -11,6 +12,10 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
   public messageContainer: Phaser.GameObjects.Container;
   public canCancel: boolean;
   public cancelled: boolean;
+  private pointerTargets: UiPointerTargets | undefined;
+  private pointerPromptReady = false;
+  private promptTimer: Phaser.Time.TimerEvent | null = null;
+  private promptDelay: number | null | undefined;
 
   setup() {
     this.canCancel = false;
@@ -51,7 +56,88 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
     globalScene.ui.bringToTop(this.messageBg.setVisible(true));
     globalScene.ui.bringToTop(this.messageContainer.setVisible(true));
 
+    this.pointerTargets?.destroy();
+    const targets = (this.pointerTargets = new UiPointerTargets(this));
+    const ui = this.getUi();
+    targets.add(ui, "evolution-page", () => ({
+      x: 0,
+      y: -globalScene.scaledCanvas.height,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height,
+    }));
+    targets.add(
+      ui,
+      "evolution-message",
+      () =>
+        this.messageBg.visible
+          ? {
+              x: this.messageBg.x,
+              y: this.messageBg.y - this.messageBg.displayHeight,
+              width: this.messageBg.displayWidth,
+              height: this.messageBg.displayHeight,
+            }
+          : null,
+      () => {
+        if (!this.pointerPromptReady || this.pendingPrompt || !this.awaitingActionInput || !this.onActionInput) {
+          return;
+        }
+        this.pointerPromptReady = false;
+        ui.processInput(Button.ACTION);
+      },
+    );
+
     return true;
+  }
+
+  override showText(...args: Parameters<MessageUiHandler["showText"]>): void {
+    this.pointerPromptReady = false;
+    this.promptTimer?.remove(false);
+    this.promptTimer = null;
+    const [text, delay, callback, callbackDelay, prompt, promptDelay] = args;
+    this.promptDelay = promptDelay;
+    // Own the prompt delay so clearing or replacing a message cannot revive an old prompt.
+    super.showText(text, delay, callback, callbackDelay, prompt, null);
+  }
+
+  override showPrompt(callback?: (() => void) | null, callbackDelay?: number | null): void {
+    if (this.promptDelay) {
+      this.promptTimer = globalScene.time.delayedCall(this.promptDelay, () => {
+        this.promptTimer = null;
+        super.showPrompt(callback, callbackDelay);
+        this.pointerPromptReady = true;
+      });
+    } else {
+      super.showPrompt(callback, callbackDelay);
+      this.pointerPromptReady = true;
+    }
+  }
+
+  override clearText(): void {
+    this.promptTimer?.remove(false);
+    this.promptTimer = null;
+    this.pointerPromptReady = false;
+    super.clearText();
+  }
+
+  private stopInput(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    this.promptTimer?.remove(false);
+    this.promptTimer = null;
+    this.textTimer?.remove(false);
+    this.textTimer = null;
+    this.textCallbackTimer?.remove(false);
+    this.textCallbackTimer = null;
+    this.awaitingActionInput = false;
+    this.onActionInput = null;
+    this.pointerPromptReady = false;
+    this.pendingPrompt = false;
+    this.prompt.setVisible(false);
+  }
+
+  override destroy(): void {
+    this.stopInput();
+    this.active = false;
   }
 
   processInput(button: Button): boolean {
@@ -77,6 +163,8 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
   }
 
   clear() {
+    this.stopInput();
+    super.clear();
     this.clearText();
     this.canCancel = false;
     this.cancelled = false;
