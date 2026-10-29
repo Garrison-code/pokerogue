@@ -12,6 +12,7 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ScrollBar } from "#ui/scroll-bar";
 import { addTextObject } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import i18next from "i18next";
 
 const Page = {
@@ -29,6 +30,78 @@ const languageSettings: { [key: string]: LanguageSetting } = {
 };
 
 export class AchvsUiHandler extends MessageUiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
+  private pointerSelected = 0;
+  private preservingSelection = false;
+
+  private scrollPointer(direction: number): void {
+    const max = Math.max(0, Math.ceil(this.currentTotal / this.COLS) - this.ROWS);
+    const next = Phaser.Math.Clamp(this.scrollCursor + direction, 0, max);
+    if (next === this.scrollCursor) {
+      return;
+    }
+    const selected = this.pointerSelected;
+    this.preservingSelection = true;
+    this.cursor = Math.max(0, Math.min(this.ROWS * this.COLS - 1, selected - next * this.COLS));
+    this.setScrollCursor(next);
+    this.cursor = selected - next * this.COLS;
+    const visible = this.cursor >= 0 && this.cursor < this.ROWS * this.COLS;
+    if (visible) {
+      this.setCursor(this.cursor);
+    }
+    this.cursorObj?.setVisible(visible);
+    if (this.currentPage === Page.ACHIEVEMENTS) {
+      this.showAchv(achvs[Object.keys(achvs)[selected]]);
+    } else {
+      this.showVoucher(vouchers[Object.keys(vouchers)[selected]]);
+    }
+    this.preservingSelection = false;
+  }
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const page = targets.add(this.mainContainer, "achievements-page", () => ({ x: 0, y: 0, width: 318, height: 178 }));
+    this.mainContainer.moveTo(page, 1);
+    targets.add(
+      this.mainContainer,
+      "achievements-switch",
+      () => ({
+        x: this.headerActionButton.x,
+        y: 0,
+        width: this.headerActionText.x + this.headerActionText.displayWidth - this.headerActionButton.x,
+        height: 24,
+      }),
+      () => this.getUi().processInput(Button.ACTION),
+    );
+    const wheel = (direction: number) => this.scrollPointer(direction);
+    targets.add(
+      this.iconsContainer,
+      "achievements-grid",
+      () => ({ x: 0, y: 0, width: this.COLS * 17, height: this.ROWS * 19 }),
+      undefined,
+      wheel,
+    );
+    this.icons.forEach((icon, i) =>
+      targets.add(
+        this.iconsContainer,
+        `achievements-cell-${i}`,
+        () =>
+          i + this.scrollCursor * this.COLS < this.currentTotal
+            ? { x: icon.x, y: icon.y, width: 17, height: 19 }
+            : null,
+        () => {
+          if (this.setCursor(i)) {
+            this.getUi().playSelect();
+          }
+          this.cursorObj?.setVisible(true);
+        },
+        wheel,
+      ),
+    );
+  }
+
   private readonly ROWS = 4;
   private readonly COLS = 18;
 
@@ -186,6 +259,7 @@ export class AchvsUiHandler extends MessageUiHandler {
     this.getUi().moveTo(this.mainContainer, this.getUi().length - 1);
 
     this.getUi().hideTooltip();
+    this.createPointerTargets();
 
     return true;
   }
@@ -309,6 +383,22 @@ export class AchvsUiHandler extends MessageUiHandler {
    * @returns Whether an action was successfully processed
    */
   processInput(button: Button): boolean {
+    if (
+      [Button.UP, Button.DOWN, Button.LEFT, Button.RIGHT].includes(button)
+      && (this.cursor < 0 || this.cursor >= this.ROWS * this.COLS)
+    ) {
+      const index = this.pointerSelected;
+      const scroll = Math.max(
+        0,
+        Math.min(Math.floor(index / this.COLS), Math.ceil(this.currentTotal / this.COLS) - this.ROWS),
+      );
+      this.preservingSelection = true;
+      this.cursor = index - scroll * this.COLS;
+      this.setScrollCursor(scroll);
+      this.preservingSelection = false;
+      this.setCursor(this.cursor);
+      this.cursorObj?.setVisible(true);
+    }
     let success = false;
 
     switch (button) {
@@ -343,6 +433,9 @@ export class AchvsUiHandler extends MessageUiHandler {
   // #endregion Input Processing
 
   setCursor(cursor: number, pageChange?: boolean): boolean {
+    if (!this.preservingSelection) {
+      this.pointerSelected = cursor + this.scrollCursor * this.COLS;
+    }
     const ret = super.setCursor(cursor);
 
     let update = ret;
@@ -502,7 +595,15 @@ export class AchvsUiHandler extends MessageUiHandler {
     );
   }
 
+  override destroy(): void {
+    this.clear();
+    this.mainContainer.destroy();
+    super.destroy();
+  }
+
   clear() {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
     super.clear();
     this.currentPage = Page.ACHIEVEMENTS;
     this.mainContainer.setVisible(false);
