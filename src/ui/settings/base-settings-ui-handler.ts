@@ -24,7 +24,7 @@ export class BaseSettingsUiHandler extends MessageUiHandler {
   protected pointerBlocked = false;
 
   protected get supportsSettingsPointer(): boolean {
-    return this.category === "general";
+    return ["general", "display"].includes(this.category);
   }
 
   private settingsContainer: Phaser.GameObjects.Container;

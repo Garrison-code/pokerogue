@@ -7,7 +7,7 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-describe.each([UiMode.SETTINGS_GENERAL])("UI - settings mouse controls %i", mode => {
+describe.each([UiMode.SETTINGS_GENERAL, UiMode.SETTINGS_DISPLAY])("UI - settings mouse controls %i", mode => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let handler: BaseSettingsUiHandler;
@@ -45,19 +45,41 @@ describe.each([UiMode.SETTINGS_GENERAL])("UI - settings mouse controls %i", mode
   }
   it("selects an unselected row first, then applies the clicked value once", () => {
     const save = vi.spyOn(settings, "update").mockImplementation(() => {});
-    const value = (handler["optionCursors"][1] + 1) % handler["uiItems"][1].options.length;
-    click(`settings-value-1-${value}`);
-    expect(handler.getCursor()).toBe(1);
+    const index = mode === UiMode.SETTINGS_DISPLAY ? 2 : 1;
+    const value = (handler["optionCursors"][index] + 1) % handler["uiItems"][index].options.length;
+    click(`settings-value-${index}-${value}`);
+    expect(handler.getCursor()).toBe(index);
     expect(save).not.toHaveBeenCalled();
-    click(`settings-value-1-${value}`);
+    click(`settings-value-${index}-${value}`);
     expect(save).toHaveBeenCalledExactlyOnceWith(
       handler["category"],
-      handler["uiItems"][1].key,
-      handler["uiItems"][1].options[value].value,
+      handler["uiItems"][index].key,
+      handler["uiItems"][index].options[value].value,
     );
-    click(`settings-value-1-${value}`);
+    click(`settings-value-${index}-${value}`);
     expect(save).toHaveBeenCalledOnce();
   });
+  if (mode === UiMode.SETTINGS_DISPLAY) {
+    it("opens and cancels the original language submenu without saving a preference", async () => {
+      const save = vi.spyOn(settings, "update").mockImplementation(() => {});
+      click("settings-value-0-1");
+      await vi.waitFor(() => expect(game.scene.ui.mode).toBe(UiMode.OPTION_SELECT));
+      click("settings-row-1");
+      expect(handler.getCursor()).toBe(0);
+      game.scene.ui.processInput(Button.CANCEL);
+      await vi.waitFor(() => expect(game.scene.ui.mode).toBe(UiMode.SETTINGS_DISPLAY));
+      expect(handler["optionCursors"][0]).toBe(0);
+      expect(save).not.toHaveBeenCalled();
+    });
+    it("retains the existing reload path for a theme change", () => {
+      const reload = vi.spyOn(settings, "updateAndReload").mockImplementation(() => {});
+      const value = handler["optionCursors"][1] ? 0 : 1;
+      click(`settings-value-1-${value}`);
+      expect(reload).not.toHaveBeenCalled();
+      click(`settings-value-1-${value}`);
+      expect(reload).toHaveBeenCalledExactlyOnceWith("display", "uiTheme", handler["uiItems"][1].options[value].value);
+    });
+  }
   it("row labels and whitespace select without applying or confirming", () => {
     const action = vi.spyOn(handler, "processInput");
     click("settings-row-2");
@@ -98,7 +120,9 @@ describe.each([UiMode.SETTINGS_GENERAL])("UI - settings mouse controls %i", mode
     const item = handler["uiItems"][index];
     const old = item.options[value];
     item.options[value] = { ...old, requiresConfirmation: true };
-    const save = vi.spyOn(handler, "handleSaveSetting").mockImplementation(() => {});
+    const save = vi
+      .spyOn(handler as unknown as { handleSaveSetting: (item: unknown, value: unknown) => void }, "handleSaveSetting")
+      .mockImplementation(() => {});
     vi.spyOn(game.scene.ui, "showText").mockImplementation((_text, _delay, callback) => callback?.());
     try {
       click(`settings-value-${index}-${value}`);
@@ -134,7 +158,7 @@ describe.each([UiMode.SETTINGS_GENERAL])("UI - settings mouse controls %i", mode
     expect(input.mock.calls).toEqual([[Button.ACTION], [Button.CANCEL]]);
   });
   it("switches tabs immediately through the opt-in TabMenu", () => {
-    const setMode = vi.spyOn(game.scene.ui, "setMode").mockResolvedValue(true);
+    const setMode = vi.spyOn(game.scene.ui, "setMode").mockResolvedValue(undefined);
     handler["tabMenu"]["pointerZones"][2].emit("pointerdown", pointer, 0, 0, { stopPropagation: vi.fn() });
     expect(setMode).toHaveBeenCalledExactlyOnceWith(UiMode.SETTINGS_AUDIO);
   });
