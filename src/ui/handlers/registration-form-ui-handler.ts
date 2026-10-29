@@ -5,6 +5,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { LoginPhase } from "#phases/login-phase";
 import type { ModalConfig } from "#types/ui-types";
 import type { InputFieldConfig } from "#ui/form-modal-ui-handler";
+import type { LoadingModalUiHandler } from "#ui/loading-modal-ui-handler";
 import { LoginRegisterInfoContainerUiHandler } from "#ui/login-register-info-container-ui-handler";
 import { addTextObject } from "#ui/text";
 import { fixedInt } from "#utils/common";
@@ -19,6 +20,24 @@ const ERR_FAILED_TO_GENERATE_UUID = "failed to generate uuid";
 const ERR_FAILED_TO_GENERATE_PASSWORD = "failed to generate salt";
 
 export class RegistrationFormUiHandler extends LoginRegisterInfoContainerUiHandler {
+  private retryTimer: Phaser.Time.TimerEvent | undefined;
+
+  protected override get pointerFormEnabled(): boolean {
+    return true;
+  }
+
+  override clear(): void {
+    this.retryTimer?.remove();
+    this.retryTimer = undefined;
+    super.clear();
+  }
+
+  override destroy(): void {
+    this.retryTimer?.remove();
+    this.retryTimer = undefined;
+    super.destroy();
+  }
+
   public override getModalTitle(): string {
     return i18next.t("menu:register");
   }
@@ -87,6 +106,8 @@ export class RegistrationFormUiHandler extends LoginRegisterInfoContainerUiHandl
   }
 
   public override show(args: [ModalConfig, ...any[]]): boolean {
+    this.retryTimer?.remove();
+    this.retryTimer = undefined;
     if (!super.show(args)) {
       return false;
     }
@@ -95,56 +116,70 @@ export class RegistrationFormUiHandler extends LoginRegisterInfoContainerUiHandl
     this.showInfoContainer(config);
 
     const originalRegistrationAction = this.submitAction;
-    this.submitAction = () => {
-      if (globalScene.tweens.getTweensOf(this.modalContainer).length === 0) {
-        // Prevent overlapping overrides on action modification
-        this.submitAction = originalRegistrationAction;
-        this.sanitizeInputs();
-        globalScene.ui.setMode(UiMode.LOADING, { buttonActions: [] });
-        const onFail = (error: string) => {
-          globalScene.ui.setMode(UiMode.REGISTRATION_FORM, Object.assign(config, { errorMessage: error?.trim() }));
-          globalScene.ui.playError();
-        };
-        if (!this.inputs[0].text) {
-          return onFail(i18next.t("menu:emptyUsername"));
+    this.submitAction = async () => {
+      this.sanitizeInputs();
+      const username = this.inputs[0].text;
+      const password = this.inputs[1].text;
+      const confirmPassword = this.inputs[2].text;
+      const current = await this.beginLoadingOperation();
+      const onFail = (error: string) => {
+        if (!current()) {
+          return;
         }
-        if (!this.inputs[1].text) {
-          return onFail(this.getReadableErrorMessage("invalid password"));
+        globalScene.ui.setMode(UiMode.REGISTRATION_FORM, { ...config, errorMessage: error?.trim() });
+        globalScene.ui.playError();
+      };
+      if (!current()) {
+        return;
+      }
+      if (!username) {
+        onFail(i18next.t("menu:emptyUsername"));
+        return;
+      }
+      if (!password) {
+        onFail(this.getReadableErrorMessage("invalid password"));
+        return;
+      }
+      if (password !== confirmPassword) {
+        onFail(i18next.t("menu:passwordNotMatchingConfirmPassword"));
+        return;
+      }
+      const login = async (retry: boolean) => {
+        if (!current()) {
+          return;
         }
-        if (this.inputs[1].text !== this.inputs[2].text) {
-          return onFail(i18next.t("menu:passwordNotMatchingConfirmPassword"));
+        try {
+          const error = await pokerogueApi.account.login({ username, password });
+          if (!current()) {
+            return;
+          }
+          if (!error) {
+            originalRegistrationAction?.();
+          } else if (retry) {
+            (globalScene.phaseManager.getCurrentPhase() as LoginPhase).goToLogin();
+          } else {
+            const loading = this.getUi().getHandler() as LoadingModalUiHandler;
+            this.retryTimer = loading.addOperationTimer(fixedInt(2000), () => {
+              this.retryTimer = undefined;
+              void login(true);
+            });
+          }
+        } catch (error) {
+          onFail(String(error));
         }
-        const [usernameInput, passwordInput] = this.inputs;
-        pokerogueApi.account
-          .register({
-            username: usernameInput.text,
-            password: passwordInput.text,
-          })
-          .then(registerError => {
-            if (registerError) {
-              onFail(registerError);
-            } else {
-              const username = usernameInput.text;
-              const password = passwordInput.text;
-              pokerogueApi.account.login({ username, password }).then(loginError => {
-                if (loginError) {
-                  // retry once if the first attempt fails
-                  const retryLogin = () => {
-                    pokerogueApi.account.login({ username, password }).then(error => {
-                      if (error) {
-                        (globalScene.phaseManager.getCurrentPhase() as LoginPhase).goToLogin();
-                      } else {
-                        originalRegistrationAction?.();
-                      }
-                    });
-                  };
-                  globalScene.time.delayedCall(fixedInt(2000), retryLogin);
-                } else {
-                  originalRegistrationAction?.();
-                }
-              });
-            }
-          });
+      };
+      try {
+        const error = await pokerogueApi.account.register({ username, password });
+        if (!current()) {
+          return;
+        }
+        if (error) {
+          onFail(error);
+        } else {
+          await login(false);
+        }
+      } catch (error) {
+        onFail(String(error));
       }
     };
 

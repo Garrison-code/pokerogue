@@ -23,9 +23,11 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
     const operationId = ++this.operationId;
     const scene = globalScene;
     const ui = this.getUi();
-    await ui.setMode(UiMode.LOADING, { buttonActions: [] });
+    // LOADING is a no-transition mode: capture its identity before yielding to another operation.
+    const shown = ui.setMode(UiMode.LOADING, { buttonActions: [] });
     const loading = ui.handlers[UiMode.LOADING] as LoadingModalUiHandler;
     const displayId = loading.displayId;
+    await shown;
     return () =>
       globalScene === scene
       && operationId === this.operationId

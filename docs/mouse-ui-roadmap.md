@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 42 項完成、12 項待辦；EX 項目與 UI-41 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 43 項完成、11 項待辦；EX 項目與 UI-41 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -291,7 +291,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - [x] **UI-41** 登入／註冊入口 — `LOGIN_OR_REGISTER`。
 - [x] **UI-42** 登入表單 — `LOGIN_FORM`。
-- [ ] **UI-43** 註冊表單 — `REGISTRATION_FORM`。
+- [x] **UI-43** 註冊表單 — `REGISTRATION_FORM`。
 - [ ] **UI-44** 修改密碼 — `CHANGE_PASSWORD_FORM`。
 - [ ] **EX-04** 第三方登入與帳號資訊／存檔下載區；`oauth-providers-ui-handler.ts`、`login-register-info-container-ui-handler.ts`，已有部分點擊。
 - [ ] **EX-05** 合併匯入資料視窗 — `src/ui/system-merge-dialog.ts`；包含檔案來源、預覽、移除、取消與確認，已有 DOM 操作。
@@ -313,7 +313,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-42；其餘 12 個項目保持待辦。所有 EX 與 UI-43 起仍待辦；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-43；其餘 11 個項目保持待辦。所有 EX 與 UI-44 起仍待辦；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -382,3 +382,5 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 | UI-41 | 2026-10-29 | `feat(ui): support mouse login entry` | 新增 10 項入口互動測試與搜尋／兩種命名 52 項回歸通過。Chromium default／legacy 實測登入／註冊獨立單擊、連點防重複、右鍵無作用與重開通過；沿用現有側欄層級，未擴充 EX-04。共用表單改為所有欄位 DOM 監聽與可覆寫按鈕分派，側欄監聽去重及動畫清理。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。使用替身入口，未操作真實帳號；未測實體裝置／OS IME。 |
 
 | UI-42 | 2026-10-29 | `feat(ui): support mouse account login` | 新增 17 項登入互動測試，連同入口共 27 項通過；涵蓋所有欄位取消／組字、單次提交、空帳號、錯誤重試及離頁／另一個 LOADING／銷毀後舊結果失效。Chromium default／legacy 實測原生帳密編輯、密碼遮罩、單擊提交與右鍵／Escape 返回通過。加入內部 LOADING 顯示身分與表單操作識別，正常進入等待不取消當次工作；OAuth 動畫生命週期清理，不擴充 EX-04。typecheck、build:dev、修改檔案 Biome、diff check 通過。全部登入使用替身 API／回呼，未測真實授權與實體裝置。 |
+
+| UI-43 | 2026-10-29 | `feat(ui): support mouse account registration` | 新增 22 項註冊互動測試，連同登入共 39 項通過；涵蓋三欄 DOM、確認密碼、註冊／登入舊結果、原兩秒重試一次與最終返回登入。重試由當次 LOADING 管理，清除／重開／銷毀移除計時器；共用工作在讓出執行前擷取等待身分。Chromium default／legacy 實測三欄編輯、密碼遮罩、單次註冊與右鍵／Escape 取消通過；首次重開測試曾動畫等待逾時，獨立重跑兩主題通過。typecheck、build:dev、修改檔案 Biome、REUSE 與 diff check 通過。使用替身 API，不註冊真實帳號；未測實體裝置與 OS 原生 IME。 |
