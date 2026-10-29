@@ -51,13 +51,28 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   private inputDelayTimer: Phaser.Time.TimerEvent | null = null;
 
   protected get supportsPointerInput(): boolean {
-    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT, UiMode.TITLE, UiMode.MENU].includes(
-      this.mode,
-    );
+    return [
+      UiMode.OPTION_SELECT,
+      UiMode.CONFIRM,
+      UiMode.MENU_OPTION_SELECT,
+      UiMode.TITLE,
+      UiMode.MENU,
+      UiMode.AUTO_COMPLETE,
+    ].includes(this.mode);
   }
 
   private get supportsPointerCancel(): boolean {
-    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT, UiMode.MENU].includes(this.mode);
+    return [
+      UiMode.OPTION_SELECT,
+      UiMode.CONFIRM,
+      UiMode.MENU_OPTION_SELECT,
+      UiMode.MENU,
+      UiMode.AUTO_COMPLETE,
+    ].includes(this.mode);
+  }
+
+  protected get pointerConfirmButton(): Button {
+    return Button.ACTION;
   }
 
   protected get canSelectWithPointer(): boolean {
@@ -462,7 +477,7 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
       return;
     }
     if (index === this.cursor + this.scrollCursor) {
-      this.getUi().processInput(Button.ACTION);
+      this.getUi().processInput(this.pointerConfirmButton);
     } else if (this.setCursor(row)) {
       this.getUi().playSelect();
     }
