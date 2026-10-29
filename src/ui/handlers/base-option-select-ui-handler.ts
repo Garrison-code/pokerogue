@@ -44,11 +44,17 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   private inputDelayTimer: Phaser.Time.TimerEvent | null = null;
 
   protected get supportsPointerInput(): boolean {
-    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT, UiMode.TITLE].includes(this.mode);
+    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT, UiMode.TITLE, UiMode.MENU].includes(
+      this.mode,
+    );
   }
 
   private get supportsPointerCancel(): boolean {
-    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT].includes(this.mode);
+    return [UiMode.OPTION_SELECT, UiMode.CONFIRM, UiMode.MENU_OPTION_SELECT, UiMode.MENU].includes(this.mode);
+  }
+
+  protected get canSelectWithPointer(): boolean {
+    return true;
   }
 
   protected fullyInitialized: boolean;
@@ -435,7 +441,12 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
       this.processPointerCancel(pointer);
       return;
     }
-    if (!pointer.leftButtonDown() || pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
+    if (
+      !pointer.leftButtonDown()
+      || pointer.wasTouch
+      || !this.canSelectWithPointer
+      || !this.getUi().canProcessPointerInput(this)
+    ) {
       return;
     }
     const index = this.scrollCursor + row;
@@ -471,14 +482,14 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   }
 
   private onPointerWheel(
-    _pointer: Phaser.Input.Pointer,
+    pointer: Phaser.Input.Pointer,
     _deltaX: number,
     deltaY: number,
     _deltaZ: number,
     event: Phaser.Types.Input.EventData,
   ): void {
     event.stopPropagation();
-    if (!deltaY || !this.getUi().canProcessPointerInput(this)) {
+    if (pointer.wasTouch || !deltaY || !this.canSelectWithPointer || !this.getUi().canProcessPointerInput(this)) {
       return;
     }
 

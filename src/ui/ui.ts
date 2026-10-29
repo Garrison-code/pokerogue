@@ -36,6 +36,7 @@ import { SettingsKeyboardUiHandler } from "#ui/keyboard-settings-ui-handler";
 import { LoadingModalUiHandler } from "#ui/loading-modal-ui-handler";
 import { LoginFormUiHandler } from "#ui/login-form-ui-handler";
 import { LoginOrRegisterUiHandler } from "#ui/login-or-register-ui-handler";
+import { MenuButton } from "#ui/menu-button";
 import { MenuUiHandler } from "#ui/menu-ui-handler";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
@@ -128,6 +129,7 @@ export class UI extends Phaser.GameObjects.Container {
   public achvBar: AchvBar;
   public bgmBar: BgmBar;
   public savingIcon: SavingIconContainer;
+  private menuButton: MenuButton;
 
   constructor() {
     super(globalScene, 0, globalScene.scaledCanvas.height);
@@ -215,6 +217,9 @@ export class UI extends Phaser.GameObjects.Container {
     this.savingIcon.setup();
 
     globalScene.uiContainer.add(this.savingIcon);
+
+    this.menuButton = new MenuButton();
+    this.add(this.menuButton);
   }
 
   private setupTooltip() {
@@ -657,6 +662,7 @@ export class UI extends Phaser.GameObjects.Container {
    * Attempts to free memory held by UI handlers
    */
   public freeUIData(): void {
+    this.menuButton?.destroy();
     this.handlers.forEach(h => h.destroy());
     this.handlers = [];
   }

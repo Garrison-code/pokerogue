@@ -222,7 +222,7 @@ describe("UI - option selection with a mouse", () => {
     });
 
     it("does not enable other menus that inherit the same base", () => {
-      for (const unsupportedMode of [UiMode.MENU, UiMode.AUTO_COMPLETE]) {
+      for (const unsupportedMode of [UiMode.AUTO_COMPLETE]) {
         const otherHandler = game.scene.ui.handlers[unsupportedMode] as OptionSelectUiHandler;
         expect(otherHandler["supportsPointerInput"]).toBe(false);
         expect(otherHandler["pointerRows"]).toHaveLength(0);
