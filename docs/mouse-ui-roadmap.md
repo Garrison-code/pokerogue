@@ -29,7 +29,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 25 項完成、29 項待辦；EX 項目與 UI-26 起的後續項目仍待個別規劃、實作與驗證。
+- 目前維持 26 項完成、28 項待辦；EX 項目與 UI-27 起的後續項目仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -236,7 +236,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-23** 音效設定 — `SETTINGS_AUDIO`。
 - [x] **UI-24** 鍵盤設定 — `SETTINGS_KEYBOARD`。
 - [x] **UI-25** 鍵盤按鍵綁定彈窗 — `KEYBOARD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
-- [ ] **UI-26** 手把設定 — `SETTINGS_GAMEPAD`。
+- [x] **UI-26** 手把設定 — `SETTINGS_GAMEPAD`。
 - [ ] **UI-27** 手把按鍵綁定彈窗 — `GAMEPAD_BINDING`；滑鼠處理介面操作，綁定本身仍需實際裝置輸入。
 - [ ] **EX-03** 移動觸控控制按鈕的配置畫面；`src/ui/settings/move-touch-controls-handler.ts`，已有 pointer 操作，需驗證整合。
 
@@ -284,7 +284,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 ## 完成紀錄
 
-目前已完成 UI-01～UI-25；其餘 29 個項目保持待辦。Phase 2 的 UI 項目已完成，EX-02 除外；這不代表整份滑鼠 roadmap 已完成。
+目前已完成 UI-01～UI-26；其餘 28 個項目保持待辦。Phase 2 的 UI 項目已完成，EX-02 除外；這不代表整份滑鼠 roadmap 已完成。
 
 以下保留各批當時的驗證結果；後續補強以較新的完成紀錄及上方已定案規則為準。
 
@@ -326,6 +326,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 | UI-24 | 2026-10-29 | `feat(ui): support mouse keyboard settings` | 新增 14 項鍵盤設定互動測試，連同既有重新綁定回歸共 47 項通過。Chromium default／legacy 實測綁定列兩階段、實際 W 鍵擷取及原返回、底部刪除／重設、長列表逐列滾輪與右鍵返回通過；使用測試配置與替身保存／重設。共用裝置基礎改以實際設定鍵識別列，修正翻譯刪除與不同 layout 索引，配置更新後重建區域，無配置仍可分類／返回。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；綁定彈窗直接滑鼠操作於 UI-25 接續，手把設定尚未啟用，未測實體裝置。 |
 
 | UI-25 | 2026-10-29 | `feat(ui): support mouse keyboard binding dialogs` | 新增 15 項綁定互動測試，連同鍵盤設定及原重新綁定回歸共 62 項通過。Chromium default／legacy 實測原鍵盤 A 輸入、返回／指派兩階段、成功單次保存、預選返回、倒數返回與等待／確認時右鍵無法關閉通過；使用測試配置與替身保存。保留原 CANCEL 回傳與音效，外側事件只消耗；清理延後監聽與倒數，避免舊計時器／重複回呼，擷取新鍵後停止原按鍵重複輸入。共用裝置身分保護亦供後續手把使用，手把彈窗尚未啟用直接滑鼠。typecheck、build:dev、修改檔案 Biome 與 diff check 通過；未測實體裝置。 |
+
+| UI-26 | 2026-10-29 | `feat(ui): support mouse gamepad settings` | 新增 18 項手把設定測試，連同鍵盤設定回歸共 32 項通過；涵蓋 Xbox、Generic、Dualshock、Pro Controller 與 SNES 的實際列身分。修正共用 xbox 素材導致排版覆蓋，改依配置 padID 分開排版並顯示目前裝置名稱；斷線後清除舊列與區域，無裝置仍可返回。Chromium default／legacy 以模擬裝置實測啟用值兩階段、原裝置清單與切換、長列表滾輪、斷線提示及返回通過。typecheck、build:dev、修改檔案 Biome 與 diff check 通過。使用模擬配置與替身持久化；未測實體手把／觸控，EX-03 未實作。 |
 
 瀏覽器驗證使用本機開發版選單、訊息、提醒彈窗、存檔欄位及挑戰條件情境。軟體繪圖約 3 FPS，延遲到期測試在 fixture 停用 Phaser delta 平滑，未修改遊戲預設。
 UI-05 的 fixture 暫停並恢復 tween，驗證淡出期間的背景阻擋；未修改遊戲動畫設定。

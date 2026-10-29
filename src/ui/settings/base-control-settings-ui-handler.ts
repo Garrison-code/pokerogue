@@ -27,7 +27,7 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
   private pointerDevice: string | undefined;
 
   protected get supportsControlPointer(): boolean {
-    return this.device === Device.KEYBOARD;
+    return this.device === Device.KEYBOARD || this.device === Device.GAMEPAD;
   }
 
   protected settingsContainer: Phaser.GameObjects.Container;
@@ -176,7 +176,7 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
     ]);
 
     for (const config of this.configs) {
-      this.layout[config.padType] = new Map();
+      this.layout[config.padID] = new Map();
 
       const optionsContainer = globalScene.add //
         .container()
@@ -263,13 +263,13 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
         }
       });
 
-      this.layout[config.padType].optionsContainer = optionsContainer;
-      this.layout[config.padType].inputsIcons = inputsIcons;
-      this.layout[config.padType].settingLabels = settingLabels;
-      this.layout[config.padType].optionValueLabels = optionValueLabels;
-      this.layout[config.padType].optionCursors = optionCursors;
-      this.layout[config.padType].keys = settingFiltered.map(key => this.setting[key]);
-      this.layout[config.padType].bindingSettings = bindingSettings;
+      this.layout[config.padID].optionsContainer = optionsContainer;
+      this.layout[config.padID].inputsIcons = inputsIcons;
+      this.layout[config.padID].settingLabels = settingLabels;
+      this.layout[config.padID].optionValueLabels = optionValueLabels;
+      this.layout[config.padID].optionCursors = optionCursors;
+      this.layout[config.padID].keys = settingFiltered.map(key => this.setting[key]);
+      this.layout[config.padID].bindingSettings = bindingSettings;
 
       this.settingsContainer.add(optionsContainer);
     }
@@ -566,9 +566,13 @@ export abstract class BaseControlSettingsUiHandler extends UiHandler {
     }
     const noGamepads = this.layout["noGamepads"];
     noGamepads?.optionsContainer?.setVisible(false);
-    const configType = activeConfig.padType;
+    const configType = activeConfig.padID;
 
     const layout = this.layout[configType];
+    if (!layout) {
+      this.layout[this.device === Device.KEYBOARD ? "noKeyboard" : "noGamepads"].optionsContainer.setVisible(true);
+      return false;
+    }
     this.keys = layout.keys;
     this.optionsContainer = layout.optionsContainer;
     this.optionsContainer.setVisible(true);
