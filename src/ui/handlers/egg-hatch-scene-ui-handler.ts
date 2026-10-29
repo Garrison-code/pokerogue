@@ -1,8 +1,10 @@
 import { globalScene } from "#app/global-scene";
 import { Button } from "#enums/buttons";
 import { UiHandler } from "#ui/ui-handler";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 
 export class EggHatchSceneUiHandler extends UiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
   public eggHatchContainer: Phaser.GameObjects.Container;
 
   /**
@@ -28,7 +30,20 @@ export class EggHatchSceneUiHandler extends UiHandler {
   }
 
   show(_args: any[]): boolean {
+    this.pointerTargets?.destroy();
     super.show(_args);
+    this.pointerTargets = new UiPointerTargets(this);
+    this.pointerTargets.add(
+      this.getUi(),
+      "egg-hatch-page",
+      () => ({
+        x: 0,
+        y: -globalScene.scaledCanvas.height,
+        width: globalScene.scaledCanvas.width,
+        height: globalScene.scaledCanvas.height,
+      }),
+      () => this.getUi().processInput(Button.ACTION),
+    );
 
     this.getUi().showText("", 0);
 
@@ -52,7 +67,15 @@ export class EggHatchSceneUiHandler extends UiHandler {
     return false;
   }
 
+  override destroy(): void {
+    this.clear();
+    this.eggHatchContainer.destroy();
+    super.destroy();
+  }
+
   clear() {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
     super.clear();
     this.eggHatchContainer.removeAll(true);
     this.getUi().hideTooltip();
