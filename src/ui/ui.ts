@@ -1,6 +1,7 @@
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
+import type { TutorialRun } from "#app/tutorial";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
@@ -125,6 +126,7 @@ export class UI extends Phaser.GameObjects.Container {
 
   private overlayActive: boolean;
   private fadeId = 0;
+  private pointerFadeActive = false;
 
   public handlers: UiHandler[];
 
@@ -133,6 +135,8 @@ export class UI extends Phaser.GameObjects.Container {
   public savingIcon: SavingIconContainer;
   private menuButton: MenuButton;
   private messagePointer: MessagePointerController | undefined;
+  /** Internal owner of an active tutorial; not a new UiMode. */
+  public tutorialSession: TutorialRun | null = null;
 
   constructor() {
     super(globalScene, 0, globalScene.scaledCanvas.height);
@@ -290,9 +294,19 @@ export class UI extends Phaser.GameObjects.Container {
     }
 
     const handler = this.getHandler();
+    if (this.tutorialSession) {
+      if (!this.tutorialSession.inputReady) {
+        return false;
+      }
+      const result = this.tutorialSession.message?.processTutorialInput(button) ?? false;
+      this.updateMessagePointer();
+      return result;
+    }
 
     if (handler instanceof AwaitableUiHandler && handler.tutorialActive) {
-      return handler.processTutorialInput(button);
+      const result = handler.processTutorialInput(button);
+      this.updateMessagePointer();
+      return result;
     }
 
     const result = handler.processInput(button);
@@ -309,9 +323,24 @@ export class UI extends Phaser.GameObjects.Container {
   public canProcessPointerInput(handler: UiHandler): boolean {
     return (
       !this.overlayActive
+      && !this.pointerFadeActive
+      && !this.tutorialSession
       && handler.active
       && this.getHandler() === handler
       && !(handler instanceof AwaitableUiHandler && handler.tutorialActive)
+    );
+  }
+
+  /** Tutorial input is permitted only for its current message, never the background UI. */
+  public canProcessTutorialPointerInput(): boolean {
+    const handler = this.getHandler();
+    return (
+      !this.overlayActive
+      && !this.pointerFadeActive
+      && handler.active
+      && (this.tutorialSession
+        ? this.tutorialSession.inputReady
+        : handler instanceof AwaitableUiHandler && handler.tutorialActive)
     );
   }
 
@@ -518,10 +547,12 @@ export class UI extends Phaser.GameObjects.Container {
     globalScene.tweens.killTweensOf(this.overlay);
     this.overlay.setVisible(false).setAlpha(0);
     this.overlayActive = false;
+    this.pointerFadeActive = false;
   }
 
   public fadeOut(duration: number): Promise<void> {
     ++this.fadeId;
+    this.pointerFadeActive = true;
     return new Promise(resolve => {
       if (this.overlayActive) {
         return resolve();
@@ -540,11 +571,12 @@ export class UI extends Phaser.GameObjects.Container {
   }
 
   public fadeIn(duration: number): Promise<void> {
-    const fadeId = ++this.fadeId;
     return new Promise(resolve => {
       if (!this.overlayActive) {
         return resolve();
       }
+      const fadeId = ++this.fadeId;
+      this.pointerFadeActive = true;
       globalScene.tweens.add({
         targets: this.overlay,
         alpha: 0,
@@ -553,11 +585,13 @@ export class UI extends Phaser.GameObjects.Container {
         onComplete: () => {
           if (this.fadeId === fadeId) {
             this.overlay.setVisible(false);
-            this.overlayActive = false;
+            this.pointerFadeActive = false;
           }
           resolve();
         },
       });
+      // Keyboard/gamepad retain their original fade-in timing; only pointer input waits.
+      this.overlayActive = false;
     });
   }
 
@@ -574,6 +608,7 @@ export class UI extends Phaser.GameObjects.Container {
         resolve();
         return;
       }
+      this.tutorialSession?.onModeChange(mode);
       const doSetMode = () => {
         if (this._mode !== mode) {
           if (clear) {
@@ -639,6 +674,7 @@ export class UI extends Phaser.GameObjects.Container {
         return resolve(false);
       }
 
+      this.tutorialSession?.cancel();
       const lastMode = this._mode;
 
       const doRevertMode = () => {
@@ -694,6 +730,7 @@ export class UI extends Phaser.GameObjects.Container {
    * Attempts to free memory held by UI handlers
    */
   public freeUIData(): void {
+    this.tutorialSession?.cancel();
     this.messagePointer?.destroy();
     this.messagePointer = undefined;
     this.menuButton?.destroy();

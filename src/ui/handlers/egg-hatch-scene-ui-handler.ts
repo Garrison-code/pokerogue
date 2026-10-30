@@ -4,6 +4,7 @@ import { UiHandler } from "#ui/ui-handler";
 import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 
 export class EggHatchSceneUiHandler extends UiHandler {
+  private pointerSkipChecked = false;
   private pointerTargets: UiPointerTargets | undefined;
   private pointerCleanups: (() => void)[] = [];
   private pointerVisited = new WeakSet<Phaser.GameObjects.GameObject>();
@@ -107,17 +108,22 @@ export class EggHatchSceneUiHandler extends UiHandler {
       return;
     }
     const message = this.getUi().getMessageHandler();
-    if (message.hasPointerMessage) {
-      message.processPointerMessage();
-    } else {
-      this.getUi().processInput(Button.ACTION);
+    this.pointerSkipChecked = true;
+    try {
+      if (message.hasPointerMessage) {
+        message.processPointerMessage();
+      } else {
+        this.getUi().processInput(Button.ACTION);
+      }
+    } finally {
+      this.pointerSkipChecked = false;
     }
   }
 
   processInput(button: Button): boolean {
     if (button === Button.ACTION || button === Button.CANCEL) {
       const phase = globalScene.phaseManager.getCurrentPhase();
-      if (phase.is("EggHatchPhase") && phase.trySkip()) {
+      if (!this.pointerSkipChecked && phase.is("EggHatchPhase") && phase.trySkip()) {
         return true;
       }
     }

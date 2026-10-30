@@ -98,6 +98,7 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
   }
 
   override destroy(): void {
+    super.destroy();
     this.stopInput();
     this.active = false;
   }

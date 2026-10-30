@@ -26,18 +26,23 @@ export class MessagePointerController {
   }
 
   private getMessage(): MessageUiHandler | null {
+    const session = this.ui.tutorialSession;
+    if (session) {
+      return session.message;
+    }
     const handler = this.ui.getHandler();
     return handler instanceof MessageUiHandler
       && handler.active
-      && (handler.hasPointerMessage || this.ui.mode === UiMode.MESSAGE)
+      && (handler.hasPointerMessage || handler.tutorialActive || this.ui.mode === UiMode.MESSAGE)
       ? handler
       : null;
   }
 
   update(): void {
     const message = this.getMessage();
-    this.zone.setVisible(!!message);
-    if (message) {
+    const visible = !!message || !!this.ui.tutorialSession;
+    this.zone.setVisible(visible);
+    if (visible) {
       this.zone.setPosition(0, -globalScene.scaledCanvas.height);
       this.zone.setSize(globalScene.scaledCanvas.width, globalScene.scaledCanvas.height).setInteractive();
       this.ui.bringToTop(this.zone);
@@ -54,7 +59,11 @@ export class MessagePointerController {
   ): void {
     event.stopPropagation();
     const message = this.getMessage();
-    if (!message || pointer.wasTouch || !this.ui.canProcessPointerInput(message)) {
+    const tutorial = !!this.ui.tutorialSession || !!message?.tutorialActive;
+    const allowed = tutorial
+      ? this.ui.canProcessTutorialPointerInput()
+      : !!message && this.ui.canProcessPointerInput(message);
+    if (!message || pointer.wasTouch || !allowed) {
       return;
     }
     if (pointer.rightButtonDown()) {

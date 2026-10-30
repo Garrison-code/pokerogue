@@ -107,16 +107,13 @@ describe("UI - message advancement with a mouse", () => {
     expect(done).toHaveBeenCalledOnce();
   });
 
-  it.each([1, 2])("blocks overlays, transitions, tutorials and inactive handlers (buttons %i)", async buttons => {
+  it.each([1, 2])("blocks overlays, transitions and inactive handlers (buttons %i)", async buttons => {
     pointer.buttons = buttons;
     const callback = vi.fn();
     handler.showText("Ready", 0, callback, null, true);
     game.scene.ui["overlayActive"] = true;
     click();
     game.scene.ui["overlayActive"] = false;
-    handler.tutorialActive = true;
-    click();
-    handler.tutorialActive = false;
     handler.active = false;
     click();
     handler.active = true;

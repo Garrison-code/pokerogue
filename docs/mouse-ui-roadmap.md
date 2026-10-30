@@ -29,7 +29,8 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 - 2026-10-28：[PR #9](https://github.com/Garrison-code/pokerogue/pull/9) 已合併至 `develop`（`85083e030f`），交付 UI-01～UI-09 與共用右鍵 CANCEL 規則。
 - 下一階段沿用 `feat/mouse-ui-support`，已同步上述合併進度，以新的 draft PR 接續尚未完成的項目；本次只記錄交接，不新增功能或變更完成狀態。
-- 目前維持 48 項完成、6 項待辦；六個 EX 項目仍待個別規劃、實作與驗證。
+- 2026-10-30：PR #12 已合併；沿用分支同步最新 `develop`（`1ce69c527a`），由 [draft PR #15](https://github.com/Garrison-code/pokerogue/pull/15) 接續共用訊息與 EX-01。
+- 目前維持 49 項完成、5 項待辦；EX-01 已完成，EX-02～EX-06 仍待個別規劃、實作與驗證。
 
 ## 已確認的方向
 
@@ -69,11 +70,11 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 以上四種 UiMode 已啟用共用選單的直接滑鼠操作；MENU 的頁面背景與入口另依 UI-20 規格，AUTO_COMPLETE 已依 UI-35 啟用，確認仍送其原 SUBMIT。
 - UI-04 包含資料管理、社群與存檔欄位的子選單；不擴充父頁、檔案選擇或後續介面的操作。
 - UI-06 包含繼續、新遊戲、讀取、紀錄及選單入口；只驗證尚未支援的後續頁面能正確開啟，不擴充其操作。主畫面保留既有取消限制，右鍵不取消。
-- 使用者決定 UI-06～UI-08 接續實作，EX-01 留待獨立一批；首次登入與後續教學仍需既有鍵盤／手把輸入。
+- UI-06～UI-08 原批次將 EX-01 留待獨立處理；首次登入與後續教學的滑鼠操作改依下節 EX-01 規格，不改寫該批歷史驗證紀錄。
 
 ## 已定案：EX-01 與全畫布訊息操作（2026-10-30）
 
-本節取代先前「訊息框內左鍵」「左鍵不快轉」「教學／對話預覽僅鍵盤操作」的規則；歷史完成紀錄保留。實作與驗證前 EX-01 維持待辦。
+本節取代先前「訊息框內左鍵」「左鍵不快轉」「教學／對話預覽僅鍵盤操作」的規則；歷史完成紀錄保留。EX-01 已依下方完成紀錄驗證；EX-02～EX-06 維持待辦。
 
 - 教學及既有待確認訊息採整個遊戲畫布操作，包含角色、場景、框內與留白；不同項目先選取的規則仍適用上層選單，不將訊息點擊穿透到它們。
 - 左鍵先補完目前頁的逐字文字，再次點擊才走既有 ACTION；已就緒可直接確認。保留提示與回呼延遲、強制等待；自動提示與常駐說明不快轉。
@@ -146,7 +147,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - IV、招式、被動、糖果、費用及其他寶可夢操作透過既有操作選單處理。重新命名、圖鑑詳細頁的直接滑鼠操作不在 UI-09 範圍，按後續對應項目處理。
 - 頁面內右鍵直接送入既有 CANCEL，不先選取點擊位置；完全沿用當前狀態下的下拉關閉、篩選重設、IV 退出、最後隊員移除及離開流程與限制，不另定右鍵語意。
 - 事件先消耗，再檢查目前 handler、教學與轉場；上層介面阻擋背景。移入不選取，中鍵與觸控不啟用新增操作。清理互動區域與監聽，過期素材／隨機載入不得更新新選取或重開的頁面。
-- EX-01 保持待辦；教學與沿用教學輸入機制的頁內提示仍使用既有鍵盤／手把操作，不宣稱新玩家已可全程使用滑鼠。
+- UI-09 原批次未擴充教學；教學與沿用教學輸入機制的頁內提示改依 EX-01 全畫布訊息規則。其他 EX 仍須個別驗證，不宣稱整份滑鼠操作已完成。
 
 ## 清單如何使用
 
@@ -178,7 +179,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 四頁均不新增滾輪導航；事件先消耗再檢查目前 handler、教學與轉場。中鍵／觸控不走新增操作，保留既有資訊 hover。
 - MODIFIER_SELECT 的獎勵、商店商品、重抽、鎖定稀有度、管理道具、查看隊伍及繼續採兩階段點擊，更新既有游標與資訊；確認走 ACTION，頁面右鍵完全沿用 CANCEL（含放棄確認）。揭示／升級與教學完成前不允許左鍵操作，資訊浮層遮住的商品不可點。處理商店反向列索引、返回重新啟用與舊動畫／非同步回呼失效。
 - MYSTERY_ENCOUNTER 的二／三／四選項與查看隊伍採兩階段點擊；固定格範圍不跟隨長文字捲動，選取更新既有說明。未達需求仍可查看，確認沿用 optionMode 判定；右鍵只送 CANCEL，目前不新增離開事件能力。管理入場／返回延遲、捲動動畫及 hover 清理。
-- EVOLUTION_SCENE 的可見訊息框在文字／提示完成且等待確認時，左鍵走 ACTION；不快轉逐字訊息或動畫。頁面右鍵完整沿用 CANCEL 的取消進化優先順序、不可取消限制與訊息推進。進化、形態變化、暫停確認及學招保留原流程。
+- EVOLUTION_SCENE 的待確認訊息改依 EX-01：整個畫布左鍵先補完本頁文字，再次點擊走 ACTION；不新增進化動畫略過能力。頁面右鍵完整沿用 CANCEL 的取消進化優先順序、不可取消限制與訊息推進。進化、形態變化、暫停確認及學招保留原流程。
 - RENAME_POKEMON 保留既有表單單擊提交／取消與原生文字編輯，不改成選項兩階段操作。本 handler 補齊 CANCEL 並與取消按鈕共用入口，右鍵只送 CANCEL；彈窗本體含輸入框生效，框外僅阻擋背景。保留 SUBMIT、空白修剪、Unicode 編碼與呼叫端回呼；清理 focus 延遲、DOM 監聽與進場 tween，不擴及其他表單。
 - 新增互動測試並以 Chromium default／legacy 驗證；使用測試隊伍與替身，不讀寫真實存檔。UI-16～UI-19 已依下方完成紀錄驗證，該批完成時累計 19 項完成、35 項待辦，Phase 2 的 UI 項目完成，EX-02 仍待辦。
 
@@ -191,7 +192,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - [x] **UI-03** 訊息／對話推進 — `MESSAGE`；包含戰鬥訊息、提示及共用對話流程。
 - [x] **UI-04** 選單內子選單 — `MENU_OPTION_SELECT`；包含資料管理、社群等共用選項。
 - [x] **UI-05** 提醒／錯誤彈窗 — `ALERT_MODAL`；現有 modal 點擊一併驗證。
-- [ ] **EX-01** 教學覆蓋層與教學提示；依附各頁，沒有獨立 UiMode。
+- [x] **EX-01** 教學覆蓋層與教學提示；依附各頁，沒有獨立 UiMode。
 
 對照：`base-option-select-ui-handler.ts`、`confirm-ui-handler.ts`、
 `message-ui-handler.ts`、`battle-message-ui-handler.ts`、`modal-ui-handler.ts`、
@@ -287,7 +288,7 @@ SPDX-License-Identifier: CC-BY-NC-SA-4.0
 - 保留登入／註冊／改密碼驗證與原 API；註冊後登入失敗仍 2 秒重試一次，保存並清理重試計時器。
 - LOADING／UNAVAILABLE 不新增操作，右鍵 CANCEL 維持無作用。重連保持 5 秒起始、倍增至 5 分鐘、最多額外 10 秒隨機間隔及原狀態碼處理；只保留單一有效請求，清理計時器與晚到結果。
 - ADMIN 驗證 LINK／SEARCH／ADMIN、唯讀、服務連結／解除、Stats／Pokedex 與原返回層級；子頁返回可再次操作，無資料保留原錯誤，不放寬權限。
-- TEST_DIALOGUE 保留 255 字元、空白參數與原 Unicode 編碼；候選只替換最後一段、不提交 Check，Enter／Escape／空白與焦點沿用 UI-35。預覽保留鍵盤／手把推進，滑鼠待 EX-01。
+- TEST_DIALOGUE 保留 255 字元、空白參數與原 Unicode 編碼；候選只替換最後一段、不提交 Check，Enter／Escape／空白與焦點沿用 UI-35。預覽依 EX-01 共用訊息規則支援全畫布滑鼠；鍵盤／手把原流程保留。
 - 帳號側欄維持功能與層級，必要生命週期修正不完成 EX-04；第三方授權、下載、匯入皆不擴充。本批不修改公開設定型別、呼叫端、API 契約、驗證規則或存檔格式。
 - 各頁以互動測試及 Chromium default／legacy 驗證，使用假帳號／替身 API 與持久化。回歸 UI-01～40、鍵盤／模擬手把及 API；執行型別、Biome、Vitest、build、REUSE、Dependency Cruiser、diff check 及最終 HEAD CI。未測實體裝置／OS IME 如實記錄。
 - 八項完成後才為 48 完成、6 待辦；六個 EX 仍未完成，不合併或發布 PR。
@@ -399,3 +400,5 @@ pnpm 使用現有依賴執行，將依賴狀態檢查設為 warn，未重裝或�
 | UI-48 | 2026-10-29 | `feat(ui): support mouse dialogue testing` | 新增 24 項對話表單測試；候選／搜尋首輪 47 項、搜尋與兩種命名收尾 76 項通過。Chromium default／legacy 從實際資料管理入口實測候選 SUBMIT 只回填、Check 原預覽、滑鼠不推進教學、鍵盤結束預覽、Escape／右鍵取消與重開通過。保留原 255 字元、Unicode 編碼與空白參數；處理貼上／刪除／組字、空白收起候選及過期回呼。收尾補強共用表單上層原生編輯阻擋、銷毀容器、帳號側欄焦點延遲／OAuth 監聽清理，修正 UI-41 側欄在遮罩上方並兩主題實測語言入口開啟／取消；不擴充 EX-04。整批新增 147 項互動測試，最新來源 65 檔回歸 61 檔、943 項通過（4 檔 skipped、22 todo）。typecheck、main／github／js 型別、build:dev、全量 Biome、Dependency Cruiser、REUSE 與 diff check 通過；GitHub CI 以最終 HEAD 為準。八項各自提交並 push；48 項完成、六個 EX 待辦，不代表整份 roadmap 完成。使用假帳號／替身 API 與隔離 Guest 資料，未測真實授權、實體裝置與 OS 原生 IME；不合併或發布 PR。 |
 
 | 共用訊息補強（EX-01 前置） | 2026-10-30 | `feat(ui): allow canvas-wide message reveal and advance` | 新增 16 項全畫布／文字快轉測試；訊息、進化與孵蛋收尾 59 項通過，UI／蛋流程整批首輪 900 項通過（4 檔 skipped、22 todo）。Chromium default／legacy 實測畫布角落、先快轉再確認、提示／回呼等待、上層確認隔離、右鍵原 CANCEL、鍵鼠交替與反覆清除重開通過；提示時序採可控制的測試計時器，真實計時／晚到回呼由自動測試驗證。保留自動文字時序、原鍵盤／手把與動畫略過優先序；訊息識別使舊文字／提示／淡出回呼失效。修正 MESSAGE=0 未加入返回堆疊及淡入完成前輸入保護；typecheck、build:dev、全量 Biome、Dependency Cruiser、REUSE、diff check 通過。完成數仍為 48／6，EX-01 尚待教學整合；未測實體裝置與觸控。 |
+
+| EX-01 | 2026-10-30 | `feat(ui): support mouse tutorials and contextual prompts` | 新增 31 項教學生命週期案例、1 項孵蛋略過單次檢查及 2 項轉場輸入案例，連同前置共 50 項新案例；最新整批 67 檔中 63 檔、992 項通過（4 檔 skipped、22 todo）。Chromium default／legacy 實測八種既有教學；涵蓋選單、起始選擇及抽蛋實際入口、寶可病毒、能力變化、獎勵頁 MESSAGE／MODIFIER_SELECT 交接、無效隊伍替身、全畫布快轉／確認、鍵鼠交替、取消及反覆重開。實際資料管理 Test Dialogue 候選／Check／預覽滑鼠推進與返回兩主題通過；legacy 續驗從保留紀錄接續完成，最後泛用提示明確等待轉場後通過。教學進退場等待真實 tween，中斷結束 Promise、不標已看過，舊回呼無效；取消後恢復訊息及背景操作。收尾將淡入保護限定滑鼠，保留鍵盤／手把原時序；孵蛋每次滑鼠事件只檢查一次原略過入口。typecheck、main／github／js 型別、CI Biome、Dependency Cruiser、build:dev、REUSE、diff check 通過；GitHub CI 以最終 HEAD 為準。測試使用隔離 Guest、測試旗標與替身持久化，未測實體裝置及觸控。累計 49 項完成、5 項待辦，EX-02～EX-06 未完成；不代表整份 roadmap 完成，不合併或發布 PR。 |

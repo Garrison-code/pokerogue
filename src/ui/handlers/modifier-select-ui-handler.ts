@@ -160,7 +160,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
   }
 
   show(args: any[]): boolean {
-    globalScene.disableMenu = false;
+    globalScene.disableMenu = !!this.getUi().tutorialSession;
 
     if (this.active) {
       if (args.length >= 3) {

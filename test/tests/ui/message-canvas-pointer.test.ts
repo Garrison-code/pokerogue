@@ -224,6 +224,46 @@ describe("UI - canvas message reveal", () => {
     click();
     expect(done).toHaveBeenCalledOnce();
   });
+  it("blocks pointer input through fade-in without extending the keyboard lock", async () => {
+    const ui = game.scene.ui;
+    const done = vi.fn();
+    handler.showText("Ready", 0, done, null, true);
+    let finish!: () => void;
+    vi.spyOn(game.scene.tweens, "add").mockImplementation(config => {
+      const tween = { remove: vi.fn() } as unknown as Phaser.Tweens.Tween;
+      finish = () => (config as Phaser.Types.Tweens.TweenBuilderConfig).onComplete?.(tween, []);
+      return tween;
+    });
+    ui["overlayActive"] = true;
+    const fade = ui.fadeIn(500);
+    expect(ui["overlayActive"]).toBe(false);
+    expect(ui.canProcessPointerInput(handler)).toBe(false);
+    click();
+    expect(done).not.toHaveBeenCalled();
+    expect(ui.processInput(Button.ACTION)).toBe(true);
+    expect(done).toHaveBeenCalledOnce();
+    finish();
+    await fade;
+    expect(ui.canProcessPointerInput(handler)).toBe(true);
+  });
+  it("does not invalidate an ongoing pointer fade when fadeIn is called again", async () => {
+    const ui = game.scene.ui;
+    let finish!: () => void;
+    vi.spyOn(game.scene.tweens, "add").mockImplementation(config => {
+      const tween = { remove: vi.fn() } as unknown as Phaser.Tweens.Tween;
+      finish = () => (config as Phaser.Types.Tweens.TweenBuilderConfig).onComplete?.(tween, []);
+      return tween;
+    });
+    ui["overlayActive"] = true;
+    const fade = ui.fadeIn(500);
+    const fadeId = ui.currentFadeId;
+    await ui.fadeIn(500);
+    expect(ui.currentFadeId).toBe(fadeId);
+    expect(ui.canProcessPointerInput(handler)).toBe(false);
+    finish();
+    await fade;
+    expect(ui.canProcessPointerInput(handler)).toBe(true);
+  });
   it("destroys its single scene listener and full-canvas zone", () => {
     const controller = game.scene.ui["messagePointer"]!;
     controller.destroy();

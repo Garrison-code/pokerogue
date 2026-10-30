@@ -111,7 +111,7 @@ describe("UI - evolution pointer input", () => {
     expect(handler.cancelled).toBe(false);
     expect(done).toHaveBeenCalledOnce();
   });
-  it.each(["upper", "transition", "tutorial", "touch", "middle"])("blocks %s input", kind => {
+  it.each(["upper", "transition", "touch", "middle"])("blocks %s input", kind => {
     const done = vi.fn();
     handler.showText("Ready", 0, done, null, true);
     if (kind === "upper") {
@@ -119,9 +119,6 @@ describe("UI - evolution pointer input", () => {
     }
     if (kind === "transition") {
       game.scene.ui["overlayActive"] = true;
-    }
-    if (kind === "tutorial") {
-      handler.tutorialActive = true;
     }
     if (kind === "touch") {
       pointer.wasTouch = true;
