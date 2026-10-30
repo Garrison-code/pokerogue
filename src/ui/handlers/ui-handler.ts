@@ -11,6 +11,7 @@ export abstract class UiHandler {
   abstract setup(): void;
 
   show(_args: any[]): boolean {
+    globalScene.ui?.tutorialSession?.onHandlerShown(this);
     this.active = true;
 
     return true;
@@ -45,11 +46,14 @@ export abstract class UiHandler {
   }
 
   clear() {
+    globalScene.ui?.tutorialSession?.onHandlerCleared(this);
     this.active = false;
   }
   /**
    * To be implemented by individual handlers when necessary to free memory
    * Called when {@linkcode BattleScene} is reset
    */
-  destroy(): void {}
+  destroy(): void {
+    globalScene.ui?.tutorialSession?.onHandlerCleared(this);
+  }
 }

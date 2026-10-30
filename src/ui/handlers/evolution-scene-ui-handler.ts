@@ -13,9 +13,6 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
   public canCancel: boolean;
   public cancelled: boolean;
   private pointerTargets: UiPointerTargets | undefined;
-  private pointerPromptReady = false;
-  private promptTimer: Phaser.Time.TimerEvent | null = null;
-  private promptDelay: number | null | undefined;
 
   setup() {
     this.canCancel = false;
@@ -78,45 +75,11 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
             }
           : null,
       () => {
-        if (!this.pointerPromptReady || this.pendingPrompt || !this.awaitingActionInput || !this.onActionInput) {
-          return;
-        }
-        this.pointerPromptReady = false;
-        ui.processInput(Button.ACTION);
+        this.processPointerMessage();
       },
     );
 
     return true;
-  }
-
-  override showText(...args: Parameters<MessageUiHandler["showText"]>): void {
-    this.pointerPromptReady = false;
-    this.promptTimer?.remove(false);
-    this.promptTimer = null;
-    const [text, delay, callback, callbackDelay, prompt, promptDelay] = args;
-    this.promptDelay = promptDelay;
-    // Own the prompt delay so clearing or replacing a message cannot revive an old prompt.
-    super.showText(text, delay, callback, callbackDelay, prompt, null);
-  }
-
-  override showPrompt(callback?: (() => void) | null, callbackDelay?: number | null): void {
-    if (this.promptDelay) {
-      this.promptTimer = globalScene.time.delayedCall(this.promptDelay, () => {
-        this.promptTimer = null;
-        super.showPrompt(callback, callbackDelay);
-        this.pointerPromptReady = true;
-      });
-    } else {
-      super.showPrompt(callback, callbackDelay);
-      this.pointerPromptReady = true;
-    }
-  }
-
-  override clearText(): void {
-    this.promptTimer?.remove(false);
-    this.promptTimer = null;
-    this.pointerPromptReady = false;
-    super.clearText();
   }
 
   private stopInput(): void {
@@ -130,12 +93,12 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
     this.textCallbackTimer = null;
     this.awaitingActionInput = false;
     this.onActionInput = null;
-    this.pointerPromptReady = false;
     this.pendingPrompt = false;
     this.prompt.setVisible(false);
   }
 
   override destroy(): void {
+    super.destroy();
     this.stopInput();
     this.active = false;
   }
@@ -151,6 +114,7 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
       ui.playSelect();
       const originalOnActionInput = this.onActionInput;
       this.onActionInput = null;
+      this.awaitingActionInput = false;
       originalOnActionInput();
       return true;
     }

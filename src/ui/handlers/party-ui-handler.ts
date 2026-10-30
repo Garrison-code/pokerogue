@@ -1145,8 +1145,8 @@ export class PartyUiHandler extends MessageUiHandler {
         ui.playSelect();
         const originalOnActionInput = this.onActionInput;
         this.onActionInput = null;
-        originalOnActionInput();
         this.awaitingActionInput = false;
+        originalOnActionInput();
         return true;
       }
       return false;

@@ -48,6 +48,20 @@ describe("UI - egg hatch scene pointer", () => {
     click();
     expect(message).toHaveBeenCalledExactlyOnceWith(Button.ACTION);
   });
+  it("checks phase skip only once before revealing or confirming a message", () => {
+    const skip = vi.fn(() => false);
+    const phase = game.scene.phaseManager.getCurrentPhase();
+    vi.spyOn(phase, "is").mockReturnValue(true);
+    Object.assign(phase, { trySkip: skip });
+    const done = vi.fn();
+    game.scene.ui.getMessageHandler().showText("Typing", 20, done, null, true);
+    click();
+    expect(skip).toHaveBeenCalledTimes(1);
+    expect(done).not.toHaveBeenCalled();
+    click();
+    expect(skip).toHaveBeenCalledTimes(2);
+    expect(done).toHaveBeenCalledOnce();
+  });
   it("dispatches the same CANCEL on right click", () => {
     const input = vi.spyOn(game.scene.ui, "processInput").mockReturnValue(true);
     pointer.buttons = 2;

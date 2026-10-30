@@ -184,7 +184,7 @@ describe("UI - dialogue testing pointer form", () => {
     expect(handler["inputs"][0].text).toBe("New command");
     expect(oldInput.listenerCount("textchange")).toBe(0);
   });
-  it("does not make preview tutorial messages pointer-accessible", () => {
+  it("keeps normal pointer operations blocked beneath a tutorial preview", () => {
     const message = game.scene.ui.handlers[
       UiMode.MESSAGE
     ] as import("#ui/battle-message-ui-handler").BattleMessageUiHandler;

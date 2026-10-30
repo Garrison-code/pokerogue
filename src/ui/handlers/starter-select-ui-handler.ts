@@ -3695,6 +3695,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   public override destroy(): void {
+    super.destroy();
+    this.active = false;
     this.starterSummary.clear();
     ++this.pointerSession;
     this.clearPointerInput();

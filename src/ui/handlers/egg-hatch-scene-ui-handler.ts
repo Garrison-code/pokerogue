@@ -4,6 +4,7 @@ import { UiHandler } from "#ui/ui-handler";
 import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 
 export class EggHatchSceneUiHandler extends UiHandler {
+  private pointerSkipChecked = false;
   private pointerTargets: UiPointerTargets | undefined;
   private pointerCleanups: (() => void)[] = [];
   private pointerVisited = new WeakSet<Phaser.GameObjects.GameObject>();
@@ -32,7 +33,7 @@ export class EggHatchSceneUiHandler extends UiHandler {
           if (pointer.rightButtonDown()) {
             this.getUi().processInput(Button.CANCEL);
           } else if (pointer.leftButtonDown()) {
-            this.getUi().processInput(Button.ACTION);
+            this.processPointerAction();
           }
         };
         object.on("pointerdown", down);
@@ -82,7 +83,7 @@ export class EggHatchSceneUiHandler extends UiHandler {
         width: globalScene.scaledCanvas.width,
         height: globalScene.scaledCanvas.height,
       }),
-      () => this.getUi().processInput(Button.ACTION),
+      () => this.processPointerAction(),
     );
 
     this.eggHatchContainer.moveTo(this.pointerTargets.zones[0], 0);
@@ -90,7 +91,7 @@ export class EggHatchSceneUiHandler extends UiHandler {
       this.getUi(),
       "egg-hatch-message",
       () => ({ x: 0, y: -49, width: globalScene.scaledCanvas.width, height: 49 }),
-      () => this.getUi().processInput(Button.ACTION),
+      () => this.processPointerAction(),
     );
     globalScene.events.on("preupdate", this.bindHoverClicks, this);
     this.getUi().showText("", 0);
@@ -100,10 +101,29 @@ export class EggHatchSceneUiHandler extends UiHandler {
     return true;
   }
 
+  private processPointerAction(): void {
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    // The phase decides whether the current animation can be skipped.
+    if (phase.is("EggHatchPhase") && phase.trySkip()) {
+      return;
+    }
+    const message = this.getUi().getMessageHandler();
+    this.pointerSkipChecked = true;
+    try {
+      if (message.hasPointerMessage) {
+        message.processPointerMessage();
+      } else {
+        this.getUi().processInput(Button.ACTION);
+      }
+    } finally {
+      this.pointerSkipChecked = false;
+    }
+  }
+
   processInput(button: Button): boolean {
     if (button === Button.ACTION || button === Button.CANCEL) {
       const phase = globalScene.phaseManager.getCurrentPhase();
-      if (phase.is("EggHatchPhase") && phase.trySkip()) {
+      if (!this.pointerSkipChecked && phase.is("EggHatchPhase") && phase.trySkip()) {
         return true;
       }
     }

@@ -103,15 +103,15 @@ describe("UI - evolution pointer input", () => {
     click();
     expect(handler.cancelled).toBe(true);
   });
-  it("does not fast-forward or cancel via the left-click animation background", () => {
+  it("advances ready messages through the full-canvas controller without cancelling evolution", () => {
     handler.canCancel = true;
     const done = vi.fn();
     handler.showText("Ready", 0, done, null, true);
-    click("evolution-page");
+    game.scene.ui["messagePointer"]!.zone.emit("pointerdown", pointer, 0, 0, { stopPropagation: vi.fn() });
     expect(handler.cancelled).toBe(false);
-    expect(done).not.toHaveBeenCalled();
+    expect(done).toHaveBeenCalledOnce();
   });
-  it.each(["upper", "transition", "tutorial", "touch", "middle"])("blocks %s input", kind => {
+  it.each(["upper", "transition", "touch", "middle"])("blocks %s input", kind => {
     const done = vi.fn();
     handler.showText("Ready", 0, done, null, true);
     if (kind === "upper") {
@@ -119,9 +119,6 @@ describe("UI - evolution pointer input", () => {
     }
     if (kind === "transition") {
       game.scene.ui["overlayActive"] = true;
-    }
-    if (kind === "tutorial") {
-      handler.tutorialActive = true;
     }
     if (kind === "touch") {
       pointer.wasTouch = true;
