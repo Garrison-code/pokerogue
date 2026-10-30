@@ -19,7 +19,7 @@ export class EggListUiHandler extends MessageUiHandler {
 
   private eggListContainer: Phaser.GameObjects.Container;
   private eggListIconContainer: Phaser.GameObjects.Container;
-  private eggIcons: Phaser.GameObjects.Sprite[];
+  private eggIcons: Phaser.GameObjects.Sprite[] = [];
   private eggSprite: Phaser.GameObjects.Sprite;
   private eggNameText: Phaser.GameObjects.Text;
   private eggDateText: Phaser.GameObjects.Text;
