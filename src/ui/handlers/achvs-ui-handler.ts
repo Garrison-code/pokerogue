@@ -14,6 +14,7 @@ import { addTextObject } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
 import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import i18next from "i18next";
+import Phaser from "phaser";
 
 const Page = {
   ACHIEVEMENTS: 0,
@@ -555,7 +556,9 @@ export class AchvsUiHandler extends MessageUiHandler {
 
       icon.setVisible(true);
       if (tinted) {
-        icon.setTintFill(0);
+        icon //
+          .setTint(0)
+          .setTintMode(Phaser.TintModes.FILL);
       } else {
         icon.clearTint();
       }

@@ -15,6 +15,7 @@ import { addWindow } from "#ui/ui-theme";
 import { hasTouchscreen } from "#utils/app-utils";
 import { capitalizeFirstLetter } from "#utils/strings";
 import i18next from "i18next";
+import Phaser from "phaser";
 
 /** Abstract class for handling UI elements related to settings. */
 export class BaseSettingsUiHandler extends MessageUiHandler {

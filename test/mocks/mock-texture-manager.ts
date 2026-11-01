@@ -11,6 +11,7 @@ import { MockSprite } from "#test/mocks/mocks-container/mock-sprite";
 import { MockText } from "#test/mocks/mocks-container/mock-text";
 import { MockTexture } from "#test/mocks/mocks-container/mock-texture";
 import { MockZone } from "#test/mocks/mocks-container/mock-zone";
+import Phaser from "phaser";
 
 /**
  * Stub class for Phaser.Textures.TextureManager

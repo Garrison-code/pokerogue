@@ -3,6 +3,7 @@ import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { getTextColor } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
+import Phaser from "phaser";
 
 /** A mouse entry to the same MENU action used by keyboard and gamepad. */
 export class MenuButton extends Phaser.GameObjects.Container {
