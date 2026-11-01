@@ -19,7 +19,9 @@ rogueserver 有一份對應的文件：`rogueserver/docs/branch-migration-roadma
   - Hotfix 用 `hotfix-*` branch。
   - 上游的部署 workflow 都有加 `github.repository == 'pagefaultgames/pokerogue'` 的條件，在 fork 裡不會執行。
 - 原本部署用的 VPS 已經退掉，`notify-develop` 和 `notify-production` 兩個通知 job 已經在 `develop` 上刪除（commit `e1a50acb`）。
-- 新的部署目標：Oracle Cloud Always Free 的 **ARM（arm64）** VM，用 docker compose 跑前端（nginx 靜態容器）、rogueserver 和 MariaDB，前面套 Cloudflare 免費方案。部署本身是第 4 階段，不在這份文件的範圍內。
+- 新的部署目標：Oracle Cloud Always Free 的 **ARM（arm64）** VM，用 docker compose 跑前端（nginx 靜態容器）、rogueserver、MariaDB 和 cloudflared。對外連線走 Cloudflare Tunnel，VM 不開 80、443。部署本身是第 4 階段，不在這份文件的範圍內。
+- 子網域：`game.<網域>` 對應前端，`api.<網域>` 對應 rogueserver。前端容器啟動時要把 `VITE_SERVER_URL` 設成 `https://api.<網域>`，必須是 https，結尾不加 `/`。
+- 長期目標是改成「程式放 Cloudflare Pages、assets 放 Cloudflare R2」。到時 `Dockerfile.static` 和 `container/` 可能會淘汰，但現階段要保留。
 
 ## 目標狀態
 
@@ -100,7 +102,7 @@ rogueserver 有一份對應的文件：`rogueserver/docs/branch-migration-roadma
 ## 不在這份文件範圍內的事
 
 - **第 0 階段**：Oracle Cloud、Cloudflare、Hostinger nameserver 的設定，由使用者自己處理。
-- **第 4 階段**：VM 上的 docker compose、Cloudflare DNS、自動更新（Watchtower 或 SSH 部署）。
+- **第 4 階段**：VM 上的 docker compose、Cloudflare Tunnel、Cloudflare Cache Rule（讓 `.json` 也被快取）、自動更新（建議 Watchtower）。
 - **第 5 階段**：第一次把 `beta` 合進 `main` 發版。
 - **第 6 階段**：
   - 刪除 `develop` branch。
