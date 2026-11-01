@@ -22,6 +22,7 @@ export abstract class OAuthProvidersUiHandler extends LoginRegisterInfoContainer
   public override clear(): void {
     super.clear();
 
+    globalScene.tweens.killTweensOf(this.externalPartyContainer);
     this.externalPartyContainer //
       .setVisible(false)
       .setActive(false);
@@ -68,6 +69,9 @@ export abstract class OAuthProvidersUiHandler extends LoginRegisterInfoContainer
   }
 
   protected processExternalProvider(): void {
+    globalScene.tweens.killTweensOf(this.externalPartyContainer);
+    this.discordImage.off("pointerdown");
+    this.googleImage.off("pointerdown");
     const titleX = 22;
     this.externalPartyTitle
       .setText(i18next.t("menu:orUse"))

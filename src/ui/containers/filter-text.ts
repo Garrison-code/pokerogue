@@ -117,6 +117,11 @@ export class FilterText extends Phaser.GameObjects.Container {
     return true;
   }
 
+  /** Read-only geometry for handlers that explicitly enable mouse input. */
+  getPointerTargets() {
+    return this.labels.map((label, index) => ({ label, index, selection: this.selections[index] }));
+  }
+
   resetSelection(index: number): void {
     this.selections[index].setText(this.defaultText);
     this.onChange();

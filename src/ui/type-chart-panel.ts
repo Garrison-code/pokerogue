@@ -1,6 +1,12 @@
+import { eventBus } from "#app/event-bus";
+import { settings } from "#app/global-settings-manager";
 import { getTypeRgb } from "#data/type";
 import { queryTypeChart, regularTypes } from "#data/type-chart";
 import type { RegularPokemonType } from "#enums/pokemon-type";
+import { TextStyle } from "#enums/text-style";
+import type { SettingsUpdateEventArgs } from "#types/event-bus-types";
+import { getTextColor } from "#ui/text";
+import { getCachedUrl } from "#utils/fetch-utils";
 import { getPokemonTypeLocaleKey } from "#utils/i18n";
 import i18next from "i18next";
 
@@ -28,6 +34,22 @@ export function createTypeChartPanel(options: TypeChartPanelOptions): { refresh:
   controls.before(controlsMarker);
   const layout = node("div");
   layout.id = "game-layout";
+  const applyTheme = () => {
+    const legacy = settings.isLegacyTheme;
+    const windowPath = `images/ui/${legacy ? "legacy/" : ""}windows/window_${settings.display.uiWindowStyle}.png`;
+    layout.dataset.theme = legacy ? "legacy" : "default";
+    layout.style.setProperty("--chart-window", `url("${new URL(getCachedUrl(windowPath), document.baseURI).href}")`);
+    layout.style.setProperty("--chart-window-slice", legacy ? "6" : "8");
+    layout.style.setProperty("--chart-text", getTextColor(TextStyle.WINDOW));
+    layout.style.setProperty("--chart-shadow", getTextColor(TextStyle.WINDOW, true));
+  };
+  const onSettingsUpdate = ({ category, key }: SettingsUpdateEventArgs) => {
+    if (category === "display" && (key === "uiTheme" || key === "uiWindowStyle")) {
+      applyTheme();
+    }
+  };
+  applyTheme();
+  eventBus.on("settings/update/success", onSettingsUpdate);
   const panel = node("aside", "type-chart-panel");
   panel.id = "type-chart-panel";
   panel.dataset.gameTool = "";
@@ -77,7 +99,15 @@ export function createTypeChartPanel(options: TypeChartPanelOptions): { refresh:
   const buttons = new Map<RegularPokemonType, HTMLButtonElement>();
   const name = (type: RegularPokemonType) => String(i18next.t(getPokemonTypeLocaleKey(type)));
   const color = (element: HTMLElement, type: RegularPokemonType) => {
-    element.style.setProperty("--type-color", `rgb(${getTypeRgb(type).join(",")})`);
+    const rgb = getTypeRgb(type);
+    element.style.setProperty("--type-color", `rgb(${rgb.join(",")})`);
+    // WCAG relative luminance: pick the higher-contrast black/white foreground.
+    const linear = rgb.map(value => {
+      const channel = value / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance = linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+    element.style.setProperty("--type-text", (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? "#000" : "#fff");
   };
   for (const type of regularTypes) {
     const button = node("button", "type-chart-type");
@@ -221,6 +251,7 @@ export function createTypeChartPanel(options: TypeChartPanelOptions): { refresh:
     refresh,
     destroy() {
       observer.disconnect();
+      eventBus.off("settings/update/success", onSettingsUpdate);
       window.removeEventListener("keydown", keyboard, true);
       window.removeEventListener("keyup", keyboard, true);
       document.removeEventListener("focusin", focus);

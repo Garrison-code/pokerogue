@@ -2242,6 +2242,25 @@ export class BattleScene extends SceneBase {
     });
   }
 
+  private menuButtonSpace = false;
+
+  /** Reserve the top-right mouse entry without changing the ordinary HUD layout. */
+  reserveMenuButtonSpace(visible: boolean): void {
+    if (visible === this.menuButtonSpace) {
+      return;
+    }
+    this.menuButtonSpace = visible;
+    const delta = visible ? -24 : 24;
+    for (const label of [this.biomeWaveText, this.moneyText, this.scoreText, this.luckText, this.luckLabelText]) {
+      if (label) {
+        label.setX(label.x + delta);
+      }
+    }
+    if (this.enemyModifierBar) {
+      this.enemyModifierBar.setX(this.enemyModifierBar.x + delta);
+    }
+  }
+
   updateUIPositions(): void {
     const enemyModifierCount = this.enemyModifiers.filter(m => m.isIconVisible()).length;
     const biomeWaveTextHeight = this.biomeWaveText.getBottomLeft().y - this.biomeWaveText.getTopLeft().y;

@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { TextStyle } from "#enums/text-style";
 import { SettingKeyboard } from "#system/settings-keyboard";
@@ -41,6 +42,19 @@ export class StarterSelectInstructionsContainer extends Phaser.GameObjects.Conta
 
     this.setupInstructionButtons();
     this.hideInstructions();
+  }
+
+  /** Existing visible labels and icons also serve as mouse controls. */
+  public getPointerTargets() {
+    return [
+      { button: Button.CYCLE_SHINY, icon: this.shinyIconElement, label: this.shinyLabel },
+      { button: Button.CYCLE_FORM, icon: this.formIconElement, label: this.formLabel },
+      { button: Button.CYCLE_GENDER, icon: this.genderIconElement, label: this.genderLabel },
+      { button: Button.CYCLE_ABILITY, icon: this.abilityIconElement, label: this.abilityLabel },
+      { button: Button.CYCLE_NATURE, icon: this.natureIconElement, label: this.natureLabel },
+      { button: Button.CYCLE_TERA, icon: this.teraIconElement, label: this.teraLabel },
+      { button: Button.STATS, icon: this.goFilterIconElement, label: this.goFilterLabel },
+    ];
   }
 
   private setupInstructionButtons(): void {
@@ -240,7 +254,8 @@ export class StarterSelectInstructionsContainer extends Phaser.GameObjects.Conta
         globalScene.inputController.selectedDevice[Device.GAMEPAD]!, // TODO: re-evaluate bang
       ).padType;
     } else {
-      gamepadType = globalScene.inputMethod;
+      // A mouse-only visit has no recorded keyboard/gamepad input yet.
+      gamepadType = globalScene.inputMethod || "keyboard";
     }
 
     if (!gamepadType) {

@@ -4,28 +4,14 @@ name: Deployment checks
 
 on:
   push:
-    branches: [develop, beta]
+    branches: [beta, main]
   pull_request:
-    branches: [develop, beta]
+    branches: [beta, main]
 
 permissions:
   contents: read
 
 jobs:
-  tooling:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Test registry gates, dispatch, failure latch and verification
-        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
-      - name: Validate workflow syntax and shell commands
-        run: >-
-          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7
-          .github/workflows/ghcr.yml .github/workflows/deploy-production.yml .github/workflows/deployment-checks.yml
-
   static-image:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

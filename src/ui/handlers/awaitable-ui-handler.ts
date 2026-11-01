@@ -17,12 +17,22 @@ export abstract class AwaitableUiHandler extends UiHandler {
       this.getUi().playSelect();
       const originalOnActionInput = this.onActionInput;
       this.onActionInput = null;
-      originalOnActionInput();
       this.awaitingActionInput = false;
+      originalOnActionInput();
       return true;
     }
 
     return false;
+  }
+
+  override clear(): void {
+    super.clear();
+    this.tutorialActive = false;
+  }
+
+  override destroy(): void {
+    super.destroy();
+    this.tutorialActive = false;
   }
 
   /**

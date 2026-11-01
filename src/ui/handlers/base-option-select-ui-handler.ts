@@ -37,8 +37,47 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   private options: (UIOptionSelectItem & T)[] = [];
   private maxOptions: number;
 
+  private displayGeneration = 0;
+
+  /** Internal lifetime token for async work initiated by a menu option. */
+  public get displayToken(): number {
+    return this.displayGeneration;
+  }
+
   private repeatInput = false;
   private maxIconWidth = 0;
+
+  private pointerRows: Phaser.GameObjects.Zone[] = [];
+  private inputDelayTimer: Phaser.Time.TimerEvent | null = null;
+
+  protected get supportsPointerInput(): boolean {
+    return [
+      UiMode.OPTION_SELECT,
+      UiMode.CONFIRM,
+      UiMode.MENU_OPTION_SELECT,
+      UiMode.TITLE,
+      UiMode.MENU,
+      UiMode.AUTO_COMPLETE,
+    ].includes(this.mode);
+  }
+
+  private get supportsPointerCancel(): boolean {
+    return [
+      UiMode.OPTION_SELECT,
+      UiMode.CONFIRM,
+      UiMode.MENU_OPTION_SELECT,
+      UiMode.MENU,
+      UiMode.AUTO_COMPLETE,
+    ].includes(this.mode);
+  }
+
+  protected get pointerConfirmButton(): Button {
+    return Button.ACTION;
+  }
+
+  protected get canSelectWithPointer(): boolean {
+    return true;
+  }
 
   protected fullyInitialized: boolean;
 
@@ -105,7 +144,11 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
       return false;
     }
 
+    ++this.displayGeneration;
     super.show(args);
+
+    this.resetInputDelay();
+    this.optionSelectText.setAlpha(1);
 
     this.maxIconWidth = 0;
 
@@ -121,7 +164,7 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
       this.blockInput = true;
       this.optionSelectText.setAlpha(0.5);
       this.cursorObj?.setAlpha(0.8);
-      globalScene.time.delayedCall(fixedInt(this.config.inputDelay), () => this.unblockInput());
+      this.inputDelayTimer = globalScene.time.delayedCall(fixedInt(this.config.inputDelay), () => this.unblockInput());
     }
 
     return true;
@@ -372,6 +415,140 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
         }
       }
     });
+
+    this.updatePointerTargets();
+  }
+
+  /** Keep hit areas in the same local coordinates as the rendered menu and cursor. */
+  private updatePointerTargets(): void {
+    if (!this.supportsPointerInput) {
+      return;
+    }
+
+    const bg = this.optionSelectBg;
+    bg.setInteractive();
+    bg.input?.hitArea.setSize(bg.width, bg.height);
+    bg.off("wheel", this.onPointerWheel, this);
+    bg.on("wheel", this.onPointerWheel, this);
+    bg.off("pointerdown", this.onBackgroundPointerDown, this);
+    bg.on("pointerdown", this.onBackgroundPointerDown, this);
+
+    const rowHeight = 114 * this.scale - 3;
+    const left = bg.x - bg.width;
+    const top = bg.y - bg.height;
+    const width = bg.width - 8 - (this.options.length > this.maxOptions ? SCROLLBAR_PADDING : 0);
+
+    for (let row = 0; row < this.maxOptions; row++) {
+      let zone = this.pointerRows[row];
+      if (!zone) {
+        zone = globalScene.add.zone(0, 0, 1, 1).setOrigin(0).setName(`option-select-row-${row}`);
+        zone.on(
+          "pointerdown",
+          (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+            this.onPointerRowDown(row, pointer, event);
+          },
+        );
+        zone.on("wheel", this.onPointerWheel, this);
+        this.optionSelectContainer.add(zone);
+        this.pointerRows.push(zone);
+      }
+      zone.setPosition(left + 4, top + 102 * this.scale - 2 + row * rowHeight - rowHeight / 2);
+      zone.setSize(width, rowHeight);
+      zone.setInteractive();
+    }
+  }
+
+  private onPointerRowDown(row: number, pointer: Phaser.Input.Pointer, event: Phaser.Types.Input.EventData): void {
+    event.stopPropagation();
+    if (pointer.rightButtonDown()) {
+      this.processPointerCancel(pointer);
+      return;
+    }
+    if (
+      !pointer.leftButtonDown()
+      || pointer.wasTouch
+      || !this.canSelectWithPointer
+      || !this.getUi().canProcessPointerInput(this)
+    ) {
+      return;
+    }
+    const index = this.scrollCursor + row;
+    if (!this.options[index]?.selectable) {
+      return;
+    }
+    if (index === this.cursor + this.scrollCursor) {
+      this.getUi().processInput(this.pointerConfirmButton);
+    } else if (this.setCursor(row)) {
+      this.getUi().playSelect();
+    }
+  }
+
+  private onBackgroundPointerDown(
+    pointer: Phaser.Input.Pointer,
+    _x: number,
+    _y: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    event.stopPropagation();
+    this.processPointerCancel(pointer);
+  }
+
+  private processPointerCancel(pointer: Phaser.Input.Pointer): void {
+    if (
+      pointer.rightButtonDown()
+      && !pointer.wasTouch
+      && this.supportsPointerCancel
+      && this.getUi().canProcessPointerInput(this)
+    ) {
+      this.getUi().processInput(Button.CANCEL);
+    }
+  }
+
+  private onPointerWheel(
+    pointer: Phaser.Input.Pointer,
+    _deltaX: number,
+    deltaY: number,
+    _deltaZ: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    event.stopPropagation();
+    if (pointer.wasTouch || !deltaY || !this.canSelectWithPointer || !this.getUi().canProcessPointerInput(this)) {
+      return;
+    }
+
+    const direction = Math.sign(deltaY);
+    let index = this.cursor + this.scrollCursor + direction;
+    while (index >= 0 && index < this.options.length && !this.options[index].selectable) {
+      index += direction;
+    }
+    if (index < 0 || index >= this.options.length) {
+      return;
+    }
+
+    // Update the absolute selection atomically: intermediate rows may be unselectable.
+    this.scrollCursor = Math.max(0, Math.min(this.scrollCursor, index, this.options.length - this.maxOptions));
+    this.scrollCursor = Math.max(this.scrollCursor, index - this.maxOptions + 1);
+    this.cursor = index - this.scrollCursor;
+    this.displayCurrentOptions();
+    this.scrollBar?.setScrollCursor(this.scrollCursor);
+    this.setCursor(this.cursor);
+    this.getUi().playSelect();
+  }
+
+  private clearPointerTargets(): void {
+    for (const zone of this.pointerRows) {
+      zone.destroy();
+    }
+    this.pointerRows = [];
+    this.optionSelectBg.off("wheel", this.onPointerWheel, this);
+    this.optionSelectBg.off("pointerdown", this.onBackgroundPointerDown, this);
+    this.optionSelectBg.disableInteractive();
+  }
+
+  private resetInputDelay(): void {
+    this.inputDelayTimer?.remove();
+    this.inputDelayTimer = null;
+    this.blockInput = false;
   }
 
   public override processInput(button: Button): boolean {
@@ -467,7 +644,7 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
       return;
     }
 
-    this.blockInput = false;
+    this.resetInputDelay();
     this.optionSelectText.setAlpha(1);
     this.cursorObj?.setAlpha(1);
   }
@@ -542,7 +719,12 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
   }
 
   public override clear(): void {
+    ++this.displayGeneration;
     super.clear();
+
+    this.clearPointerTargets();
+    this.resetInputDelay();
+    this.repeatInput = false;
 
     this.config = null;
     this.options = [];
@@ -555,6 +737,12 @@ export abstract class BaseOptionSelectUiHandler<T extends OptionSelectItem> exte
     this.clearIconSprites();
     this.clearCursor();
     this.clearScrollBar();
+  }
+
+  public override destroy(): void {
+    this.clear();
+    this.optionSelectContainer.destroy();
+    super.destroy();
   }
 
   protected clearIconSprites(): void {

@@ -1,6 +1,7 @@
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
+import type { TutorialRun } from "#app/tutorial";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
@@ -36,6 +37,7 @@ import { SettingsKeyboardUiHandler } from "#ui/keyboard-settings-ui-handler";
 import { LoadingModalUiHandler } from "#ui/loading-modal-ui-handler";
 import { LoginFormUiHandler } from "#ui/login-form-ui-handler";
 import { LoginOrRegisterUiHandler } from "#ui/login-or-register-ui-handler";
+import { MenuButton } from "#ui/menu-button";
 import { MenuUiHandler } from "#ui/menu-ui-handler";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
@@ -61,6 +63,7 @@ import { TitleUiHandler } from "#ui/title-ui-handler";
 import type { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { UnavailableModalUiHandler } from "#ui/unavailable-modal-ui-handler";
+import { MessagePointerController } from "#ui/utils/message-pointer-controller";
 import { executeIf } from "#utils/common";
 import i18next from "i18next";
 
@@ -122,12 +125,18 @@ export class UI extends Phaser.GameObjects.Container {
   private tooltipContent: Phaser.GameObjects.Text;
 
   private overlayActive: boolean;
+  private fadeId = 0;
+  private pointerFadeActive = false;
 
   public handlers: UiHandler[];
 
   public achvBar: AchvBar;
   public bgmBar: BgmBar;
   public savingIcon: SavingIconContainer;
+  private menuButton: MenuButton;
+  private messagePointer: MessagePointerController | undefined;
+  /** Internal owner of an active tutorial; not a new UiMode. */
+  public tutorialSession: TutorialRun | null = null;
 
   constructor() {
     super(globalScene, 0, globalScene.scaledCanvas.height);
@@ -215,6 +224,10 @@ export class UI extends Phaser.GameObjects.Container {
     this.savingIcon.setup();
 
     globalScene.uiContainer.add(this.savingIcon);
+
+    this.menuButton = new MenuButton();
+    this.add(this.menuButton);
+    this.messagePointer = new MessagePointerController(this);
   }
 
   private setupTooltip() {
@@ -281,12 +294,54 @@ export class UI extends Phaser.GameObjects.Container {
     }
 
     const handler = this.getHandler();
-
-    if (handler instanceof AwaitableUiHandler && handler.tutorialActive) {
-      return handler.processTutorialInput(button);
+    if (this.tutorialSession) {
+      if (!this.tutorialSession.inputReady) {
+        return false;
+      }
+      const result = this.tutorialSession.message?.processTutorialInput(button) ?? false;
+      this.updateMessagePointer();
+      return result;
     }
 
-    return handler.processInput(button);
+    if (handler instanceof AwaitableUiHandler && handler.tutorialActive) {
+      const result = handler.processTutorialInput(button);
+      this.updateMessagePointer();
+      return result;
+    }
+
+    const result = handler.processInput(button);
+    this.updateMessagePointer();
+    return result;
+  }
+
+  /** Refresh synchronously when a callback changes the current page. */
+  public updateMessagePointer(): void {
+    this.messagePointer?.update();
+  }
+
+  /** Whether a handler may change selection or confirm through direct pointer input. */
+  public canProcessPointerInput(handler: UiHandler): boolean {
+    return (
+      !this.overlayActive
+      && !this.pointerFadeActive
+      && !this.tutorialSession
+      && handler.active
+      && this.getHandler() === handler
+      && !(handler instanceof AwaitableUiHandler && handler.tutorialActive)
+    );
+  }
+
+  /** Tutorial input is permitted only for its current message, never the background UI. */
+  public canProcessTutorialPointerInput(): boolean {
+    const handler = this.getHandler();
+    return (
+      !this.overlayActive
+      && !this.pointerFadeActive
+      && handler.active
+      && (this.tutorialSession
+        ? this.tutorialSession.inputReady
+        : handler instanceof AwaitableUiHandler && handler.tutorialActive)
+    );
   }
 
   public showTextPromise(text: string, callbackDelay = 0, prompt = true, promptDelay?: number | null): Promise<void> {
@@ -479,7 +534,25 @@ export class UI extends Phaser.GameObjects.Container {
     audioManager.playSound("ui/error");
   }
 
+  /** Identity of the current global fade, used only to release an owned inline fade. */
+  public get currentFadeId(): number {
+    return this.fadeId;
+  }
+
+  public cancelMessageFade(fadeId: number): void {
+    if (this.fadeId !== fadeId) {
+      return;
+    }
+    ++this.fadeId;
+    globalScene.tweens.killTweensOf(this.overlay);
+    this.overlay.setVisible(false).setAlpha(0);
+    this.overlayActive = false;
+    this.pointerFadeActive = false;
+  }
+
   public fadeOut(duration: number): Promise<void> {
+    ++this.fadeId;
+    this.pointerFadeActive = true;
     return new Promise(resolve => {
       if (this.overlayActive) {
         return resolve();
@@ -502,16 +575,22 @@ export class UI extends Phaser.GameObjects.Container {
       if (!this.overlayActive) {
         return resolve();
       }
+      const fadeId = ++this.fadeId;
+      this.pointerFadeActive = true;
       globalScene.tweens.add({
         targets: this.overlay,
         alpha: 0,
         duration,
         ease: "Sine.easeIn",
         onComplete: () => {
-          this.overlay.setVisible(false);
+          if (this.fadeId === fadeId) {
+            this.overlay.setVisible(false);
+            this.pointerFadeActive = false;
+          }
           resolve();
         },
       });
+      // Keyboard/gamepad retain their original fade-in timing; only pointer input waits.
       this.overlayActive = false;
     });
   }
@@ -529,12 +608,13 @@ export class UI extends Phaser.GameObjects.Container {
         resolve();
         return;
       }
+      this.tutorialSession?.onModeChange(mode);
       const doSetMode = () => {
         if (this._mode !== mode) {
           if (clear) {
             this.getHandler().clear();
           }
-          if (chainMode && this._mode && !clear) {
+          if (chainMode && !clear) {
             this._modeChain.push(this._mode);
             globalScene.updateGameInfo();
           }
@@ -544,6 +624,7 @@ export class UI extends Phaser.GameObjects.Container {
             touchControls.dataset.uiMode = UiMode[mode];
           }
           this.getHandler().show(args);
+          this.updateMessagePointer();
         }
         resolve();
       };
@@ -593,11 +674,13 @@ export class UI extends Phaser.GameObjects.Container {
         return resolve(false);
       }
 
+      this.tutorialSession?.cancel();
       const lastMode = this._mode;
 
       const doRevertMode = () => {
         this.getHandler().clear();
         this._mode = this._modeChain.pop()!; // TODO: is this bang correct?
+        this.updateMessagePointer();
         globalScene.updateGameInfo();
         const touchControls = document.getElementById("touchControls");
         if (touchControls) {
@@ -647,6 +730,10 @@ export class UI extends Phaser.GameObjects.Container {
    * Attempts to free memory held by UI handlers
    */
   public freeUIData(): void {
+    this.tutorialSession?.cancel();
+    this.messagePointer?.destroy();
+    this.messagePointer = undefined;
+    this.menuButton?.destroy();
     this.handlers.forEach(h => h.destroy());
     this.handlers = [];
   }

@@ -422,8 +422,12 @@ export class InputsController {
       return;
     }
     this.lastSource = "keyboard";
-    // Bang is safe here; can't receive keyboard input if no active keyboard
-    const buttonUp = getButtonWithKeycode(this.getActiveConfig(Device.KEYBOARD)!, event.keyCode);
+    // An HTML input can consume keydown, then close before keyup reaches the game.
+    const config = this.getActiveConfig(Device.KEYBOARD);
+    if (!config) {
+      return;
+    }
+    const buttonUp = getButtonWithKeycode(config, event.keyCode);
     if (buttonUp != null) {
       this.events.emit("input_up", {
         controller_type: "keyboard",

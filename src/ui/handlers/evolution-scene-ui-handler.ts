@@ -4,6 +4,7 @@ import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { addTextObject } from "#ui/text";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 
 export class EvolutionSceneUiHandler extends MessageUiHandler {
   public evolutionContainer: Phaser.GameObjects.Container;
@@ -11,6 +12,7 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
   public messageContainer: Phaser.GameObjects.Container;
   public canCancel: boolean;
   public cancelled: boolean;
+  private pointerTargets: UiPointerTargets | undefined;
 
   setup() {
     this.canCancel = false;
@@ -51,7 +53,54 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
     globalScene.ui.bringToTop(this.messageBg.setVisible(true));
     globalScene.ui.bringToTop(this.messageContainer.setVisible(true));
 
+    this.pointerTargets?.destroy();
+    const targets = (this.pointerTargets = new UiPointerTargets(this));
+    const ui = this.getUi();
+    targets.add(ui, "evolution-page", () => ({
+      x: 0,
+      y: -globalScene.scaledCanvas.height,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height,
+    }));
+    targets.add(
+      ui,
+      "evolution-message",
+      () =>
+        this.messageBg.visible
+          ? {
+              x: this.messageBg.x,
+              y: this.messageBg.y - this.messageBg.displayHeight,
+              width: this.messageBg.displayWidth,
+              height: this.messageBg.displayHeight,
+            }
+          : null,
+      () => {
+        this.processPointerMessage();
+      },
+    );
+
     return true;
+  }
+
+  private stopInput(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    this.promptTimer?.remove(false);
+    this.promptTimer = null;
+    this.textTimer?.remove(false);
+    this.textTimer = null;
+    this.textCallbackTimer?.remove(false);
+    this.textCallbackTimer = null;
+    this.awaitingActionInput = false;
+    this.onActionInput = null;
+    this.pendingPrompt = false;
+    this.prompt.setVisible(false);
+  }
+
+  override destroy(): void {
+    super.destroy();
+    this.stopInput();
+    this.active = false;
   }
 
   processInput(button: Button): boolean {
@@ -65,6 +114,7 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
       ui.playSelect();
       const originalOnActionInput = this.onActionInput;
       this.onActionInput = null;
+      this.awaitingActionInput = false;
       originalOnActionInput();
       return true;
     }
@@ -77,6 +127,8 @@ export class EvolutionSceneUiHandler extends MessageUiHandler {
   }
 
   clear() {
+    this.stopInput();
+    super.clear();
     this.clearText();
     this.canCancel = false;
     this.cancelled = false;

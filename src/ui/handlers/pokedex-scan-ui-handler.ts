@@ -1,14 +1,121 @@
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { ModalConfig, OptionSelectItem } from "#types/ui-types";
+import type { AutoCompleteUiHandler } from "#ui/autocomplete-ui-handler";
 import { FilterTextRow } from "#ui/filter-text";
 import type { InputFieldConfig } from "#ui/form-modal-ui-handler";
-import { FormModalUiHandler } from "#ui/form-modal-ui-handler";
+import { PointerFormModalUiHandler } from "#ui/pointer-form-modal-ui-handler";
 import i18next from "i18next";
 
-export class PokedexScanUiHandler extends FormModalUiHandler {
+export class PokedexScanUiHandler extends PointerFormModalUiHandler {
+  private displayId = 0;
+  private candidateId = 0;
+  private acceptingCandidate = false;
+  private inputCleanups: (() => void)[] = [];
+
+  private ownsCandidate(): boolean {
+    return (
+      this.getUi().mode === UiMode.AUTO_COMPLETE
+      && (this.getUi().getHandler() as AutoCompleteUiHandler).parentModal === this.modalContainer
+    );
+  }
+
+  protected override handleFormKeyDown(event: KeyboardEvent): boolean {
+    if (!this.ownsCandidate()) {
+      return false;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      this.getUi().processInput(Button.SUBMIT);
+      return true;
+    }
+    if (event.key === "Escape" || event.code === "Space") {
+      if (event.key === "Escape") {
+        event.preventDefault();
+      }
+      this.getUi()
+        .revertMode()
+        .then(() => {
+          if (this.active && this.getUi().getHandler() === this) {
+            this.inputs[0]?.setFocus();
+          }
+        });
+      return true;
+    }
+    return false;
+  }
+
+  protected override onFormCompositionEnd(): void {
+    this.updateCandidates();
+  }
+
+  private stopInputListeners(): void {
+    this.displayId++;
+    this.candidateId++;
+    for (const cleanup of this.inputCleanups) {
+      cleanup();
+    }
+    this.inputCleanups = [];
+  }
+
+  private updateCandidates(): void {
+    if (this.composing || this.acceptingCandidate || !this.active) {
+      return;
+    }
+    const ui = this.getUi();
+    if (ui.getHandler() !== this && !this.ownsCandidate()) {
+      return;
+    }
+    const displayId = this.displayId;
+    const candidateId = ++this.candidateId;
+    const input = this.inputs[0];
+    const text = input.text;
+    const open = () => {
+      if (
+        !this.active
+        || displayId !== this.displayId
+        || candidateId !== this.candidateId
+        || ui.getHandler() !== this
+      ) {
+        return;
+      }
+      const keys = text ? this.reducedKeys.filter(value => value.toLowerCase().includes(text.toLowerCase())) : [];
+      const options: OptionSelectItem[] = keys.map(value => ({
+        label: value,
+        handler: () => {
+          if (
+            !this.active
+            || displayId !== this.displayId
+            || candidateId !== this.candidateId
+            || !this.ownsCandidate()
+          ) {
+            return false;
+          }
+          this.acceptingCandidate = true;
+          input.setText(value);
+          this.acceptingCandidate = false;
+          ui.revertMode().then(() => {
+            if (this.active && displayId === this.displayId && ui.getHandler() === this) {
+              input.setFocus();
+            }
+          });
+          return true;
+        },
+      }));
+      if (options.length > 0) {
+        ui.setOverlayMode(UiMode.AUTO_COMPLETE, { options, maxOptions: 5, modalContainer: this.modalContainer });
+      }
+    };
+    if (this.ownsCandidate()) {
+      ui.revertMode().then(open);
+    } else {
+      open();
+    }
+  }
+
   keys: string[];
   reducedKeys: string[];
   parallelKeys: string[];
@@ -95,6 +202,14 @@ export class PokedexScanUiHandler extends FormModalUiHandler {
 
   // args[2] is an index of FilterTextRow
   show(args: any[]): boolean {
+    this.stopInputListeners();
+    this.stopPointerInput();
+    for (const container of this.inputContainers) {
+      container.destroy();
+    }
+    for (const label of this.formLabels) {
+      label.destroy();
+    }
     this.row = args[2];
     const ui = this.getUi();
     const hasTitle = !!this.getModalTitle();
@@ -105,53 +220,10 @@ export class PokedexScanUiHandler extends FormModalUiHandler {
 
     this.reduceKeys();
 
-    input.on("keydown", (inputObject, evt: KeyboardEvent) => {
-      if (
-        ["escape", "space"].some(v => v === evt.key.toLowerCase() || v === evt.code.toLowerCase())
-        && ui.mode === UiMode.AUTO_COMPLETE
-      ) {
-        // Delete autocomplete list and recovery focus.
-        inputObject.on("blur", () => inputObject.node.focus(), { once: true });
-        ui.revertMode();
-      }
-    });
-
-    input.on("textchange", (inputObject, evt: InputEvent) => {
-      // Delete autocomplete.
-      if (ui.mode === UiMode.AUTO_COMPLETE) {
-        ui.revertMode();
-      }
-
-      let options: OptionSelectItem[] = [];
-      const filteredKeys = this.reducedKeys.filter(command =>
-        command.toLowerCase().includes(inputObject.text.toLowerCase()),
-      );
-      if (inputObject.text !== "" && filteredKeys.length > 0) {
-        options = filteredKeys.slice(0).map(value => {
-          return {
-            label: value,
-            handler: () => {
-              if (evt.data != null || evt.inputType?.toLowerCase() === "deletecontentbackward") {
-                inputObject.setText(value);
-              }
-              ui.revertMode();
-              return true;
-            },
-          };
-        });
-      }
-
-      if (options.length > 0) {
-        const modalOpts = {
-          options,
-          maxOptions: 5,
-          modalContainer: this.modalContainer,
-        };
-        ui.setOverlayMode(UiMode.AUTO_COMPLETE, modalOpts);
-      }
-    });
-
     if (super.show(args)) {
+      const changed = () => this.updateCandidates();
+      input.on("textchange", changed);
+      this.inputCleanups.push(() => input.off("textchange", changed));
       const config = args[0] as ModalConfig;
       const label = this.formLabels[0];
 
@@ -180,7 +252,13 @@ export class PokedexScanUiHandler extends FormModalUiHandler {
     return false;
   }
 
+  override destroy(): void {
+    this.stopInputListeners();
+    super.destroy();
+  }
+
   clear(): void {
+    this.stopInputListeners();
     super.clear();
 
     // Clearing the labels so they don't appear again and overlap

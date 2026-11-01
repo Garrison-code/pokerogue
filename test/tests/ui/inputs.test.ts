@@ -1,7 +1,10 @@
 import { TouchControl } from "#app/touch-controls";
 import { Button } from "#enums/buttons";
+import { Device } from "#enums/devices";
 import { CFG_KEYBOARD_QWERTY } from "#inputs/cfg-keyboard-qwerty";
+import { getIconForLatestInput } from "#inputs/config-handler";
 import { PAD_XBOX360 } from "#inputs/pad-xbox360";
+import { SettingKeyboard } from "#system/settings-keyboard";
 import { GameManager } from "#test/framework/game-manager";
 import { InputsHandler } from "#test/framework/inputs-handler";
 import Phaser from "phaser";
@@ -52,6 +55,18 @@ describe("Inputs", () => {
   it("Mobile - test touch holding for 1000ms - 4 input", async () => {
     await game.inputsHandler.pressTouch("dpadUp", 1050);
     expect(game.inputsHandler.log.length).toBe(5);
+  });
+
+  it("hides navigation icons when the previous gamepad has no configuration", () => {
+    expect(
+      getIconForLatestInput({}, "gamepad", { [Device.KEYBOARD]: "default" }, SettingKeyboard.BUTTON_ACTION),
+    ).toBeUndefined();
+  });
+  it("ignores a key release consumed by a text field before keyboard initialization", () => {
+    const controller = game.scene.inputController;
+    vi.spyOn(controller, "getActiveConfig").mockReturnValue(null);
+    expect(() => controller.keyboardKeyUp(new KeyboardEvent("keyup", { keyCode: 13 }))).not.toThrow();
+    expect(game.inputsHandler.logUp).toHaveLength(0);
   });
 
   it("keyboard - test input holding for 200ms - 1 input", async () => {

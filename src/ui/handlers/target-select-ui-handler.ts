@@ -8,9 +8,11 @@ import type { ModifierBar } from "#modifiers/modifier";
 import { getMoveTargets } from "#moves/move-utils";
 import type { TargetSelectCallback } from "#types/ui-types";
 import { UiHandler } from "#ui/ui-handler";
+import { getPointerBounds, UiPointerTargets } from "#ui/ui-pointer-targets";
 import { fixedInt } from "#utils/common";
 
 export class TargetSelectUiHandler extends UiHandler {
+  private pointerTargets: UiPointerTargets | null = null;
   private fieldIndex: number;
   private move: MoveId;
   private targetSelectCallback: TargetSelectCallback;
@@ -59,6 +61,7 @@ export class TargetSelectUiHandler extends UiHandler {
     const defaultTargets = args[3];
     if (defaultTargets && defaultTargets.length > 0 && this.targets.includes(defaultTargets[0])) {
       this.setCursor(defaultTargets[0]);
+      this.createPointerTargets();
       return true;
     }
 
@@ -67,6 +70,7 @@ export class TargetSelectUiHandler extends UiHandler {
     } else if (this.fieldIndex === BattlerIndex.PLAYER_2) {
       this.resetCursor(this.cursor1, user);
     }
+    this.createPointerTargets();
     return true;
   }
 
@@ -84,6 +88,68 @@ export class TargetSelectUiHandler extends UiHandler {
       cursorN = -1;
     }
     this.setCursor(this.targets.includes(cursorN) ? cursorN : this.targets[0]);
+  }
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const ui = this.getUi();
+    targets.add(ui, "target-field", () => ({
+      x: 0,
+      y: -globalScene.scaledCanvas.height,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height - 49,
+    }));
+    const field = globalScene.getField();
+    const ordered = field
+      .map((pokemon, index) => ({ pokemon, index }))
+      .filter(entry => entry.pokemon)
+      .sort((a, b) => globalScene.field.getIndex(a.pokemon) - globalScene.field.getIndex(b.pokemon));
+    for (const { pokemon, index } of ordered) {
+      targets.add(
+        ui,
+        `target-sprite-${index}`,
+        () => (pokemon.visible ? getPointerBounds(pokemon.getSprite(), ui) : null),
+        () => this.selectPointerTarget(index),
+      );
+    }
+    const infoOrder = [...ordered].sort(
+      (a, b) =>
+        globalScene.fieldUI.getIndex(a.pokemon.getBattleInfo())
+        - globalScene.fieldUI.getIndex(b.pokemon.getBattleInfo()),
+    );
+    for (const { pokemon, index } of infoOrder) {
+      targets.add(
+        ui,
+        `target-info-${index}`,
+        () => {
+          const info = pokemon.getBattleInfo();
+          return info.visible ? getPointerBounds(info.getPointerTarget(), ui) : null;
+        },
+        () => this.selectPointerTarget(index),
+      );
+    }
+  }
+
+  private selectPointerTarget(index: BattlerIndex): void {
+    if (!this.targets.includes(index)) {
+      return;
+    }
+    if (this.isMultipleTargets || index === this.cursor) {
+      this.getUi().processInput(Button.ACTION);
+    } else if (this.setCursor(index)) {
+      this.getUi().playSelect();
+    }
+  }
+
+  override destroy(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
+    if (this.targetsHighlighted) {
+      this.eraseCursor();
+    }
+    super.destroy();
   }
 
   processInput(button: Button): boolean {
@@ -220,6 +286,8 @@ export class TargetSelectUiHandler extends UiHandler {
   }
 
   clear() {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
     super.clear();
     this.eraseCursor();
   }

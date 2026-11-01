@@ -188,23 +188,32 @@ export class UiInputs {
     }
   }
 
+  /** Shared availability for keyboard MENU and the direct mouse entry. */
+  canOpenMenu(): boolean {
+    if (globalScene.disableMenu) {
+      return false;
+    }
+    const { ui } = globalScene;
+    if (ui.mode === UiMode.MESSAGE) {
+      const handler = ui.getHandler<MessageUiHandler>();
+      return handler.pendingPrompt && !handler.isTextAnimationInProgress();
+    }
+    return [UiMode.TITLE, UiMode.COMMAND, UiMode.MODIFIER_SELECT, UiMode.MYSTERY_ENCOUNTER].includes(ui.mode);
+  }
+
   buttonMenu(): void {
     if (globalScene.disableMenu) {
       return;
     }
     switch (globalScene.ui?.mode) {
-      // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through to show menu overlay
-      case UiMode.MESSAGE: {
-        const messageHandler = globalScene.ui.getHandler<MessageUiHandler>();
-        if (!messageHandler.pendingPrompt || messageHandler.isTextAnimationInProgress()) {
-          return;
-        }
-      }
+      case UiMode.MESSAGE:
       case UiMode.TITLE:
       case UiMode.COMMAND:
       case UiMode.MODIFIER_SELECT:
       case UiMode.MYSTERY_ENCOUNTER:
-        globalScene.ui.setOverlayMode(UiMode.MENU);
+        if (this.canOpenMenu()) {
+          globalScene.ui.setOverlayMode(UiMode.MENU);
+        }
         break;
       case UiMode.STARTER_SELECT:
       case UiMode.POKEDEX_PAGE:

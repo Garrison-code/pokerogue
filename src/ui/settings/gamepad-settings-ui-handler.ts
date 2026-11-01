@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { Device } from "#enums/devices";
 import { TextStyle } from "#enums/text-style";
 import { PAD_DUALSHOCK } from "#inputs/pad-dualshock";
+import { PAD_GENERIC } from "#inputs/pad-generic";
 import { PAD_PROCON } from "#inputs/pad-procon";
 import { PAD_UNLICENSED_SNES } from "#inputs/pad-unlicensed-snes";
 import { PAD_XBOX360 } from "#inputs/pad-xbox360";
@@ -12,7 +13,7 @@ import {
   settingGamepadDefaults,
   settingGamepadOptions,
 } from "#system/settings-gamepad";
-import type { InterfaceConfig } from "#types/inputs";
+import type { CustomInterfaceConfig, InterfaceConfig } from "#types/inputs";
 import { BaseControlSettingsUiHandler } from "#ui/base-control-settings-ui-handler";
 import { addTextObject } from "#ui/text";
 import { truncateString } from "#utils/common";
@@ -27,7 +28,7 @@ export class SettingsGamepadUiHandler extends BaseControlSettingsUiHandler {
     this.setting = SettingGamepad;
     this.settingDeviceDefaults = settingGamepadDefaults;
     this.settingDeviceOptions = settingGamepadOptions;
-    this.configs = [PAD_XBOX360, PAD_DUALSHOCK, PAD_PROCON, PAD_UNLICENSED_SNES];
+    this.configs = [PAD_XBOX360, PAD_GENERIC, PAD_DUALSHOCK, PAD_PROCON, PAD_UNLICENSED_SNES];
     this.commonSettingsCount = 2;
     this.settingBlacklisted = settingGamepadBlackList;
     this.device = Device.GAMEPAD;
@@ -49,6 +50,15 @@ export class SettingsGamepadUiHandler extends BaseControlSettingsUiHandler {
     // Map the 'noGamepads' layout options for easy access.
     this.layout["noGamepads"].optionsContainer = optionsContainer;
     this.layout["noGamepads"].label = label;
+  }
+
+  protected override getActiveConfig(): CustomInterfaceConfig | null {
+    const controller = globalScene.inputController;
+    const selected = controller.selectedDevice[Device.GAMEPAD];
+    if (!selected || !controller.getGamepadsName().some(name => name.toLowerCase() === selected.toLowerCase())) {
+      return null;
+    }
+    return super.getActiveConfig();
   }
 
   /**
@@ -84,9 +94,9 @@ export class SettingsGamepadUiHandler extends BaseControlSettingsUiHandler {
       const setting = this.setting[key];
 
       // Check if the current setting corresponds to the controller setting.
-      if (setting === this.setting.Controller) {
+      if (setting === this.setting.CONTROLLER) {
         // Iterate over all layouts excluding the 'noGamepads' special case.
-        for (const layoutKey of this.layout.keys()) {
+        for (const layoutKey of Object.keys(this.layout)) {
           if (layoutKey === "noGamepads") {
             continue;
           } // Skip updating the no gamepad layout.
@@ -94,7 +104,7 @@ export class SettingsGamepadUiHandler extends BaseControlSettingsUiHandler {
           // Update the text of the first option label under the current setting to the name of the chosen gamepad,
           // truncating the name to 30 characters if necessary.
           this.layout[layoutKey].optionValueLabels[index][0].setText(
-            truncateString(globalScene.inputController.selectedDevice[Device.GAMEPAD]!, 20),
+            truncateString(globalScene.inputController.selectedDevice[Device.GAMEPAD] ?? "", 20),
           );
         }
       }

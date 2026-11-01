@@ -27,6 +27,7 @@ import { achvs } from "#system/achv";
 import type { ConfirmModeConfig, OptionSelectItem } from "#types/ui-types";
 import { addBBCodeTextObject, addTextObject, getBBCodeFrag, getTextColor, updateCandyCountTextStyle } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
+import { UiPointerTargets } from "#ui/ui-pointer-targets";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
 import { fixedInt, formatStat, getBiomeName, getLocalizedSpriteKey, getShinyDescriptor, padInt } from "#utils/common";
 import { getEnumValues } from "#utils/enums";
@@ -58,6 +59,11 @@ interface AbilityContainer {
 }
 
 export class SummaryUiHandler extends UiHandler {
+  private pointerTargets: UiPointerTargets | null = null;
+  private pointerArrows: Phaser.GameObjects.Sprite[] = [];
+  private pageTransitionTween: Phaser.Tweens.Tween | null = null;
+  private cursorRevealTimer: Phaser.Time.TimerEvent | null = null;
+
   private summaryUiMode: SummaryUiMode;
 
   private summaryContainer: Phaser.GameObjects.Container;
@@ -352,6 +358,14 @@ export class SummaryUiHandler extends UiHandler {
       player?: boolean,
     ],
   ): boolean {
+    this.clearPointerTargets();
+    this.cancelPageTransition();
+    for (const icon of [this.splicedIcon, this.shinyIcon, this.candyShadow, this.friendshipShadow]) {
+      icon.off("pointerover");
+      icon.off("pointerout");
+      icon.off("pointerdown", this.onHoverPointerDown, this);
+      icon.off("wheel", this.onHoverPointerWheel, this);
+    }
     super.show(args);
 
     /* args[] information
@@ -527,7 +541,159 @@ export class SummaryUiHandler extends UiHandler {
       this.hideStatus(!fromSummary);
     }
 
+    this.createPointerTargets();
+    for (const icon of [this.splicedIcon, this.shinyIcon, this.candyShadow, this.friendshipShadow]) {
+      icon.on("pointerdown", this.onHoverPointerDown, this);
+      icon.on("wheel", this.onHoverPointerWheel, this);
+    }
     return true;
+  }
+
+  private createPointerTargets(): void {
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const ready = () => !this.transitioning;
+    const wheel = (direction: number) => {
+      if (ready()) {
+        this.getUi().processInput(direction < 0 ? Button.UP : Button.DOWN);
+      }
+    };
+    const background = targets.add(
+      this.getUi(),
+      "summary-page",
+      () => ({
+        x: 0,
+        y: -globalScene.scaledCanvas.height,
+        width: globalScene.scaledCanvas.width,
+        height: globalScene.scaledCanvas.height,
+      }),
+      undefined,
+      wheel,
+    );
+    this.getUi().moveBelow<Phaser.GameObjects.GameObject>(background, this.summaryContainer);
+    for (const direction of [-1, 1]) {
+      const x = direction < 0 ? 112 : globalScene.scaledCanvas.width - 10;
+      const arrow = globalScene.add
+        .sprite(x, -164, "cursor")
+        .setScale(0.75)
+        .setFlipX(direction < 0);
+      this.pointerArrows.push(arrow);
+      this.summaryContainer.add(arrow);
+      targets.add(
+        this.summaryContainer,
+        `summary-page-${direction}`,
+        () => {
+          const visible = direction < 0 ? this.cursor > Page.PROFILE : !this.moveSelect && this.cursor < Page.MOVES;
+          arrow.setVisible(visible);
+          return visible ? { x: x - 6, y: -173, width: 12, height: 18 } : null;
+        },
+        () => {
+          if (ready()) {
+            this.getUi().processInput(direction < 0 ? Button.LEFT : Button.RIGHT);
+          }
+        },
+        wheel,
+      );
+    }
+    targets.add(
+      this.summaryContainer,
+      "summary-info-toggle",
+      () => {
+        if (
+          this.moveSelect
+          || this.cursor === Page.MOVES
+          || (this.cursor === Page.PROFILE && !this.pokemon?.hasPassive())
+        ) {
+          return null;
+        }
+        return {
+          x: 110,
+          y: this.cursor === Page.PROFILE ? -132 : -107,
+          width: 205,
+          height: this.cursor === Page.PROFILE ? 85 : 60,
+        };
+      },
+      () => {
+        if (ready()) {
+          this.getUi().processInput(Button.ACTION);
+        }
+      },
+      wheel,
+    );
+    for (let index = 0; index <= 4; index++) {
+      targets.add(
+        this.summaryContainer,
+        `summary-move-${index}`,
+        () => {
+          if (this.cursor !== Page.MOVES || (index === 4 && !this.extraMoveRowContainer?.visible)) {
+            return null;
+          }
+          const pageBg = this.summaryPageContainer.getAt(0) as Phaser.GameObjects.Sprite;
+          return { x: 109, y: -pageBg.height + 12 + index * 16, width: 207, height: 16 };
+        },
+        () => {
+          if (!ready() || (index < 4 && index >= (this.pokemon?.moveset.length ?? 0))) {
+            return;
+          }
+          if (!this.moveSelect) {
+            this.showMoveSelect();
+            this.setCursor(index);
+            this.getUi().playSelect();
+          } else if (this.moveCursor === index) {
+            this.getUi().processInput(Button.ACTION);
+          } else if (this.setCursor(index)) {
+            this.getUi().playSelect();
+          }
+        },
+        wheel,
+      );
+    }
+  }
+
+  private onHoverPointerDown(
+    pointer: Phaser.Input.Pointer,
+    _x: number,
+    _y: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    event.stopPropagation();
+    if (!pointer.wasTouch && pointer.rightButtonDown() && this.getUi().canProcessPointerInput(this)) {
+      this.getUi().processInput(Button.CANCEL);
+    }
+  }
+
+  private onHoverPointerWheel(
+    pointer: Phaser.Input.Pointer,
+    _dx: number,
+    dy: number,
+    _dz: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    event.stopPropagation();
+    if (!pointer.wasTouch && dy && !this.transitioning && this.getUi().canProcessPointerInput(this)) {
+      this.getUi().processInput(dy < 0 ? Button.UP : Button.DOWN);
+    }
+  }
+
+  private cancelPageTransition(): void {
+    this.pageTransitionTween?.stop();
+    this.pageTransitionTween = null;
+    this.transitioning = false;
+    this.summaryPageTransitionContainer?.setX(106).setVisible(false);
+  }
+
+  private clearPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
+    for (const arrow of this.pointerArrows) {
+      arrow.destroy();
+    }
+    this.pointerArrows = [];
+  }
+
+  override destroy(): void {
+    this.clear();
+    super.destroy();
   }
 
   processInput(button: Button): boolean {
@@ -825,7 +991,8 @@ export class SummaryUiHandler extends UiHandler {
         delay: fixedInt(600),
         callback: () => {
           this.moveCursorObj?.setVisible(false);
-          globalScene.time.delayedCall(fixedInt(100), () => {
+          this.cursorRevealTimer?.remove(false);
+          this.cursorRevealTimer = globalScene.time.delayedCall(fixedInt(100), () => {
             if (!this.moveCursorObj) {
               return;
             }
@@ -861,7 +1028,7 @@ export class SummaryUiHandler extends UiHandler {
           } else {
             this.populatePageContainer(this.summaryPageContainer);
           }
-          globalScene.tweens.add({
+          this.pageTransitionTween = globalScene.tweens.add({
             targets: this.summaryPageTransitionContainer,
             x: forward ? "-=214" : "+=214",
             duration: 250,
@@ -878,6 +1045,7 @@ export class SummaryUiHandler extends UiHandler {
               }
               this.summaryPageTransitionContainer.setVisible(false);
               this.transitioning = false;
+              this.pageTransitionTween = null;
             },
           });
           this.summaryPageTransitionContainer.setVisible(true);
@@ -1207,6 +1375,8 @@ export class SummaryUiHandler extends UiHandler {
           icon.setInteractive(new Phaser.Geom.Rectangle(0, 0, 32, 32), Phaser.Geom.Rectangle.Contains);
           icon.on("pointerover", () => globalScene.ui.showTooltip(item.type.name, item.type.getDescription(), true));
           icon.on("pointerout", () => globalScene.ui.hideTooltip());
+          icon.on("pointerdown", this.onHoverPointerDown, this);
+          icon.on("wheel", this.onHoverPointerWheel, this);
         });
 
         const pkmLvl = this.pokemon?.level!; // TODO: is this bang correct?
@@ -1434,6 +1604,8 @@ export class SummaryUiHandler extends UiHandler {
   }
 
   destroyBlinkCursor() {
+    this.cursorRevealTimer?.remove(false);
+    this.cursorRevealTimer = null;
     if (this.moveCursorBlinkTimer) {
       this.moveCursorBlinkTimer.destroy();
       this.moveCursorBlinkTimer = null;
@@ -1475,6 +1647,19 @@ export class SummaryUiHandler extends UiHandler {
   }
 
   clear() {
+    this.clearPointerTargets();
+    this.cancelPageTransition();
+    this.destroyBlinkCursor();
+    this.descriptionScrollTween?.remove();
+    this.descriptionScrollTween = null;
+    globalScene.tweens.killTweensOf([this.statusContainer, this.moveEffectContainer]);
+    this.getUi().hideTooltip();
+    for (const icon of [this.splicedIcon, this.shinyIcon, this.candyShadow, this.friendshipShadow]) {
+      icon.off("pointerover");
+      icon.off("pointerout");
+      icon.off("pointerdown", this.onHoverPointerDown, this);
+      icon.off("wheel", this.onHoverPointerWheel, this);
+    }
     super.clear();
     this.pokemon = null;
     this.cursor = -1;

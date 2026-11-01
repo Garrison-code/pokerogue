@@ -43,6 +43,7 @@ async function startGame(): Promise<void> {
   game = new Phaser.Game({
     type: Phaser.WEBGL,
     parent: "app",
+    disableContextMenu: true,
     audio: {
       noAudio: !audioManager.isAudioEnabled,
     },

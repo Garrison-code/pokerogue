@@ -16,6 +16,21 @@ Below 960px it receives the top 40% of the page height. Its contents scroll
 independently. The existing 16:9 game fits into the remaining region and keeps
 running. Closing retains the query until the page reloads.
 
+The panel and toolbar use the game's Emerald font (with Chinese/system fallbacks)
+and existing pixel window artwork. Both DEFAULT and LEGACY themes and all five
+window styles follow display settings, including on desktop with touch controls
+disabled. Window style changes update immediately; theme changes retain the
+game's existing reload behavior. The panel removes its settings listener on destroy.
+
+Body text and choices are 20px, explanatory text is 18px, and headings are
+28px/22px. The toolbar is 56px high; buttons have a minimum height of 44px.
+Choices wrap into columns at least 88px wide with 8px gaps. Enlarged contents
+scroll inside the existing panel allocation without changing the game/panel ratio.
+Type choices and result badges are fully filled with the game's type colors,
+with black or white text chosen for contrast. Selected choices retain their color
+and show a check and double border; keyboard focus has a separate outline.
+Unavailable choices have dashed borders without fading their color or text.
+
 The panel supports mouse, touch, Tab, Enter and Space. Escape closes it while a
 tool has focus. Tool keyboard events bypass Phaser's keyboard queue. Focus
 changes release held game actions and repeat timers. Gamepad input continues to

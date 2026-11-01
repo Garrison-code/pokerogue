@@ -149,6 +149,11 @@ export class MockSprite implements MockGameObject {
     return this;
   }
 
+  setX(x: number): this {
+    this.phaserSprite.setX(x);
+    return this;
+  }
+
   setY(y: number): this {
     this.phaserSprite.setY(y);
     return this;

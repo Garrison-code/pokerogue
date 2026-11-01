@@ -66,6 +66,7 @@ import {
   updateCandyCountTextStyle,
 } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
 import { BooleanHolder, getLocalizedSpriteKey, padInt } from "#utils/common";
 import { enumValueToKey, getEnumValues } from "#utils/enums";
@@ -210,6 +211,164 @@ enum MenuOptions {
 }
 
 export class PokedexPageUiHandler extends MessageUiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
+  private pointerArrows: Phaser.GameObjects.Sprite[] = [];
+  private pointerCleanups: (() => void)[] = [];
+  private displayId = 0;
+
+  private stopPointerInput(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    for (const arrow of this.pointerArrows) {
+      arrow.destroy();
+    }
+    this.pointerArrows = [];
+    for (const cleanup of this.pointerCleanups) {
+      cleanup();
+    }
+    this.pointerCleanups = [];
+  }
+
+  private createPointerTargets(): void {
+    this.stopPointerInput();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const normal = () => !this.blockInput && !this.blockInputOverlay && !this.isRibbonTrayOpen;
+    const page = targets.add(this.starterSelectContainer, "dex-detail-page", () => ({
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 180,
+    }));
+    this.starterSelectContainer.moveTo(page, 1);
+    const wheel = (direction: number) => {
+      if (normal()) {
+        const next = Phaser.Math.Clamp(this.cursor + direction, 0, this.menuOptions.length - 1);
+        if (this.setCursor(next)) {
+          this.getUi().playSelect();
+        }
+      }
+    };
+    targets.add(
+      this.menuContainer,
+      "dex-detail-menu",
+      () => ({ x: this.menuBg.x, y: this.menuBg.y, width: this.menuBg.width, height: this.menuBg.height }),
+      undefined,
+      wheel,
+    );
+    this.menuOptions.forEach((_option, i) =>
+      targets.add(
+        this.menuContainer,
+        `dex-detail-row-${i}`,
+        () => ({
+          x: this.menuBg.x,
+          y: this.menuBg.y + 3 + i * 96 * this.scale,
+          width: this.menuBg.width,
+          height: 96 * this.scale,
+        }),
+        () => {
+          if (!normal()) {
+            return;
+          }
+          if (this.cursor === i) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.setCursor(i);
+            this.getUi().playSelect();
+          }
+        },
+        wheel,
+      ),
+    );
+    for (const direction of [-1, 1]) {
+      const x = direction < 0 ? 8 : 100;
+      const arrow = globalScene.add
+        .sprite(x, 18, "cursor")
+        .setFlipX(direction < 0)
+        .setScale(0.75);
+      this.starterSelectContainer.add(arrow);
+      this.pointerArrows.push(arrow);
+      targets.add(
+        this.starterSelectContainer,
+        `dex-detail-species-${direction}`,
+        () => {
+          const visible = normal() && (!this.filteredIndices || this.filteredIndices.length > 1);
+          arrow.setVisible(visible);
+          return visible ? { x: x - 7, y: 8, width: 14, height: 20 } : null;
+        },
+        () => this.getUi().processInput(direction < 0 ? Button.LEFT : Button.RIGHT),
+      );
+    }
+    const instructions = [
+      [this.shinyIconElement, this.shinyLabel, Button.CYCLE_SHINY],
+      [this.formIconElement, this.formLabel, Button.CYCLE_FORM],
+      [this.genderIconElement, this.genderLabel, Button.CYCLE_GENDER],
+      [this.ivIconElement, this.ivLabel, Button.CYCLE_TERA],
+      [this.candyUpgradeIconElement, this.candyUpgradeLabel, Button.STATS],
+      [this.showBackSpriteIconElement, this.showBackSpriteLabel, Button.CYCLE_ABILITY],
+    ] as const;
+    instructions.forEach(([icon, label, button], i) =>
+      targets.add(
+        this.instructionsContainer,
+        `dex-detail-instruction-${i}`,
+        () =>
+          normal() && icon.visible && label.visible
+            ? {
+                x: icon.x,
+                y: icon.y,
+                width: Math.max(8, label.x + label.displayWidth - icon.x),
+                height: Math.max(8, label.displayHeight),
+              }
+            : null,
+        () => this.getUi().processInput(button),
+      ),
+    );
+    targets.add(
+      this.baseStatsOverlay,
+      "dex-detail-stats",
+      () => (this.blockInputOverlay ? { x: 0, y: 0, width: this.baseStatsOverlay.width, height: 120 } : null),
+      () => this.getUi().processInput(Button.ACTION),
+    );
+    targets.add(this.ribbonContainer, "dex-detail-ribbons", () => {
+      const data = this.ribbonContainer.getPointerTargets();
+      return this.isRibbonTrayOpen ? { x: 0, y: 0, width: data.width, height: data.height } : null;
+    });
+    for (let i = 0; i < 100; i++) {
+      targets.add(
+        this.ribbonContainer,
+        `dex-detail-ribbon-${i}`,
+        () => {
+          const icon = this.ribbonContainer.getPointerTargets().icons[i];
+          return this.isRibbonTrayOpen && icon ? { x: icon.x - 9, y: icon.y - 9, width: 18, height: 17 } : null;
+        },
+        () => {
+          if (!this.blockInput && this.ribbonContainer.setTrayCursor(i)) {
+            this.getUi().playSelect();
+          }
+        },
+      );
+    }
+    // Keep existing hover targets usable while also consuming their clicks and routing CANCEL.
+    const visit = (object: Phaser.GameObjects.GameObject) => {
+      if (object.input && !(object instanceof Phaser.GameObjects.Zone)) {
+        const down = (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+          event.stopPropagation();
+          if (!pointer.wasTouch && pointer.rightButtonDown() && this.getUi().canProcessPointerInput(this)) {
+            this.getUi().processInput(Button.CANCEL);
+          }
+        };
+        object.on("pointerdown", down);
+        this.pointerCleanups.push(() => object.off("pointerdown", down));
+      }
+      if (object instanceof Phaser.GameObjects.Container) {
+        object.list.forEach(visit);
+      }
+    };
+    visit(this.starterSelectContainer);
+    this.menuContainer.bringToTop(this.baseStatsOverlay);
+    this.starterSelectContainer.bringToTop(this.ribbonContainer);
+  }
+
   private starterSelectContainer: Phaser.GameObjects.Container;
   private shinyOverlay: Phaser.GameObjects.Image;
   private starterDexNoLabel: Phaser.GameObjects.Image;
@@ -763,6 +922,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     this.moveInfoOverlay.clear(); // clear this when removing a menu; the cancel button doesn't seem to trigger this automatically on controllers
     this.infoOverlay.clear();
 
+    this.displayId++;
     super.show(args);
 
     this.starterSelectContainer.setVisible(true);
@@ -782,6 +942,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
     this.setCursor(0);
 
+    this.createPointerTargets();
     return true;
   }
 
@@ -1147,6 +1308,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     let success = false;
     let error = false;
 
+    const displayId = this.displayId;
     const isCaught = this.isCaught();
     const isFormCaught = this.isFormCaught();
     const isSeen = this.isSeen();
@@ -1189,6 +1351,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         this.blockInput = true;
         // TODO: this seems wrong, why do we change to `OPTION_SELECT` and then to `POKEDEX_PAGE`?
         ui.setModeWithoutClear(UiMode.OPTION_SELECT).then(() => {
+          if (displayId !== this.displayId || !this.active) {
+            return;
+          }
           const species = this.previousSpecies.pop();
           const starterPreferences = this.previousStarterPreferences.pop();
           this.moveInfoOverlay.clear();
@@ -1199,6 +1364,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         this.blockInput = false;
       } else {
         ui.revertMode().then(() => {
+          if (displayId !== this.displayId || !this.active) {
+            return;
+          }
           if (this.exitCallback instanceof Function) {
             const exitCallback = this.exitCallback;
             this.exitCallback = null;
@@ -1219,6 +1387,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
               this.blockInput = true;
 
               ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
+                if (displayId !== this.displayId || !this.active) {
+                  return;
+                }
                 this.baseStatsOverlay.show(this.baseStats, this.baseTotal);
 
                 this.blockInput = false;
@@ -1285,6 +1456,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             };
 
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
+              if (displayId !== this.displayId || !this.active) {
+                return;
+              }
               this.moveInfoOverlay.show(allMoves[this.levelMoves[0][1]]);
 
               ui.setModeWithoutClear(UiMode.OPTION_SELECT, optionSelectConfig);
@@ -1357,6 +1531,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             };
 
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
+              if (displayId !== this.displayId || !this.active) {
+                return;
+              }
               if (this.eggMoves.length === 0) {
                 ui.showText(i18next.t("pokedexUiHandler:noEggMoves"));
                 this.blockInput = false;
@@ -1427,6 +1604,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             };
 
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
+              if (displayId !== this.displayId || !this.active) {
+                return;
+              }
               this.moveInfoOverlay.show(allMoves[this.tmMoves[0]]);
 
               ui.setModeWithoutClear(UiMode.OPTION_SELECT, optionSelectConfig);
@@ -1446,6 +1626,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             this.blockInput = true;
 
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
+              if (displayId !== this.displayId || !this.active) {
+                return;
+              }
               this.infoOverlay.show(allAbilities[this.ability1].description);
 
               const options: OptionSelectItem[] = [];
@@ -1533,6 +1716,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             this.blockInput = true;
 
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
+              if (displayId !== this.displayId || !this.active) {
+                return;
+              }
               if (!this.biomes || this.biomes.length === 0) {
                 ui.showText(i18next.t("pokedexUiHandler:noBiomes"));
                 ui.playError();
@@ -1589,6 +1775,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             this.blockInput = true;
 
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
+              if (displayId !== this.displayId || !this.active) {
+                return;
+              }
               const options: OptionSelectItem[] = [];
 
               if (this.preEvolutions.length === 0 && this.evolutions.length === 0 && this.battleForms.length === 0) {
@@ -1774,6 +1963,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
             this.blockInput = true;
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
+              if (displayId !== this.displayId || !this.active) {
+                return;
+              }
               const starterDexEntry = globalScene.gameData.dexData[this.getStarterSpeciesId(this.species.speciesId)];
               const natures = globalScene.gameData.getNaturesForAttr(starterDexEntry.natureAttr);
               const optionSelectConfig: OptionSelectModeConfig = {
@@ -2098,6 +2290,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             this.blockInput = true;
             // TODO: this seems wrong, why do we change to `OPTION_SELECT` and then to `POKEDEX_PAGE`?
             ui.setModeWithoutClear(UiMode.OPTION_SELECT).then(() => {
+              if (displayId !== this.displayId || !this.active) {
+                return;
+              }
               // Always go back to first selection after scrolling around
               if (this.previousSpecies.length === 0) {
                 this.previousSpecies.push(this.species);
@@ -2139,6 +2334,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             }
             // TODO: this seems wrong, why do we change to `OPTION_SELECT` and then to `POKEDEX_PAGE`?
             ui.setModeWithoutClear(UiMode.OPTION_SELECT).then(() => {
+              if (displayId !== this.displayId || !this.active) {
+                return;
+              }
               // Always go back to first selection after scrolling around
               if (this.previousSpecies.length === 0) {
                 this.previousSpecies.push(this.species);
@@ -2193,7 +2391,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     let iconPath: string | undefined;
     // touch controls cannot be rebound as is, and are just emulating a keyboard event.
     // Additionally, since keyboard controls can be rebound (and will be displayed when they are), we need to have special handling for the touch controls
-    if (gamepadType === "touch") {
+    if (gamepadType === "touch" || !globalScene.inputController?.getIconForLatestInputRecorded(iconSetting)) {
       gamepadType = "keyboard";
       switch (iconSetting) {
         case SettingKeyboard.BUTTON_CYCLE_SHINY:
@@ -2496,6 +2694,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         getTextColor(shiny ? TextStyle.SUMMARY_DEX_NUM_GOLD : TextStyle.SUMMARY_DEX_NUM, true),
       );
 
+      const displayId = this.displayId;
       const assetLoadCancelled = new BooleanHolder(false);
       this.assetLoadCancelled = assetLoadCancelled;
 
@@ -2503,7 +2702,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         const back = !!this.showBackSprite;
         // TODO: is this bang correct?
         species.loadAssets(female!, formIndex, shiny, variant as Variant, true, back).then(() => {
-          if (assetLoadCancelled.value) {
+          if (assetLoadCancelled.value || displayId !== this.displayId) {
             return;
           }
           this.assetLoadCancelled = null;
@@ -2596,6 +2795,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       // Setting tint of the sprite
       if (isFormCaught) {
         this.species.loadAssets(female!, formIndex, shiny, variant as Variant, true).then(() => {
+          if (assetLoadCancelled.value || displayId !== this.displayId) {
+            return;
+          }
           const crier =
             this.species.forms && this.species.forms.length > 0
               ? this.species.forms[formIndex ?? this.formIndex]
@@ -2697,11 +2899,11 @@ export class PokedexPageUiHandler extends MessageUiHandler {
           const candyCropY = 16 - 16 * (currentFriendship / friendshipCap);
           this.pokemonCandyDarknessOverlay.setCrop(0, 0, 16, candyCropY);
 
-          this.pokemonCandyContainer.on("pointerover", () => {
+          this.pokemonCandyContainer.off("pointerover").on("pointerover", () => {
             globalScene.ui.showTooltip("", `${currentFriendship}/${friendshipCap}`, true);
             this.activeTooltip = "CANDY";
           });
-          this.pokemonCandyContainer.on("pointerout", () => {
+          this.pokemonCandyContainer.off("pointerout").on("pointerout", () => {
             globalScene.ui.hideTooltip();
             this.activeTooltip = undefined;
           });
@@ -2861,7 +3063,26 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     this.ivLabel.setVisible(false);
   }
 
+  override destroy(): void {
+    this.clear();
+    this.starterSelectContainer.destroy();
+    super.destroy();
+  }
+
   public override clear(): void {
+    this.displayId++;
+    this.stopPointerInput();
+    if (this.assetLoadCancelled) {
+      this.assetLoadCancelled.value = true;
+    }
+    if (this.isRibbonTrayOpen) {
+      this.ribbonContainer.close();
+    }
+    this.isRibbonTrayOpen = false;
+    this.blockInputOverlay = false;
+    this.baseStatsOverlay.clear();
+    this.moveInfoOverlay.clear();
+    this.infoOverlay.clear();
     super.clear();
 
     this.cursor = -1;

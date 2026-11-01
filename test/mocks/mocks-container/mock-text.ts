@@ -30,6 +30,12 @@ export class MockText implements MockGameObject {
     // this.phaserText = new Phaser.GameObjects.Text(scene, x, y, content, styleOptions);
   }
 
+  appendText(text: string | string[], addCR = true): this {
+    const value = Array.isArray(text) ? text.join("\n") : text;
+    this.text += (addCR && this.text ? "\n" : "") + value;
+    return this;
+  }
+
   runWordWrap(text) {
     if (!text) {
       return "";

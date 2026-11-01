@@ -37,6 +37,12 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
   private saveSlotSelectMessageBoxContainer: Phaser.GameObjects.Container;
   private sessionSlots: SessionSlot[];
 
+  private pointerRows: Phaser.GameObjects.Zone[] = [];
+  private pointerBackground: Phaser.GameObjects.Zone | null = null;
+  private pointerListZone: Phaser.GameObjects.Zone | null = null;
+  private previewPointerZone: Phaser.GameObjects.Zone | null = null;
+  private scrollTween: Phaser.Tweens.Tween | null = null;
+
   private uiMode: SaveSlotUiMode;
   private saveSlotSelectCallback: SaveSlotSelectCallback | null;
 
@@ -98,6 +104,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
 
     this.setScrollCursor(0);
     this.setCursor(0);
+    this.createPointerTargets();
     return true;
   }
 
@@ -329,8 +336,8 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
       sessionSlot.load().then(success => {
         // If the cursor was moved to this slot while the session was loading
         // call setCursor again to shift the slot position and show the arrow for save preview
-        if (success && this.cursor + this.scrollCursor === s) {
-          this.setCursor(s);
+        if (success && this.sessionSlots[s] === sessionSlot && this.cursor + this.scrollCursor === s) {
+          this.setCursor(this.cursor);
         }
       });
     }
@@ -402,10 +409,11 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
       }
       this.setArrowVisibility(hasData);
     }
-    if (prevSlotIndex != null) {
+    if (prevSlotIndex != null && prevSlotIndex !== cursorPosition) {
       this.revertSessionSlot(prevSlotIndex);
     }
 
+    this.updatePointerTargets();
     return changed;
   }
 
@@ -443,11 +451,15 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
     if (changed) {
       this.scrollCursor = scrollCursor;
       this.setCursor(this.cursor, prevSlotIndex);
-      globalScene.tweens.add({
+      this.scrollTween?.remove();
+      this.scrollTween = globalScene.tweens.add({
         targets: this.sessionSlotsContainer,
         y: this.sessionSlotsContainerInitialY - 76 * scrollCursor,
         duration: fixedInt(325),
         ease: "Sine.easeInOut",
+        onComplete: () => {
+          this.scrollTween = null;
+        },
       });
     }
 
@@ -457,10 +469,160 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
   clear() {
     super.clear();
     this.saveSlotSelectContainer.setVisible(false);
-    this.setScrollCursor(0);
+    this.clearPointerTargets();
+    this.scrollTween?.remove();
+    this.scrollTween = null;
+    this.scrollCursor = 0;
+    this.sessionSlotsContainer.setY(this.sessionSlotsContainerInitialY);
     this.eraseCursor();
     this.saveSlotSelectCallback = null;
     this.clearSessionSlots();
+  }
+
+  private createPointerTargets(): void {
+    this.clearPointerTargets();
+    const { width, height } = globalScene.scaledCanvas;
+    this.pointerBackground = globalScene.add.zone(0, -height, width, height).setOrigin(0).setInteractive();
+    this.pointerBackground.on("pointerdown", this.onBackgroundPointerDown, this);
+    this.pointerBackground.on(
+      "wheel",
+      (_pointer: Phaser.Input.Pointer, _dx: number, _dy: number, _dz: number, event: Phaser.Types.Input.EventData) =>
+        event.stopPropagation(),
+    );
+    this.saveSlotSelectContainer.add(this.pointerBackground);
+    this.pointerListZone = globalScene.add
+      .zone(2, this.sessionSlotsContainerInitialY, 316, 146)
+      .setOrigin(0)
+      .setInteractive();
+    this.pointerListZone.on("pointerdown", this.onBackgroundPointerDown, this);
+    this.pointerListZone.on("wheel", this.onPointerWheel, this);
+    this.saveSlotSelectContainer.add(this.pointerListZone);
+    for (let row = 0; row < SLOTS_ON_SCREEN; row++) {
+      const zone = globalScene.add.zone(0, 0, 304, 70).setOrigin(0).setInteractive();
+      zone.setName(`save-slot-pointer-row-${row}`);
+      zone.on(
+        "pointerdown",
+        (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+          if (!this.processPointerDown(pointer, event) || this.scrollTween) {
+            return;
+          }
+          const index = this.scrollCursor + row;
+          if (this.cursor !== row) {
+            if (this.setCursor(row, this.cursor + this.scrollCursor)) {
+              this.getUi().playSelect();
+            }
+          } else if (this.sessionSlots[index]?.loaded) {
+            this.getUi().processInput(Button.ACTION);
+          }
+        },
+      );
+      zone.on("wheel", this.onPointerWheel, this);
+      this.saveSlotSelectContainer.add(zone);
+      this.pointerRows.push(zone);
+    }
+    this.previewPointerZone = globalScene.add.zone(0, 0, 10, 16).setOrigin(0).setInteractive();
+    this.previewPointerZone.setName("save-slot-preview-pointer");
+    this.previewPointerZone.on(
+      "pointerdown",
+      (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+        if (this.processPointerDown(pointer, event) && !this.scrollTween) {
+          const slot = this.sessionSlots[this.cursor + this.scrollCursor];
+          if (slot?.loaded && slot.hasData && !slot.malformed) {
+            this.getUi().processInput(Button.RIGHT);
+          }
+        }
+      },
+    );
+    this.previewPointerZone.on("wheel", this.onPointerWheel, this);
+    this.saveSlotSelectContainer.add(this.previewPointerZone);
+    this.updatePointerTargets();
+  }
+
+  private updatePointerTargets(): void {
+    this.pointerRows.forEach((zone, row) => {
+      const slot = this.sessionSlots[this.scrollCursor + row];
+      zone.setPosition(8 + (slot?.x ?? 0), this.sessionSlotsContainerInitialY + row * 76);
+    });
+    const slot = this.sessionSlots[this.cursor + this.scrollCursor];
+    if (this.previewPointerZone && this.cursorObj) {
+      const arrow = this.cursorObj.getByName("rightArrow") as Phaser.GameObjects.Image;
+      const visible = !!(slot?.loaded && slot.hasData && !slot.malformed && arrow.visible);
+      this.previewPointerZone
+        .setPosition(
+          8 + this.cursorObj.x + arrow.x - 5,
+          this.sessionSlotsContainerInitialY + this.cursorObj.y + arrow.y - this.scrollCursor * 76 - 8,
+        )
+        .setVisible(visible);
+      if (visible) {
+        this.previewPointerZone.setInteractive();
+      } else {
+        this.previewPointerZone.disableInteractive();
+      }
+    }
+  }
+
+  private processPointerDown(pointer: Phaser.Input.Pointer, event: Phaser.Types.Input.EventData): boolean {
+    event.stopPropagation();
+    if (pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
+      return false;
+    }
+    if (pointer.rightButtonDown()) {
+      this.getUi().processInput(Button.CANCEL);
+      return false;
+    }
+    return pointer.leftButtonDown();
+  }
+
+  private onBackgroundPointerDown(
+    pointer: Phaser.Input.Pointer,
+    _x: number,
+    _y: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    this.processPointerDown(pointer, event);
+  }
+
+  private onPointerWheel(
+    _pointer: Phaser.Input.Pointer,
+    _dx: number,
+    dy: number,
+    _dz: number,
+    event: Phaser.Types.Input.EventData,
+  ): void {
+    event.stopPropagation();
+    if (_pointer.wasTouch || !dy || !this.getUi().canProcessPointerInput(this)) {
+      return;
+    }
+    const previous = this.cursor + this.scrollCursor;
+    const next = Math.max(0, Math.min(SESSION_SLOTS_COUNT - 1, previous + Math.sign(dy)));
+    if (next === previous) {
+      return;
+    }
+    const scroll = Math.max(next - SLOTS_ON_SCREEN + 1, Math.min(this.scrollCursor, next));
+    // Update the absolute selection before scrolling so no intermediate slot is selected.
+    this.cursor = next - scroll;
+    this.setScrollCursor(scroll, previous);
+    this.setCursor(this.cursor, previous);
+    this.getUi().playSelect();
+  }
+
+  private clearPointerTargets(): void {
+    for (const zone of this.pointerRows) {
+      zone.destroy();
+    }
+    this.pointerRows = [];
+    this.pointerBackground?.destroy();
+    this.pointerBackground = null;
+    this.pointerListZone?.destroy();
+    this.pointerListZone = null;
+    this.previewPointerZone?.destroy();
+    this.previewPointerZone = null;
+  }
+
+  public override destroy(): void {
+    this.clear();
+    this.saveSlotSelectContainer.destroy();
+    super.destroy();
   }
 
   eraseCursor() {
@@ -479,6 +641,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
 class SessionSlot extends Phaser.GameObjects.Container {
   public slotId: number;
   public hasData: boolean;
+  public loaded = false;
   /** Indicates the save slot ran into an error while being loaded */
   public malformed: boolean;
   private slotWindow: Phaser.GameObjects.NineSlice;
@@ -551,13 +714,16 @@ class SessionSlot extends Phaser.GameObjects.Container {
 
   async setupWithData(data: SessionSaveData) {
     const hasName = data?.name;
-    this.remove(this.loadingLabel, true);
+    this.loadingLabel.setVisible(false);
     if (hasName) {
       const nameLabel = addTextObject(8, 5, data.name, TextStyle.WINDOW);
       this.add(nameLabel);
     } else {
       const fallbackName = this.decideFallback(data);
       await globalScene.gameData.renameSession(this.slotId, fallbackName);
+      if (!this.active) {
+        return;
+      }
       const nameLabel = addTextObject(8, 5, fallbackName, TextStyle.WINDOW);
       this.add(nameLabel);
     }
@@ -629,24 +795,32 @@ class SessionSlot extends Phaser.GameObjects.Container {
         .then(async sessionData => {
           // Ignore the results if the view was exited
           if (!this.active) {
+            resolve(false);
             return;
           }
           this.hasData = !!sessionData;
           if (!sessionData) {
+            this.loaded = true;
             this.loadingLabel.setText(i18next.t("saveSlotSelectUiHandler:empty"));
             resolve(false);
             return;
           }
           this.saveData = sessionData;
-          this.setupWithData(sessionData);
-          resolve(true);
+          await this.setupWithData(sessionData);
+          this.loaded = this.active;
+          if (this.loaded) {
+            this.remove(this.loadingLabel, true);
+          }
+          resolve(this.loaded);
         })
         .catch(e => {
           if (!this.active) {
+            resolve(false);
             return;
           }
           console.warn(`Failed to load session slot #${this.slotId}:`, e);
-          this.loadingLabel.setText(i18next.t("menu:failedToLoadSession"));
+          this.loaded = true;
+          this.loadingLabel.setVisible(true).setText(i18next.t("menu:failedToLoadSession"));
           this.hasData = true;
           this.malformed = true;
           resolve(true);

@@ -15,6 +15,10 @@ export class TabMenu extends Phaser.GameObjects.Container {
   private static readonly CENTERED_LABEL_LEFT_BOUNDARY = 24;
   private static readonly CENTERED_LABEL_RIGHT_BOUNDARY = 24;
 
+  private pointerLayouts: (() => void)[] = [];
+
+  private pointerZones: Phaser.GameObjects.Zone[] = [];
+
   public selectedIndex = 0;
 
   private readonly labels: string[];
@@ -105,6 +109,75 @@ export class TabMenu extends Phaser.GameObjects.Container {
       title.setX(currentX);
       currentX += title.displayWidth + labelSpacing;
     }
+    this.pointerLayouts.forEach(layout => layout());
+  }
+
+  /** Enable direct navigation only for the owning page that explicitly opts in. */
+  public enablePointerNavigation(
+    canProcess: () => boolean,
+    onCancel: () => void,
+    canCancel: () => boolean = canProcess,
+  ): void {
+    this.disablePointerNavigation();
+    const addTarget = (area: () => { x: number; width: number }, select: () => boolean): void => {
+      const zone = globalScene.add.zone(0, 0, 1, this.height).setOrigin(0).setInteractive();
+      zone.on(
+        "pointerdown",
+        (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+          event.stopPropagation();
+          if (pointer.wasTouch) {
+            return;
+          }
+          if (pointer.rightButtonDown() && canCancel()) {
+            onCancel();
+          } else if (pointer.leftButtonDown() && canProcess() && select()) {
+            globalScene.ui.playSelect();
+          }
+        },
+      );
+      zone.on(
+        "wheel",
+        (_pointer: Phaser.Input.Pointer, _dx: number, _dy: number, _dz: number, event: Phaser.Types.Input.EventData) =>
+          event.stopPropagation(),
+      );
+      const layout = () => {
+        const { x, width } = area();
+        zone.setPosition(x, 0).setSize(width, this.height).setInteractive();
+      };
+      this.pointerLayouts.push(layout);
+      layout();
+      this.pointerZones.push(zone);
+      this.add(zone);
+    };
+    this.headerTitles.forEach((title, index) =>
+      addTarget(
+        () => ({ x: title.x - 2, width: title.displayWidth + 4 }),
+        () => {
+          if (index === this.selectedIndex) {
+            return false;
+          }
+          this.setIndex(index);
+          this.onChangeCallback(index);
+          return true;
+        },
+      ),
+    );
+    addTarget(
+      () => ({ x: 4, width: 20 }),
+      () => this.navigate(Button.CYCLE_FORM),
+    );
+    addTarget(
+      () => ({ x: this.width - 24, width: 20 }),
+      () => this.navigate(Button.CYCLE_SHINY),
+    );
+  }
+
+  public disablePointerNavigation(): void {
+    for (const zone of this.pointerZones) {
+      zone.destroy();
+    }
+    this.pointerZones = [];
+    this.pointerLayouts = [];
   }
 
   public setIndex(index: number): void {

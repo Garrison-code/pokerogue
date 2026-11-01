@@ -37,6 +37,7 @@ import { ScrollBar } from "#ui/scroll-bar";
 import { isPassiveAvailable, isSameSpeciesEggAvailable, isValueReductionAvailable } from "#ui/starter-select-ui-utils";
 import { addTextObject, getTextColor } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
 import { BooleanHolder, fixedInt, getLocalizedSpriteKey, padInt, randIntRange } from "#utils/common";
 import { loadStarterPreferences } from "#utils/data";
@@ -195,6 +196,246 @@ function calcStarterPosition(index: number): { x: number; y: number } {
 }
 
 export class PokedexUiHandler extends MessageUiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
+  private pointerSpecies: SpeciesId | null = null;
+  private displayId = 0;
+  private gridContainer: Phaser.GameObjects.Container;
+
+  private focusPointerGrid(): void {
+    this.filterMode = false;
+    this.filterTextMode = false;
+    this.filterBar.cursorObj.setVisible(false);
+    this.filterText.cursorObj.setVisible(false);
+  }
+
+  private restorePointerSelection(): void {
+    const index = this.filteredPokemonData.findIndex(data => data.species.speciesId === this.pointerSpecies);
+    const local = index - this.scrollCursor * 9;
+    const visible = index >= 0 && local >= 0 && local < 81;
+    this.cursorObj.setVisible(visible && !this.filterMode && !this.filterTextMode);
+    if (visible) {
+      const pos = calcStarterPosition(local);
+      this.cursor = local;
+      this.cursorObj.setPosition(pos.x - 1, pos.y + 1);
+    } else if (index < 0) {
+      this.pointerSpecies = null;
+      this.setSpecies(null);
+    }
+  }
+
+  private closePointerDropDown(): boolean {
+    if (!this.filterBar.openDropDown) {
+      return false;
+    }
+    this.filterBar.hideDropDowns();
+    return true;
+  }
+
+  private scrollPointerGrid(direction: number): void {
+    if (this.blockInput || this.filterBar.openDropDown || this.showingTray) {
+      return;
+    }
+    const max = Math.max(0, Math.ceil(this.filteredPokemonData.length / 9) - 9);
+    const next = Phaser.Math.Clamp(this.scrollCursor + direction, 0, max);
+    if (next === this.scrollCursor) {
+      return;
+    }
+    this.scrollCursor = next;
+    this.updateScroll();
+    this.restorePointerSelection();
+  }
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const page = targets.add(
+      this.starterSelectContainer,
+      "dex-page",
+      () => ({ x: 0, y: 0, width: 320, height: 180 }),
+      () => {
+        if (!this.blockInput) {
+          this.closePointerDropDown();
+        }
+      },
+    );
+    this.starterSelectContainer.moveTo(page, 1);
+    const wheel = (direction: number) => this.scrollPointerGrid(direction);
+    targets.add(this.gridContainer, "dex-grid", () => ({ x: -1, y: 12, width: 162, height: 153 }), undefined, wheel);
+    this.pokemonContainers.forEach((container, i) =>
+      targets.add(
+        this.gridContainer,
+        `dex-cell-${i}`,
+        () =>
+          i + this.scrollCursor * 9 < this.filteredPokemonData.length
+            ? { x: container.x - 1, y: container.y, width: 18, height: 17 }
+            : null,
+        () => {
+          if (this.blockInput || this.showingTray || this.closePointerDropDown()) {
+            return;
+          }
+          const species = this.filteredPokemonData[i + this.scrollCursor * 9]?.species;
+          if (!species) {
+            return;
+          }
+          const same = !this.filterMode && !this.filterTextMode && this.pointerSpecies === species.speciesId;
+          this.focusPointerGrid();
+          this.setCursor(i);
+          this.cursorObj.setVisible(true);
+          if (same) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.getUi().playSelect();
+          }
+        },
+        wheel,
+      ),
+    );
+    for (const { label, index, dropDown } of this.filterBar.getPointerTargets()) {
+      targets.add(
+        this.filterBar,
+        `dex-filter-${index}`,
+        () => ({ x: label.x - 2, y: 0, width: label.displayWidth + 4, height: this.filterBar.height }),
+        () => {
+          if (this.blockInput || this.showingTray) {
+            return;
+          }
+          const same = this.filterMode && this.filterBarCursor === index;
+          const open = this.filterBar.openDropDown;
+          this.filterBar.hideDropDowns();
+          this.filterTextMode = false;
+          this.filterText.cursorObj.setVisible(false);
+          this.setFilterMode(true);
+          this.setCursor(index);
+          if (!same || !open) {
+            this.getUi().processInput(Button.ACTION);
+          }
+        },
+      );
+      const data = dropDown.getPointerTargets();
+      const wheel = (direction: number) => {
+        if (this.blockInput) {
+          return;
+        }
+        const next = Phaser.Math.Clamp(dropDown.cursor + direction, 0, data.options.length - 1);
+        if (dropDown.setCursor(next)) {
+          this.getUi().playSelect();
+        }
+      };
+      const enabled = () =>
+        this.filterMode && this.filterBar.openDropDown && this.filterBarCursor === index && dropDown.visible;
+      targets.add(
+        dropDown,
+        `dex-dropdown-${index}`,
+        () => (enabled() ? { x: 0, y: 0, width: data.window.width, height: data.window.height } : null),
+        undefined,
+        wheel,
+      );
+      data.options.forEach((option, row) =>
+        targets.add(
+          dropDown,
+          `dex-dropdown-${index}-${row}`,
+          () =>
+            enabled() && option.visible
+              ? { x: 0, y: option.y, width: data.window.width, height: data.rowHeight }
+              : null,
+          () => {
+            if (this.blockInput) {
+              return;
+            }
+            if (dropDown.cursor === row) {
+              this.getUi().processInput(Button.ACTION);
+            } else {
+              dropDown.setCursor(row);
+              this.getUi().playSelect();
+            }
+          },
+          wheel,
+        ),
+      );
+    }
+    for (const { label, index, selection } of this.filterText.getPointerTargets()) {
+      targets.add(
+        this.filterText,
+        `dex-search-${index}`,
+        () => ({
+          x: label.x - 8,
+          y: label.y,
+          width: Math.max(125, selection.x + selection.displayWidth - label.x + 8),
+          height: 17,
+        }),
+        () => {
+          if (this.blockInput || this.showingTray || this.closePointerDropDown()) {
+            return;
+          }
+          const same = this.filterTextMode && this.filterTextCursor === index;
+          this.filterMode = false;
+          this.filterBar.cursorObj.setVisible(false);
+          this.setFilterTextMode(true);
+          this.setCursor(index);
+          if (same) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.getUi().playSelect();
+          }
+        },
+      );
+    }
+    const instructions = [
+      [this.goFilterIconElement1, this.goFilterLabel, Button.STATS],
+      [this.goFilterIconElement2, this.goFilterLabel, Button.CYCLE_TERA],
+      [this.toggleDecorationsIconElement, this.toggleDecorationsLabel, Button.CYCLE_SHINY],
+      [this.showFormTrayIconElement, this.showFormTrayLabel, Button.CYCLE_FORM],
+    ] as const;
+    instructions.forEach(([icon, label, button], i) =>
+      targets.add(
+        this.starterSelectContainer,
+        `dex-instruction-${i}`,
+        () =>
+          icon.visible && label.visible
+            ? {
+                x: icon.x,
+                y: icon.y,
+                width: label.x + label.displayWidth - icon.x,
+                height: Math.max(8, label.displayHeight),
+              }
+            : null,
+        () => {
+          if (!this.blockInput && !this.closePointerDropDown()) {
+            this.getUi().processInput(button);
+          }
+        },
+      ),
+    );
+    const tray = targets.add(this.formTrayContainer, "dex-form-tray", () =>
+      this.showingTray ? { x: 0, y: 0, width: this.trayBg.width, height: this.trayBg.height } : null,
+    );
+    this.formTrayContainer.moveTo(tray, 1);
+    for (let i = 0; i < 81; i++) {
+      targets.add(
+        this.formTrayContainer,
+        `dex-form-${i}`,
+        () =>
+          this.showingTray && i < this.trayContainers.length
+            ? { x: 4 + (i % 9) * 18, y: 3 + Math.floor(i / 9) * 18, width: 18, height: 18 }
+            : null,
+        () => {
+          if (this.blockInput) {
+            return;
+          }
+          if (this.trayCursor === i) {
+            this.getUi().processInput(Button.ACTION);
+          } else {
+            this.setTrayCursor(i);
+            this.getUi().playSelect();
+          }
+        },
+      );
+    }
+    this.starterSelectContainer.bringToTop(this.filterBar);
+    this.starterSelectContainer.bringToTop(this.formTrayContainer);
+  }
+
   private starterSelectContainer: Phaser.GameObjects.Container;
   private starterSelectScrollBar: ScrollBar;
   private filterBarContainer: Phaser.GameObjects.Container;
@@ -516,7 +757,8 @@ export class PokedexUiHandler extends MessageUiHandler {
     this.pokemonFormText.setOrigin(0, 0);
     this.starterSelectContainer.add(this.pokemonFormText);
 
-    const starterBoxContainer = globalScene.add.container(speciesContainerX + 6, 9); //115
+    const starterBoxContainer = globalScene.add.container(speciesContainerX + 6, 9);
+    this.gridContainer = starterBoxContainer; //115
 
     this.starterSelectScrollBar = new ScrollBar(161, 12, 5, pokemonContainerWindow.height - 6, 9);
 
@@ -677,6 +919,7 @@ export class PokedexUiHandler extends MessageUiHandler {
       this.blockOpenPage = false;
     }
 
+    this.displayId++;
     super.show(args);
 
     this.starterSelectContainer.setVisible(true);
@@ -702,6 +945,7 @@ export class PokedexUiHandler extends MessageUiHandler {
     this.setCursor(0);
 
     this.filterTextContainer.setVisible(true);
+    this.createPointerTargets();
 
     return true;
   }
@@ -979,6 +1223,23 @@ export class PokedexUiHandler extends MessageUiHandler {
       return false;
     }
 
+    if (
+      !this.filterMode
+      && !this.filterTextMode
+      && !this.showingTray
+      && [Button.UP, Button.DOWN, Button.LEFT, Button.RIGHT].includes(button)
+      && this.pointerSpecies !== null
+    ) {
+      const index = this.filteredPokemonData.findIndex(data => data.species.speciesId === this.pointerSpecies);
+      if (index >= 0 && (index < this.scrollCursor * 9 || index >= this.scrollCursor * 9 + 81)) {
+        this.scrollCursor = Math.max(
+          0,
+          Math.min(Math.floor(index / 9), Math.ceil(this.filteredPokemonData.length / 9) - 9),
+        );
+        this.updateScroll();
+        this.restorePointerSelection();
+      }
+    }
     const maxColumns = 9;
     const numberOfStarters = this.filteredPokemonData.length;
     const numOfRows = Math.ceil(numberOfStarters / maxColumns);
@@ -1290,7 +1551,8 @@ export class PokedexUiHandler extends MessageUiHandler {
     let iconPath;
     // touch controls cannot be rebound as is, and are just emulating a keyboard event.
     // Additionally, since keyboard controls can be rebound (and will be displayed when they are), we need to have special handling for the touch controls
-    if (gamepadType === "touch") {
+    if (gamepadType === "touch" || !globalScene.inputController?.getIconForLatestInputRecorded(iconSetting)) {
+      gamepadType = "keyboard";
       gamepadType = "keyboard";
       switch (iconSetting) {
         case SettingKeyboard.BUTTON_CYCLE_SHINY:
@@ -1318,7 +1580,8 @@ export class PokedexUiHandler extends MessageUiHandler {
     let iconPath;
     // touch controls cannot be rebound as is, and are just emulating a keyboard event.
     // Additionally, since keyboard controls can be rebound (and will be displayed when they are), we need to have special handling for the touch controls
-    if (gamepadType === "touch") {
+    if (gamepadType === "touch" || !globalScene.inputController?.getIconForLatestInputRecorded(iconSetting)) {
+      gamepadType = "keyboard";
       gamepadType = "keyboard";
       iconPath = "C.png";
     } else {
@@ -1346,6 +1609,7 @@ export class PokedexUiHandler extends MessageUiHandler {
 
   // TODO: why does this need to be `() => {}` in order to not crash?
   updateStarters = () => {
+    const selected = this.pointerSpecies;
     this.scrollCursor = 0;
     this.filteredPokemonData = [];
 
@@ -1760,6 +2024,8 @@ export class PokedexUiHandler extends MessageUiHandler {
     this.filteredIndices = this.filteredPokemonData.map(c => c.species.speciesId);
 
     this.updateScroll();
+    this.pointerSpecies = selected;
+    this.restorePointerSelection();
   };
 
   updateScroll = () => {
@@ -1916,6 +2182,7 @@ export class PokedexUiHandler extends MessageUiHandler {
       const species = this.pokemonContainers[cursor]?.species;
 
       if (species) {
+        this.pointerSpecies = species.speciesId;
         this.setSpecies(species);
         return true;
       }
@@ -2319,6 +2586,7 @@ export class PokedexUiHandler extends MessageUiHandler {
   }
 
   tryExit(): boolean {
+    const displayId = this.displayId;
     this.blockInput = true;
     const ui = this.getUi();
 
@@ -2337,6 +2605,9 @@ export class PokedexUiHandler extends MessageUiHandler {
       yOffset: 29,
     };
     ui.showText(i18next.t("pokedexUiHandler:confirmExit"), null, () => {
+      if (displayId !== this.displayId || !this.active || ui.getHandler() !== this) {
+        return;
+      }
       ui.setModeWithoutClear(UiMode.CONFIRM, confirmExitConfig);
     });
 
@@ -2406,6 +2677,9 @@ export class PokedexUiHandler extends MessageUiHandler {
   }
 
   override destroy(): void {
+    this.clear();
+    this.starterSelectContainer.destroy();
+    super.destroy();
     this.pokemonContainers = [];
     this.filteredPokemonData = [];
   }
@@ -2416,6 +2690,16 @@ export class PokedexUiHandler extends MessageUiHandler {
   }
 
   clear(): void {
+    this.displayId++;
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    this.filterBar.hideDropDowns();
+    if (this.assetLoadCancelled) {
+      this.assetLoadCancelled.value = true;
+    }
+    if (this.showingTray) {
+      this.closeFormTray();
+    }
     super.clear();
 
     this.cursor = -1;

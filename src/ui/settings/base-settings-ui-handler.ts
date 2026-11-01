@@ -10,6 +10,7 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ScrollBar } from "#ui/scroll-bar";
 import { TabMenu } from "#ui/tab-menu";
 import { addTextObject, getTextColor } from "#ui/text";
+import { UiPointerTargets } from "#ui/ui-pointer-targets";
 import { addWindow } from "#ui/ui-theme";
 import { hasTouchscreen } from "#utils/app-utils";
 import { capitalizeFirstLetter } from "#utils/strings";
@@ -17,6 +18,15 @@ import i18next from "i18next";
 
 /** Abstract class for handling UI elements related to settings. */
 export class BaseSettingsUiHandler extends MessageUiHandler {
+  private pointerTargets: UiPointerTargets | null = null;
+  private footerTargets: { object: Phaser.GameObjects.Text | Phaser.GameObjects.Sprite; button: Button }[] = [];
+  private displayId = 0;
+  protected pointerBlocked = false;
+
+  protected get supportsSettingsPointer(): boolean {
+    return ["general", "display", "audio"].includes(this.category);
+  }
+
   private settingsContainer: Phaser.GameObjects.Container;
   private optionsContainer: Phaser.GameObjects.Container;
   private messageBoxContainer: Phaser.GameObjects.Container;
@@ -115,6 +125,12 @@ export class BaseSettingsUiHandler extends MessageUiHandler {
       .setOrigin(0, 0.15);
     cancelText.setPositionRelative(iconCancel, -cancelText.width / 6 - 2, 0);
 
+    this.footerTargets = [
+      { object: actionText, button: Button.ACTION },
+      { object: iconAction, button: Button.ACTION },
+      { object: cancelText, button: Button.CANCEL },
+      { object: iconCancel, button: Button.CANCEL },
+    ];
     this.optionsContainer = globalScene.add.container();
 
     this.settingLabels = [];
@@ -243,6 +259,9 @@ export class BaseSettingsUiHandler extends MessageUiHandler {
    * @returns `true` if successful.
    */
   public override show(args: any[]): boolean {
+    ++this.displayId;
+    this.pointerTargets?.destroy();
+    this.showText("", 0);
     super.show(args);
     const activeIndex = this.settingsTabs.findIndex(tab => tab.mode === this.getUi().mode);
     if (activeIndex !== -1) {
@@ -278,8 +297,140 @@ export class BaseSettingsUiHandler extends MessageUiHandler {
     ui.moveTo(this.settingsContainer, ui.length - 1);
 
     ui.hideTooltip();
+    this.setupPointerTargets();
 
     return true;
+  }
+
+  private setupPointerTargets(): void {
+    if (!this.supportsSettingsPointer) {
+      return;
+    }
+    this.pointerTargets = new UiPointerTargets(this);
+    const targets = this.pointerTargets;
+    targets.add(this.settingsContainer, "settings-page", () => ({
+      x: -1,
+      y: -1,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height,
+    }));
+    const rowArea = (index: number) => {
+      if (index < this.scrollCursor || index >= this.scrollCursor + this.rowsToDisplay) {
+        return null;
+      }
+      return {
+        x: 4,
+        y: this.optionsBg.y + 4 + (index - this.scrollCursor) * 16,
+        width: this.optionsBg.width - (this.scrollBar.visible ? 16 : 8),
+        height: 16,
+      };
+    };
+    this.uiItems.forEach((_item, index) => {
+      targets.add(
+        this.settingsContainer,
+        `settings-row-${index}`,
+        () => rowArea(index),
+        () => {
+          if (!this.pointerBlocked) {
+            this.selectPointerRow(index);
+          }
+        },
+        direction => this.movePointerRow(direction),
+      );
+      this.optionValueLabels[index].forEach((label, value) => {
+        targets.add(
+          this.settingsContainer,
+          `settings-value-${index}-${value}`,
+          () => {
+            const row = rowArea(index);
+            if (!row) {
+              return null;
+            }
+            const x = Math.max(row.x, label.x - 2);
+            return {
+              x,
+              y: row.y,
+              width: Math.max(0, Math.min(row.x + row.width, label.x + label.displayWidth + 2) - x),
+              height: row.height,
+            };
+          },
+          () => {
+            if (this.pointerBlocked) {
+              return;
+            }
+            if (this.cursor + this.scrollCursor !== index) {
+              this.selectPointerRow(index);
+            } else if (this.setOptionCursor(index, value, true)) {
+              this.getUi().playSelect();
+            }
+          },
+          direction => this.movePointerRow(direction),
+        );
+      });
+    });
+    targets.add(
+      this.settingsContainer,
+      "settings-list",
+      () => ({
+        x: this.optionsBg.x,
+        y: this.optionsBg.y,
+        width: this.optionsBg.width,
+        height: this.optionsBg.height,
+      }),
+      undefined,
+      direction => this.movePointerRow(direction),
+    );
+    // Keep the list background below its row and value targets.
+    this.settingsContainer.moveTo(targets.zones.at(-1)!, this.settingsContainer.getIndex(targets.zones[0]) + 1);
+    this.footerTargets.forEach(({ object, button }, index) => {
+      targets.add(
+        this.settingsContainer,
+        `settings-footer-${index}`,
+        () =>
+          object.alpha === 0 || object.visible === false
+            ? null
+            : {
+                x: object.x - (object.displayWidth || 16) * (object.originX ?? 0) - 2,
+                y: object.y - (object.displayHeight || 16) * (object.originY ?? 0),
+                width: (object.displayWidth || 16) + 4,
+                height: object.displayHeight || 16,
+              },
+        () => {
+          if (button === Button.CANCEL || !this.pointerBlocked) {
+            this.getUi().processInput(button);
+          }
+        },
+      );
+    });
+    this.tabMenu.enablePointerNavigation(
+      () => !this.pointerBlocked && this.getUi().canProcessPointerInput(this),
+      () => this.getUi().processInput(Button.CANCEL),
+      () => this.getUi().canProcessPointerInput(this),
+    );
+    this.settingsContainer.bringToTop(this.tabMenu);
+  }
+
+  private selectPointerRow(index: number): void {
+    const changed = index !== this.cursor + this.scrollCursor;
+    const nextScroll = Math.max(
+      0,
+      Math.min(this.scrollCursor, index, Math.max(0, this.uiItems.length - this.rowsToDisplay)),
+    );
+    this.setScrollCursor(Math.max(nextScroll, index - this.rowsToDisplay + 1));
+    this.setCursor(index - this.scrollCursor);
+    if (changed) {
+      this.getUi().playSelect();
+    }
+  }
+
+  private movePointerRow(direction: number): void {
+    if (this.pointerBlocked) {
+      return;
+    }
+    const index = this.cursor + this.scrollCursor + direction;
+    if (index >= 0 && index < this.uiItems.length) {
+      this.selectPointerRow(index);
+    }
   }
 
   /**
@@ -507,6 +658,13 @@ export class BaseSettingsUiHandler extends MessageUiHandler {
    * Clear the UI elements and state.
    */
   public override clear(): void {
+    ++this.displayId;
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
+    this.tabMenu.disablePointerNavigation();
+    this.textTimer?.remove();
+    this.textCallbackTimer?.remove();
+    this.showText("", 0);
     super.clear();
 
     this.settingsContainer.setVisible(false);
@@ -533,8 +691,28 @@ export class BaseSettingsUiHandler extends MessageUiHandler {
     prompt?: boolean,
     promptDelay?: number,
   ): void {
-    this.messageBoxContainer.setVisible(text?.length > 0);
-    super.showText(text, delay, callback, callbackDelay, prompt, promptDelay);
+    this.pointerBlocked = text.length > 0;
+    this.messageBoxContainer.setVisible(text.length > 0);
+    const displayId = this.displayId;
+    super.showText(
+      text,
+      delay,
+      callback
+        && (() => {
+          if (this.active && displayId === this.displayId) {
+            callback();
+          }
+        }),
+      callbackDelay,
+      prompt,
+      promptDelay,
+    );
+  }
+
+  public override destroy(): void {
+    this.clear();
+    this.settingsContainer.destroy();
+    super.destroy();
   }
 
   protected updateOptionValueLabel(settingIndex: number, optionIndex: number, newLabel: string) {
