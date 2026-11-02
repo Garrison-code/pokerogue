@@ -8,6 +8,7 @@ import { getStarterSelectTextSettings } from "#ui/starter-select-ui-utils";
 import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 import type { GameObjects } from "phaser";
+import Phaser from "phaser";
 
 export class StarterSelectInstructionsContainer extends Phaser.GameObjects.Container {
   private shinyIconElement: Phaser.GameObjects.Sprite;
@@ -250,9 +251,9 @@ export class StarterSelectInstructionsContainer extends Phaser.GameObjects.Conta
 
     let gamepadType: string;
     if (globalScene.inputMethod === "gamepad") {
-      gamepadType = globalScene.inputController.getConfig(
-        globalScene.inputController.selectedDevice[Device.GAMEPAD]!, // TODO: re-evaluate bang
-      ).padType;
+      const gamepadId = globalScene.inputController.selectedDevice[Device.GAMEPAD];
+      // Phaser 4 can report gamepad input before a device id exists.
+      gamepadType = gamepadId ? globalScene.inputController.getConfig(gamepadId).padType : "keyboard";
     } else {
       // A mouse-only visit has no recorded keyboard/gamepad input yet.
       gamepadType = globalScene.inputMethod || "keyboard";

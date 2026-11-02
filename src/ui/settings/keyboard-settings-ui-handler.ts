@@ -16,6 +16,7 @@ import { BaseControlSettingsUiHandler } from "#ui/base-control-settings-ui-handl
 import { addTextObject } from "#ui/text";
 import { truncateString } from "#utils/common";
 import i18next from "i18next";
+import Phaser from "phaser";
 
 /** Class representing the settings UI handler for keyboards */
 export class SettingsKeyboardUiHandler extends BaseControlSettingsUiHandler {

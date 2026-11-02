@@ -99,6 +99,13 @@ rogueserver 有一份對應的文件：`rogueserver/docs/branch-migration-roadma
 - 完整測試（`pnpm test`）、lint 和 typecheck 全部通過。
 - 本機 `pnpm build` 成功，`Dockerfile.static` 也能建出 image。
 
+### 完成紀錄（2026-11-02）
+
+- 第 1 階段已完成：PR #17（https://github.com/Garrison-code/pokerogue/pull/17）合進 `develop`。
+- 第 2 階段已完成：PR #18（https://github.com/Garrison-code/pokerogue/pull/18）以 merge commit `bf7dd37b` 合進 `beta`。
+- 第 3 階段由 PR #19（https://github.com/Garrison-code/pokerogue/pull/19）同步上游 `beta`（2026-11-02 量測落後 37 個 commit）。合併前 `beta` 尚未包含這 37 個 commit。
+- multi-arch（`linux/amd64` 加 `linux/arm64`）的實際建置留到第 5 階段第一次 push 到 `main` 時確認。`ghcr.yml` 已設定這兩個平台與 QEMU，但本機不安裝 Docker，第 3 階段不以本機 image 建置作為驗收。
+
 ## 不在這份文件範圍內的事
 
 - **第 0 階段**：Oracle Cloud、Cloudflare、Hostinger nameserver 的設定，由使用者自己處理。

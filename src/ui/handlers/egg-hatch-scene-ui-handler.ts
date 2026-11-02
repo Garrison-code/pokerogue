@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { Button } from "#enums/buttons";
 import { UiHandler } from "#ui/ui-handler";
 import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
+import Phaser from "phaser";
 
 export class EggHatchSceneUiHandler extends UiHandler {
   private pointerSkipChecked = false;

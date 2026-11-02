@@ -66,6 +66,7 @@ import { UnavailableModalUiHandler } from "#ui/unavailable-modal-ui-handler";
 import { MessagePointerController } from "#ui/utils/message-pointer-controller";
 import { executeIf } from "#utils/common";
 import i18next from "i18next";
+import Phaser from "phaser";
 
 const transitionModes = [
   UiMode.SAVE_SLOT,
@@ -720,8 +721,11 @@ export class UI extends Phaser.GameObjects.Container {
    */
   public getGamepadType(): string {
     if (globalScene.inputMethod === "gamepad") {
-      // TODO: is this bang correct?
-      return globalScene.inputController.getConfig(globalScene.inputController.selectedDevice[Device.GAMEPAD]!).padType;
+      const gamepadId = globalScene.inputController.selectedDevice[Device.GAMEPAD];
+      if (!gamepadId) {
+        return "keyboard";
+      }
+      return globalScene.inputController.getConfig(gamepadId).padType;
     }
     return globalScene.inputMethod;
   }

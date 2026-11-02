@@ -12,7 +12,7 @@ import {
   systemRevision,
   validateSystemImportShape,
 } from "#system/system-data-merge";
-import type { SystemSaveData } from "#types/save-data";
+import type { StarterData, SystemSaveData } from "#types/save-data";
 import { AES, enc } from "crypto-js";
 import i18next from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,7 +48,7 @@ function save(id = 1): SystemSaveData {
         classicWinCount: 0,
         pity: [0, 0],
       },
-    },
+    } as StarterData,
     gameStats: new GameStats(),
     unlocks: {},
     achvUnlocks: {},
