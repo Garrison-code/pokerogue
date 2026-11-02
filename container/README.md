@@ -10,9 +10,10 @@ image only from `main`, as the moving tag `latest` and the immutable tag
 validates the image before publishing. `beta` and every other branch do not
 publish an image. The original Dockerfile remains available for local development only.
 
-The default build mode is `development`, retaining the project's development flags;
-this still uses `vite build` rather than the Vite development server. Change
-`BUILD_MODE` only when intentionally building another environment.
+A direct `docker build -f Dockerfile.static .` defaults to build mode `development`,
+retaining the project's development flags; this still uses `vite build` rather than
+the Vite development server. The publish workflow passes `BUILD_MODE=production`, so
+published images have no beta labels, developer keys or request logging.
 
 Container runtime settings are supported through an explicit public
 allowlist: `VITE_APP_TITLE` (image default `PokéRogue (Garrix)`), `VITE_SERVER_URL`
