@@ -31,7 +31,8 @@ import { getStarterColors } from "#utils/pokemon-utils";
 import { toCamelCase, toTitleCase } from "#utils/strings";
 import i18next from "i18next";
 import type { GameObjects } from "phaser";
-import type BBCodeText from "phaser3-rex-plugins/plugins/bbcodetext";
+import Phaser from "phaser";
+import type BBCodeText from "phaser4-rex-plugins/plugins/bbcodetext";
 
 export class StarterSummary extends Phaser.GameObjects.Container {
   private readonly pokemonSprite: Phaser.GameObjects.Sprite;
@@ -101,7 +102,11 @@ export class StarterSummary extends Phaser.GameObjects.Container {
 
     this.pokemonSprite = globalScene.add //
       .sprite(53, 63, "pkmn__sub")
-      .setPipeline(globalScene.spritePipeline, { tone: [0.0, 0.0, 0.0, 0.0], ignoreTimeTint: true });
+      .setRenderNodeRole("Submitter", globalScene.spriteSubmitter, {
+        tone: [0.0, 0.0, 0.0, 0.0],
+        ignoreTimeTint: true,
+      })
+      .setRenderNodeRole("BatchHandler", globalScene.spriteBatchHandler);
 
     this.shinyOverlay = globalScene.add
       .image(6, 111, getLocalizedSpriteKey("summary_dexnb_label_overlay_shiny"))
@@ -494,6 +499,7 @@ export class StarterSummary extends Phaser.GameObjects.Container {
   }
 
   public setNoStarter(): void {
+    ++this.spriteRequest;
     if (globalScene.ui.getTooltip().visible) {
       globalScene.ui.hideTooltip();
     }
@@ -512,6 +518,7 @@ export class StarterSummary extends Phaser.GameObjects.Container {
     // Checking here to ensure achievements are loaded, and updated if unlocked while playing
     this.allowTera = Object.hasOwn(globalScene.gameData.achvUnlocks, achvs.TERASTALLIZE.id);
 
+    ++this.spriteRequest;
     this.speciesId = starterId;
     const species = speciesDataRegistry.getSpecies(starterId);
 
@@ -796,6 +803,8 @@ export class StarterSummary extends Phaser.GameObjects.Container {
       .setPosition(iconPosition.x, iconPosition.y);
   }
 
+  private spriteRequest = 0;
+
   private updateSprite(
     species: PokemonSpecies,
     female: boolean,
@@ -803,12 +812,20 @@ export class StarterSummary extends Phaser.GameObjects.Container {
     shiny: boolean,
     variant: Variant,
   ): void {
+    const request = ++this.spriteRequest;
     species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
+      if (request !== this.spriteRequest || !this.scene) {
+        return;
+      }
       this.pokemonSprite
         .play(species.getSpriteKey(female, formIndex, shiny, variant))
-        .setPipelineData("shiny", shiny)
-        .setPipelineData("variant", variant)
-        .setPipelineData("spriteKey", species.getSpriteKey(female, formIndex, shiny, variant))
+        .setRenderNodeData(globalScene.spriteSubmitter, "shiny", shiny)
+        .setRenderNodeData(globalScene.spriteSubmitter, "variant", variant)
+        .setRenderNodeData(
+          globalScene.spriteSubmitter,
+          "spriteKey",
+          species.getSpriteKey(female, formIndex, shiny, variant),
+        )
         .setVisible(!this.statsMode);
     });
   }
@@ -875,6 +892,7 @@ export class StarterSummary extends Phaser.GameObjects.Container {
   }
 
   public clear(): void {
+    ++this.spriteRequest;
     globalScene.ui.hideTooltip();
     this.activeTooltip = undefined;
   }

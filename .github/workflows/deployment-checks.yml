@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Garrison-code
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Deployment checks
+
+on:
+  push:
+    branches: [beta, main]
+  pull_request:
+    branches: [beta, main]
+
+permissions:
+  contents: read
+
+jobs:
+  static-image:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_REVISION: ${{ github.sha }}
+      EXPECTED_BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Build and validate the static runtime before merge
+        run: |
+          docker build -f Dockerfile.static -t pokerogue-static:pr \
+            --build-arg "BUILD_REVISION=$EXPECTED_REVISION" \
+            --build-arg "BUILD_ID=$EXPECTED_BUILD_ID" \
+            --build-arg 'VITE_APP_TITLE=PokéRogue (Garrix-dev)' .
+          docker run -d --name static-check -p 127.0.0.1:18000:8000 pokerogue-static:pr
+          trap 'docker logs static-check; docker rm -f static-check' EXIT
+          python3 container/check_static.py http://127.0.0.1:18000 'PokéRogue (Garrix-dev)'

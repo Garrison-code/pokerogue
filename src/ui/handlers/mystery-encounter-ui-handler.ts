@@ -13,9 +13,12 @@ import type { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { addBBCodeTextObject, getBBCodeFrag } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow, WindowVariant } from "#ui/ui-theme";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import { fixedInt } from "#utils/common";
+import { addMask } from "#utils/mask-utils";
 import i18next from "i18next";
-import type BBCodeText from "phaser3-rex-plugins/plugins/bbcodetext";
+import Phaser from "phaser";
+import type BBCodeText from "phaser4-rex-plugins/plugins/bbcodetext";
 
 export class MysteryEncounterUiHandler extends UiHandler {
   private cursorContainer: Phaser.GameObjects.Container;
@@ -46,6 +49,124 @@ export class MysteryEncounterUiHandler extends UiHandler {
   protected viewPartyXPosition = 0;
 
   protected blockInput = true;
+  private pointerTargets: UiPointerTargets | undefined;
+  private displayId = 0;
+  private displayTimers: ReturnType<typeof setTimeout>[] = [];
+  private optionSubmitted = false;
+  private textMasks: Phaser.GameObjects.Graphics[] = [];
+  private tooltipMask: Phaser.GameObjects.Graphics | undefined;
+
+  private delayDisplay(callback: () => void, delay: number): void {
+    const displayId = this.displayId;
+    this.displayTimers.push(
+      setTimeout(() => {
+        if (this.active && displayId === this.displayId) {
+          callback();
+        }
+      }, delay),
+    );
+  }
+
+  private readonly onDexPointer = (
+    pointer: Phaser.Input.Pointer,
+    _x: number,
+    _y: number,
+    event: Phaser.Types.Input.EventData,
+  ) => {
+    event.stopPropagation();
+    if (!pointer.wasTouch && this.getUi().canProcessPointerInput(this) && pointer.rightButtonDown()) {
+      this.getUi().processInput(Button.CANCEL);
+    }
+  };
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = (this.pointerTargets = new UiPointerTargets(this));
+    const ui = this.getUi();
+    const page = targets.add(ui, "mystery-page", () => ({
+      x: 0,
+      y: -globalScene.scaledCanvas.height,
+      width: globalScene.scaledCanvas.width,
+      height: globalScene.scaledCanvas.height,
+    }));
+    ui.moveTo(page, ui.getIndex(this.cursorContainer));
+    for (let index = 0; index <= this.viewPartyIndex; index++) {
+      targets.add(
+        ui,
+        `mystery-option-${index}`,
+        () => {
+          if (!this.optionsContainer.visible) {
+            return null;
+          }
+          if (index === this.viewPartyIndex) {
+            const text = this.optionsContainer.getAt<Phaser.GameObjects.Text>(index);
+            return {
+              x: this.optionsContainer.x + text.x - 2,
+              y: this.optionsContainer.y + text.y - 1,
+              width: text.displayWidth + 4,
+              height: 18,
+            };
+          }
+          return {
+            x: this.optionsContainer.x + (index % 2) * 100 - 2,
+            y: this.optionsContainer.y + (this.encounterOptions.length === 2 ? 8 : index < 2 ? 0 : 16),
+            width: 96,
+            height: 16,
+          };
+        },
+        () => {
+          if (this.optionSubmitted || (this.blockInput && index !== this.viewPartyIndex)) {
+            return;
+          }
+          if (this.getCursor() === index) {
+            ui.processInput(Button.ACTION);
+          } else {
+            this.setCursor(index);
+            this.displayOptionTooltip();
+            ui.playSelect();
+          }
+        },
+      );
+    }
+    // Keep the radar's existing hover in front of the page hit area.
+    this.dexProgressContainer.off("pointerdown", this.onDexPointer).on("pointerdown", this.onDexPointer);
+  }
+
+  private stopDisplay(): void {
+    ++this.displayId;
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
+    for (const timer of this.displayTimers) {
+      clearTimeout(timer);
+    }
+    this.displayTimers.length = 0;
+    for (let i = 0; i < this.optionScrollTweens.length; i++) {
+      this.optionScrollTweens[i]?.remove();
+      this.optionScrollTweens[i] = null;
+    }
+    this.descriptionScrollTween?.remove();
+    this.descriptionScrollTween = undefined;
+    this.tooltipScrollTween?.remove();
+    this.tooltipScrollTween = undefined;
+    for (const mask of this.textMasks) {
+      mask.destroy();
+    }
+    this.textMasks.length = 0;
+    this.tooltipMask?.destroy();
+    this.tooltipMask = undefined;
+    globalScene.tweens.killTweensOf(this.descriptionContainer);
+    globalScene.tweens.killTweensOf(this.dexProgressContainer);
+    this.descriptionContainer.x = 0;
+    this.dexProgressContainer.y = -43;
+    this.dexProgressContainer.off("pointerover").off("pointerout").off("pointerdown", this.onDexPointer);
+    this.showDexProgress = false;
+    this.getUi().hideTooltip();
+  }
+
+  override destroy(): void {
+    this.stopDisplay();
+    this.active = false;
+  }
 
   override setup() {
     const ui = this.getUi();
@@ -88,7 +209,9 @@ export class MysteryEncounterUiHandler extends UiHandler {
   }
 
   override show(args: any[]): boolean {
+    this.stopDisplay();
     super.show(args);
+    this.optionSubmitted = false;
 
     this.overrideSettings = (args[0] as OptionSelectSettings) ?? {};
     const showDescriptionContainer =
@@ -110,11 +233,12 @@ export class MysteryEncounterUiHandler extends UiHandler {
       this.setCursor(startingCursorIndex);
     }
     if (this.blockInput) {
-      setTimeout(() => {
+      this.delayDisplay(() => {
         this.unblockInput();
       }, 1000);
     }
     this.displayOptionTooltip();
+    this.createPointerTargets();
 
     return true;
   }
@@ -128,6 +252,9 @@ export class MysteryEncounterUiHandler extends UiHandler {
 
     if (button === Button.CANCEL || button === Button.ACTION) {
       if (button === Button.ACTION) {
+        if (this.optionSubmitted) {
+          return false;
+        }
         const selected = this.encounterOptions[cursor];
         if (cursor === this.viewPartyIndex) {
           // Handle view party
@@ -137,11 +264,14 @@ export class MysteryEncounterUiHandler extends UiHandler {
             slideInDescription: false,
           };
           globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
-            globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, overrideSettings);
-            setTimeout(() => {
-              this.setCursor(this.viewPartyIndex);
-              this.unblockInput();
-            }, 300);
+            globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, overrideSettings).then(() => {
+              if (this.active && this.getUi().getHandler() === this) {
+                this.delayDisplay(() => {
+                  this.setCursor(this.viewPartyIndex);
+                  this.unblockInput();
+                }, 300);
+              }
+            });
           });
         } else if (
           this.blockInput
@@ -150,12 +280,19 @@ export class MysteryEncounterUiHandler extends UiHandler {
               || selected.optionMode === MysteryEncounterOptionMode.DISABLED_OR_SPECIAL))
         ) {
           success = false;
-        } else if (
-          (globalScene.phaseManager.getCurrentPhase() as MysteryEncounterPhase).handleOptionSelect(selected, cursor)
-        ) {
-          success = true;
         } else {
-          ui.playError();
+          const displayId = this.displayId;
+          this.optionSubmitted = true;
+          success = (globalScene.phaseManager.getCurrentPhase() as MysteryEncounterPhase).handleOptionSelect(
+            selected,
+            cursor,
+          );
+          if (!success) {
+            if (displayId === this.displayId) {
+              this.optionSubmitted = false;
+            }
+            ui.playError();
+          }
         }
       } else {
         // TODO: If we need to handle cancel option? Maybe default logic to leave/run from encounter idk
@@ -364,6 +501,7 @@ export class MysteryEncounterUiHandler extends UiHandler {
 
     // Clear options container (except cursor)
     this.optionsContainer.removeAll(true);
+    this.descriptionContainer.removeBetween(2, this.descriptionContainer.length, true);
 
     // Options Window
     for (let i = 0; i < this.encounterOptions.length; i++) {
@@ -429,14 +567,17 @@ export class MysteryEncounterUiHandler extends UiHandler {
 
       // Sets up the mask that hides the option text to give an illusion of scrolling
       const nonScrollWidth = 90;
-      const optionTextMaskRect = globalScene.make.graphics({});
-      optionTextMaskRect.setScale(6);
-      optionTextMaskRect.fillStyle(0xffffff);
-      optionTextMaskRect.beginPath();
-      optionTextMaskRect.fillRect(optionText.x + 11, optionText.y + 140, nonScrollWidth, 18);
-
-      const optionTextMask = optionTextMaskRect.createGeometryMask();
-      optionText.setMask(optionTextMask);
+      // TODO: Replace masks with crops
+      const optionTextMaskRect = globalScene.make
+        .graphics({})
+        .setScale(6)
+        .fillStyle(0xffffff)
+        .beginPath()
+        .fillRect(optionText.x + 11, optionText.y + 140, nonScrollWidth, 18);
+      this.textMasks.push(optionTextMaskRect);
+      addMask(optionText, optionTextMaskRect);
+      // Destroy this once the optionText is destroyed to prevent memory leaks.
+      optionText.once(Phaser.GameObjects.Events.DESTROY, () => optionTextMaskRect.destroy());
 
       const optionTextWidth = optionText.displayWidth;
 
@@ -500,15 +641,16 @@ export class MysteryEncounterUiHandler extends UiHandler {
     });
 
     // Sets up the mask that hides the description text to give an illusion of scrolling
-    const descriptionTextMaskRect = globalScene.make.graphics({});
-    descriptionTextMaskRect.setScale(6);
-    descriptionTextMaskRect.fillStyle(0xffffff);
-    descriptionTextMaskRect.beginPath();
-    descriptionTextMaskRect.fillRect(6, 53, 206, 57);
-
-    const abilityDescriptionTextMask = descriptionTextMaskRect.createGeometryMask();
-
-    descriptionTextObject.setMask(abilityDescriptionTextMask);
+    const descriptionTextMaskRect = globalScene.make
+      .graphics({})
+      .setScale(6)
+      .fillStyle(0xffffff)
+      .beginPath()
+      .fillRect(6, 53, 206, 57);
+    this.textMasks.push(descriptionTextMaskRect);
+    addMask(descriptionTextObject, descriptionTextMaskRect);
+    // Destroy this once the descriptionTextObject is destroyed to prevent memory leaks.
+    descriptionTextObject.once(Phaser.GameObjects.Events.DESTROY, () => descriptionTextMaskRect.destroy());
 
     const descriptionLineCount = Math.floor(descriptionTextObject.displayHeight / 9.2);
 
@@ -554,6 +696,10 @@ export class MysteryEncounterUiHandler extends UiHandler {
    * The tooltip will auto wrap and scroll if it is too long
    */
   private displayOptionTooltip() {
+    this.tooltipScrollTween?.remove();
+    this.tooltipScrollTween = undefined;
+    this.tooltipMask?.destroy();
+    this.tooltipMask = undefined;
     const cursor = this.getCursor();
     // Clear tooltip box
     if (this.tooltipContainer.length > 1) {
@@ -561,7 +707,7 @@ export class MysteryEncounterUiHandler extends UiHandler {
     }
     this.tooltipContainer.setVisible(true);
 
-    if (cursor == null || cursor > this.optionsContainer.length - 2) {
+    if (cursor == null || !this.encounterOptions[cursor]) {
       // Ignore hovers on view party button
       // Hide dex progress if visible
       this.showHideDexProgress(false);
@@ -613,21 +759,18 @@ export class MysteryEncounterUiHandler extends UiHandler {
       this.tooltipContainer.add(tooltipTextObject);
 
       // Sets up the mask that hides the description text to give an illusion of scrolling
-      const tooltipTextMaskRect = globalScene.make.graphics({});
-      tooltipTextMaskRect.setScale(6);
-      tooltipTextMaskRect.fillStyle(0xffffff);
-      tooltipTextMaskRect.beginPath();
-      tooltipTextMaskRect.fillRect(this.tooltipContainer.x, this.tooltipContainer.y + 188.5, 150, 32);
-
-      const textMask = tooltipTextMaskRect.createGeometryMask();
-      tooltipTextObject.setMask(textMask);
+      const tooltipTextMaskRect = globalScene.make
+        .graphics({})
+        .setScale(6)
+        .fillStyle(0xffffff)
+        .beginPath()
+        .fillRect(this.tooltipContainer.x, this.tooltipContainer.y + 188.5, 150, 32);
+      this.tooltipMask = tooltipTextMaskRect;
+      addMask(tooltipTextObject, tooltipTextMaskRect);
+      // Destroy this once the tooltipTextObject is destroyed to prevent memory leaks.
+      tooltipTextObject.once(Phaser.GameObjects.Events.DESTROY, () => tooltipTextMaskRect.destroy());
 
       const tooltipLineCount = Math.floor(tooltipTextObject.displayHeight / 10.2);
-
-      if (this.tooltipScrollTween) {
-        this.tooltipScrollTween.remove();
-        this.tooltipScrollTween = undefined;
-      }
 
       // Animates the tooltip text moving upwards
       if (tooltipLineCount > 3) {
@@ -651,6 +794,7 @@ export class MysteryEncounterUiHandler extends UiHandler {
   }
 
   override clear(): void {
+    this.stopDisplay();
     super.clear();
     this.overrideSettings = undefined;
     this.optionsContainer.setVisible(false);

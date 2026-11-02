@@ -442,6 +442,7 @@ export const settingsMigrators: readonly SettingsSaveMigrator[] = [migrateSettin
 
 const migrateStarterPreferences: SystemSaveMigrator = {
   name: "migrateStarterPreferences",
+  localOnly: true,
   version: "1.12.1.0",
   migrate: (_data: object): void => {
     const oldStarterPreferences = JSON.parse(

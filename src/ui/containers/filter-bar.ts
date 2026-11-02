@@ -8,6 +8,7 @@ import type { PokedexMonContainer } from "#ui/pokedex-mon-container";
 import type { StarterContainer } from "#ui/starter-container";
 import { addTextObject, getTextColor } from "#ui/text";
 import { addWindow, WindowVariant } from "#ui/ui-theme";
+import Phaser from "phaser";
 
 export class FilterBar extends Phaser.GameObjects.Container {
   private window: Phaser.GameObjects.NineSlice;
@@ -45,6 +46,15 @@ export class FilterBar extends Phaser.GameObjects.Container {
 
     this.cursorObj = globalScene.add.image(1, 1, "cursor").setScale(0.5).setVisible(false).setOrigin(0);
     this.add([this.window, this.cursorObj]);
+  }
+
+  /** Internal hit targets; callers explicitly opt in to pointer support. */
+  public getPointerTargets() {
+    return this.labels.map((label, index) => ({
+      label,
+      index,
+      dropDown: this.dropDowns[index],
+    }));
   }
 
   /**

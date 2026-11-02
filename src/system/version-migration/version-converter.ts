@@ -8,6 +8,7 @@ import type {
   SessionSaveMigrator,
   SessionSaveMigratorIn,
   SettingsSaveMigrator,
+  SystemSaveMigrationOptions,
   SystemSaveMigrator,
 } from "#types/save-migrators";
 import { getDataTypeKey } from "#utils/data";
@@ -129,12 +130,12 @@ sortMigrators(settingsMigrators);
  * to the current version.
  * @param data - The {@linkcode SystemSaveData} to migrate
  */
-export function applySystemVersionMigration(data: SystemSaveData): void {
+export function applySystemVersionMigration(data: SystemSaveData, options?: SystemSaveMigrationOptions): void {
   const prevVersion = data.gameVersion;
   const isCurrentVersionHigher = compareVersions(prevVersion, LATEST_VERSION) === -1;
 
   if (isCurrentVersionHigher) {
-    applyMigrators(systemMigrators, data, prevVersion);
+    applyMigrators(systemMigrators, data, prevVersion, options);
     console.log(`System data successfully migrated to v${LATEST_VERSION}!`);
   }
 }
@@ -218,12 +219,20 @@ function sortMigrators(migrators: SaveMigrator[]): void {
  * @param data - The {@linkcode SaveData} to migrate
  * @param saveVersion - The version of the save data
  */
-function applyMigrators(migrators: readonly SaveMigrator[], data: SaveData, saveVersion: string): void {
+function applyMigrators(
+  migrators: readonly SaveMigrator[],
+  data: SaveData,
+  saveVersion: string,
+  options?: SystemSaveMigrationOptions,
+): void {
   for (const migrator of migrators) {
+    if (options?.dataOnly && "localOnly" in migrator && migrator.localOnly) {
+      continue;
+    }
     const isMigratorVersionHigher = compareVersions(saveVersion, migrator.version) === -1;
 
     if (isMigratorVersionHigher) {
-      migrator.migrate(data as any);
+      migrator.migrate(data as any, options);
 
       if ("appliedMigrators" in data) {
         const migratorNameVersion = `${migrator.version}-${migrator.name}`;

@@ -9,6 +9,10 @@ export class MockText implements MockGameObject {
   private scene;
   private textureManager;
   public list: MockGameObject[] = [];
+  public filters = {
+    internal: { addMask: (_mask: MockGameObject) => ({ autoUpdate: true }) },
+    external: { addMask: (_mask: MockGameObject) => ({ autoUpdate: true }) },
+  };
   public style;
   public text = "";
   public name: string;
@@ -28,6 +32,12 @@ export class MockText implements MockGameObject {
     this.phaserText = "";
     // super(scene, x, y);
     // this.phaserText = new Phaser.GameObjects.Text(scene, x, y, content, styleOptions);
+  }
+
+  appendText(text: string | string[], addCR = true): this {
+    const value = Array.isArray(text) ? text.join("\n") : text;
+    this.text += (addCR && this.text ? "\n" : "") + value;
+    return this;
   }
 
   runWordWrap(text) {
@@ -281,6 +291,10 @@ export class MockText implements MockGameObject {
     return this;
   }
 
+  clearMask(_destroyMask?: boolean): this {
+    return this;
+  }
+
   getBottomLeft() {
     return {
       x: 0,
@@ -356,6 +370,10 @@ export class MockText implements MockGameObject {
   on(_event: string | symbol, _fn: () => void, _context?: any) {}
 
   setActive(_active: boolean): this {
+    return this;
+  }
+
+  enableFilters(): this {
     return this;
   }
 }

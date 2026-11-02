@@ -9,6 +9,7 @@ import { addTextObject, getTextColor } from "#ui/text";
 import type { UI } from "#ui/ui";
 import { addWindow, WindowVariant } from "#ui/ui-theme";
 import i18next from "i18next";
+import Phaser from "phaser";
 
 export enum FilterTextRow {
   NAME,
@@ -115,6 +116,11 @@ export class FilterText extends Phaser.GameObjects.Container {
     this.numFilters++;
 
     return true;
+  }
+
+  /** Read-only geometry for handlers that explicitly enable mouse input. */
+  getPointerTargets() {
+    return this.labels.map((label, index) => ({ label, index, selection: this.selections[index] }));
   }
 
   resetSelection(index: number): void {

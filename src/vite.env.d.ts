@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   // it still shows up as "string"...
   readonly MODE: "development" | "beta" | "production" | "test" | "app";
   readonly VITE_PORT?: `${number}`;
+  readonly VITE_APP_TITLE?: string;
   readonly VITE_BYPASS_LOGIN?: "0" | "1";
   readonly VITE_BYPASS_TUTORIAL?: "0" | "1";
   readonly VITE_API_BASE_URL?: HTTP_URL;

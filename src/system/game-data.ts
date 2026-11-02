@@ -17,6 +17,7 @@ import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed-utils";
 import { allMoves } from "#data/data-lists";
 import type { Egg } from "#data/egg";
+import { MAX_MASTER_BALLS } from "#data/pokeball";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { loadPositionalTag } from "#data/positional-tags/load-positional-tag";
 import { AbilityAttr } from "#enums/ability-attr";
@@ -28,6 +29,7 @@ import { GameDataType } from "#enums/game-data-type";
 import { GameModes } from "#enums/game-modes";
 import { Nature } from "#enums/nature";
 import { PlayerGender } from "#enums/player-gender";
+import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
 import { StatusEffect } from "#enums/status-effect";
 import { TrainerVariant } from "#enums/trainer-variant";
@@ -52,11 +54,12 @@ import { RibbonData } from "#system/ribbon-data";
 import { TrainerData } from "#system/trainer-data";
 import { applySessionVersionMigration, applySystemVersionMigration } from "#system/version-converter";
 import { vouchers } from "#system/voucher";
-import type { DexData, DexEntry } from "#types/dex-data";
 import type {
   AchvUnlocks,
   AppliedMigrators,
   DexAttrProps,
+  DexData,
+  DexEntry,
   RunHistoryData,
   SeenDialogues,
   SessionSaveData,
@@ -111,6 +114,8 @@ export class GameData {
   public eggPity: number[];
   public unlockPity: number[];
 
+  public importHistory: SystemSaveData["importHistory"];
+
   public appliedMigrators: AppliedMigrators = {};
 
   /**
@@ -126,7 +131,7 @@ export class GameData {
       this.trainerId = randInt(65536);
       this.secretId = randInt(65536);
     }
-    this.starterData = {};
+    this.starterData = {} as StarterData;
     this.gameStats = new GameStats();
     this.runHistory = {};
     this.unlocks = {
@@ -152,6 +157,7 @@ export class GameData {
 
   public getSystemSaveData(): SystemSaveData {
     return {
+      ...(this.importHistory ? { importHistory: this.importHistory } : {}),
       trainerId: this.trainerId,
       secretId: this.secretId,
       // TODO: save some settings (such as player gender) separately, outside of system data
@@ -345,6 +351,7 @@ export class GameData {
     applySystemVersionMigration(systemData);
 
     this.appliedMigrators = systemData.appliedMigrators;
+    this.importHistory = systemData.importHistory;
 
     this.trainerId = systemData.trainerId;
     this.secretId = systemData.secretId;
@@ -912,6 +919,7 @@ export class GameData {
     Object.keys(globalScene.pokeballCounts).forEach((key: string) => {
       globalScene.pokeballCounts[key] = fromSession.pokeballCounts[key] || 0;
     });
+    globalScene.pokeballCounts[PokeballType.MASTER_BALL] = MAX_MASTER_BALLS;
     if (activeOverrides.POKEBALL_OVERRIDE.active) {
       globalScene.pokeballCounts = activeOverrides.POKEBALL_OVERRIDE.pokeballs;
     }
@@ -1319,6 +1327,163 @@ export class GameData {
     return true;
   }
 
+  private mergeDialogOpen = false;
+
+  public async mergeImportData(): Promise<void> {
+    if (this.mergeDialogOpen) {
+      return;
+    }
+    this.mergeDialogOpen = true;
+    const wasPaused = globalScene.scene.isPaused();
+    const username = loggedInUser?.username;
+    const restoreInput = globalScene.inputController.suspendGameplayInput();
+    try {
+      if (!wasPaused) {
+        globalScene.scene.pause();
+      }
+      const [{ showSystemMergeDialog }, merge, { getStarterValueFriendshipCap }] = await Promise.all([
+        import("#ui/system-merge-dialog"),
+        import("#system/system-data-merge"),
+        import("#balance/starters"),
+      ]);
+      let remoteRevision: string | undefined;
+      let remoteBase: SystemSaveData | undefined;
+      const checkAccount = () => {
+        if (loggedInUser?.username !== username) {
+          throw new Error("Account changed");
+        }
+      };
+      const readCurrent = async (): Promise<SystemSaveData> => {
+        checkAccount();
+        const local = merge.cloneSystemData(this.getSystemSaveData());
+        if (bypassLogin) {
+          return local;
+        }
+        const raw = await pokerogueApi.savedata.system.get({ clientSessionId });
+        if (typeof raw !== "string") {
+          throw new Error("Could not read current system data");
+        }
+        const remote = GameData.parseSystemData(raw);
+        const revision = merge.systemRevision(remote);
+        applySystemVersionMigration(remote, { silent: true, dataOnly: true });
+        const changed = remoteRevision !== undefined && remoteRevision !== revision;
+        remoteRevision = revision;
+        checkAccount();
+        // A different device may have saved while the preview was open.
+        if (changed) {
+          remoteBase = remote;
+        }
+        return remoteBase ? merge.cloneSystemData(remoteBase) : local;
+      };
+      showSystemMergeDialog({
+        parse: text => {
+          const data = merge.decodeSystemImport(text, {
+            decrypt: value => AES.decrypt(value, saveKey).toString(enc.Utf8),
+            shortKeys: systemSaveShortKeyMap,
+            parse: GameData.parseSystemData,
+            migrate: data => applySystemVersionMigration(data, { silent: true, dataOnly: true }),
+            version,
+            compareVersions,
+          });
+          const species = new Set(speciesDataRegistry.getAllSpecies().map(s => s.speciesId));
+          const starters = new Set<number>(speciesDataRegistry.getAllStarters());
+          for (const id of Object.keys(data.dexData)) {
+            if (!species.has(Number(id))) {
+              throw new merge.MergeImportError("unsupported", `dexData.${id}`);
+            }
+          }
+          for (const id of Object.keys(data.starterData)) {
+            if (!starters.has(Number(id))) {
+              throw new merge.MergeImportError("unsupported", `starterData.${id}`);
+            }
+          }
+          for (const egg of data.eggs) {
+            if (egg.species && !species.has(egg.species)) {
+              throw new merge.MergeImportError("unsupported", "eggs.species");
+            }
+          }
+          if (!this.validateSystemData(data)) {
+            throw new merge.MergeImportError("invalid", "starterData");
+          }
+          for (const key of Object.keys(data.unlocks)) {
+            if (!Object.hasOwn(this.unlocks, key)) {
+              throw new merge.MergeImportError("unsupported", `unlocks.${key}`);
+            }
+          }
+          for (const key of Object.keys(data.achvUnlocks)) {
+            if (!Object.hasOwn(achvs, key)) {
+              throw new merge.MergeImportError("unsupported", `achvUnlocks.${key}`);
+            }
+          }
+          for (const key of Object.keys(data.voucherUnlocks)) {
+            if (!Object.hasOwn(vouchers, key)) {
+              throw new merge.MergeImportError("unsupported", `voucherUnlocks.${key}`);
+            }
+          }
+          for (const key of Object.keys(data.voucherCounts)) {
+            if (!Object.hasOwn(this.voucherCounts, key)) {
+              throw new merge.MergeImportError("unsupported", `voucherCounts.${key}`);
+            }
+          }
+          return data;
+        },
+        readCurrent,
+        save: async data => {
+          checkAccount();
+          const raw = merge.serializeSystemData(data);
+          const encrypted = encrypt(raw, bypassLogin);
+          if (!bypassLogin) {
+            const [success] = await updateUserInfo();
+            if (!success) {
+              throw new Error("Could not verify account");
+            }
+            checkAccount();
+            const error = await pokerogueApi.savedata.system.update(
+              { trainerId: this.trainerId, secretId: this.secretId, clientSessionId },
+              raw,
+            );
+            if (error) {
+              throw new Error(error);
+            }
+          }
+          // Do not install imported data or lineage locally until the server accepts it.
+          try {
+            localStorage.setItem(`data_${username}`, encrypted);
+          } catch (error) {
+            if (bypassLogin) {
+              throw error;
+            }
+            // The server has already committed. Reload from it even if the local cache is full.
+            console.warn("Merged data saved on server; local cache could not be updated", error);
+          }
+          this.initParsedSystem(data);
+        },
+        mergeOptions: () => ({
+          version,
+          now: Date.now(),
+          friendshipCap: id => getStarterValueFriendshipCap(speciesDataRegistry.getStarterCost(id)),
+        }),
+        speciesName: id => speciesDataRegistry.getSpecies(id).name,
+        onClose: () => {
+          restoreInput();
+          this.mergeDialogOpen = false;
+          if (!wasPaused) {
+            globalScene.scene.resume();
+          }
+        },
+        onSuccess: () => window.location.reload(),
+      });
+    } catch (error) {
+      restoreInput();
+      this.mergeDialogOpen = false;
+      if (!wasPaused && globalScene.scene.isPaused()) {
+        globalScene.scene.resume();
+      }
+      console.error(error);
+      globalScene.ui.showText(i18next.t("mergeImport:errors.failed"));
+    }
+  }
+
   // TODO: Refactor this spaghetti monster
   public importData(dataType: GameDataType, slotId = 0, confirmWindowXOffset?: number): void {
     const dataKey = `${getDataTypeKey(dataType, slotId)}_${loggedInUser?.username}`;
@@ -1545,7 +1710,7 @@ export class GameData {
   }
 
   private initStarterData(): void {
-    const starterData: StarterData = {};
+    const starterData = {} as StarterData;
 
     const starterSpeciesIds = speciesDataRegistry.getAllStarters();
     for (const speciesId of starterSpeciesIds) {
@@ -1722,7 +1887,7 @@ export class GameData {
         // TODO: remove `?? 0`, `pokemon.variant` shouldn't be able to be nullish
         const shinyBonus = pokemon.isShiny() ? 5 * Math.pow(2, pokemon.variant ?? 0) : 1;
         const eggOrBossBonus = fromEgg || pokemon.isBoss() ? 2 : 1;
-        const eventBonus = timedEventManager.getExtraCatchCandy();
+        const eventBonus = fromEgg ? 0 : timedEventManager.getExtraCatchCandy();
         const totalCandy = shinyBonus * eggOrBossBonus + eventBonus;
         this.addStarterCandy(species.speciesId, totalCandy);
       }
@@ -1925,8 +2090,10 @@ export class GameData {
 
   getSpeciesDefaultDexAttrProps(speciesId: SpeciesId, defaultIsShiny = true): DexAttrProps {
     const dexAttr = this.dexData[speciesId].caughtAttr;
-    // Default is female only for species where malePercent is not null but 0
-    const female = speciesDataRegistry.getSpecies(speciesId).malePercent === 0;
+    // Default is female for species where malePercent is not null but 0, or if the male is not caught
+    const female =
+      speciesDataRegistry.getSpecies(speciesId).malePercent === 0
+      || (!!speciesDataRegistry.getSpecies(speciesId).malePercent && (dexAttr & DexAttr.MALE) === 0n);
     // First caught form is set as the default
     let formIndex = 0;
     for (let attr = 128n, i = 0; attr <= dexAttr; attr <<= 1n, i++) {

@@ -7,7 +7,7 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import { addBBCodeTextObject, addTextObject, getTextColor } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
 import i18next from "i18next";
-import type BBCodeText from "phaser3-rex-plugins/plugins/bbcodetext";
+import type BBCodeText from "phaser4-rex-plugins/plugins/bbcodetext";
 
 export class BattleMessageUiHandler extends MessageUiHandler {
   private levelUpStatsContainer: Phaser.GameObjects.Container;
@@ -115,6 +115,10 @@ export class BattleMessageUiHandler extends MessageUiHandler {
     levelUpStatsContainer.add(levelUpStatsValuesContent);
 
     this.levelUpStatsValuesContent = levelUpStatsValuesContent;
+
+    if (ui.getHandler() === this) {
+      this.show([]);
+    }
   }
 
   show(args: any[]): boolean {
@@ -133,39 +137,12 @@ export class BattleMessageUiHandler extends MessageUiHandler {
       ui.playSelect();
       const originalOnActionInput = this.onActionInput;
       this.onActionInput = null;
+      this.awaitingActionInput = false;
       originalOnActionInput();
       return true;
     }
 
     return false;
-  }
-
-  clear() {
-    super.clear();
-  }
-
-  showText(
-    text: string,
-    delay?: number | null,
-    callback?: (() => void) | null,
-    callbackDelay?: number | null,
-    prompt?: boolean | null,
-    promptDelay?: number | null,
-  ) {
-    this.hideNameText();
-    super.showText(text, delay, callback, callbackDelay, prompt, promptDelay);
-  }
-
-  showDialogue(
-    text: string,
-    name?: string,
-    delay?: number | null,
-    callback?: () => void,
-    callbackDelay?: number,
-    prompt?: boolean,
-    promptDelay?: number,
-  ) {
-    super.showDialogue(text, name, delay, callback, callbackDelay, prompt, promptDelay);
   }
 
   promptLevelUpStats(partyMemberIndex: number, prevStats: number[], showTotals: boolean): Promise<void> {

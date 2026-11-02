@@ -4,6 +4,7 @@ import { ScrollBar } from "#ui/scroll-bar";
 import { addTextObject } from "#ui/text";
 import { addWindow, WindowVariant } from "#ui/ui-theme";
 import i18next from "i18next";
+import Phaser from "phaser";
 
 export enum DropDownState {
   ON = 0,
@@ -402,6 +403,11 @@ export class DropDown extends Phaser.GameObjects.Container {
       this.dropDownScrollBar.setTotalRows(this.totalOptions);
       this.dropDownScrollBar.setScrollCursor(0);
     }
+  }
+
+  /** Internal hit targets for pages that explicitly enable pointer input. */
+  public getPointerTargets() {
+    return { window: this.window, options: this.options, rowHeight: this.optionHeight + this.optionSpacing };
   }
 
   getWidth(): number {

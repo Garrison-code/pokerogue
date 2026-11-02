@@ -1,0 +1,11 @@
+{
+  "title": "Type matchups",
+  "close": "Close",
+  "defender": "Defending types",
+  "attacker": "Incoming attacks",
+  "clear": "Clear",
+  "choose": "Choose one or two defending types.",
+  "limit": "Two types selected. Deselect one to choose another.",
+  "scope": "Basic type matchups only. Abilities, items, field effects and special battle rules are excluded.",
+  "neutral": "All incoming attacks deal 1× damage."
+}

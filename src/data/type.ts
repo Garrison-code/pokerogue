@@ -22,8 +22,9 @@ export function getTypeDamageMultiplier(attackType: PokemonType, defType: Pokemo
   return multi.value as SingleTypeDamageMultiplier;
 }
 
+/** Standard type chart only; does not read battle state or apply challenge modifiers. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This simulates the Pokemon type chart with nested `switch case`s
-function getTypeChartMultiplier(attackType: PokemonType, defType: PokemonType): SingleTypeDamageMultiplier {
+export function getTypeChartMultiplier(attackType: PokemonType, defType: PokemonType): SingleTypeDamageMultiplier {
   if (attackType === PokemonType.UNKNOWN || defType === PokemonType.UNKNOWN) {
     return 1;
   }

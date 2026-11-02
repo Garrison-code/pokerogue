@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { TextStyle } from "#enums/text-style";
 import { SettingKeyboard } from "#system/settings-keyboard";
@@ -7,6 +8,7 @@ import { getStarterSelectTextSettings } from "#ui/starter-select-ui-utils";
 import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 import type { GameObjects } from "phaser";
+import Phaser from "phaser";
 
 export class StarterSelectInstructionsContainer extends Phaser.GameObjects.Container {
   private shinyIconElement: Phaser.GameObjects.Sprite;
@@ -41,6 +43,19 @@ export class StarterSelectInstructionsContainer extends Phaser.GameObjects.Conta
 
     this.setupInstructionButtons();
     this.hideInstructions();
+  }
+
+  /** Existing visible labels and icons also serve as mouse controls. */
+  public getPointerTargets() {
+    return [
+      { button: Button.CYCLE_SHINY, icon: this.shinyIconElement, label: this.shinyLabel },
+      { button: Button.CYCLE_FORM, icon: this.formIconElement, label: this.formLabel },
+      { button: Button.CYCLE_GENDER, icon: this.genderIconElement, label: this.genderLabel },
+      { button: Button.CYCLE_ABILITY, icon: this.abilityIconElement, label: this.abilityLabel },
+      { button: Button.CYCLE_NATURE, icon: this.natureIconElement, label: this.natureLabel },
+      { button: Button.CYCLE_TERA, icon: this.teraIconElement, label: this.teraLabel },
+      { button: Button.STATS, icon: this.goFilterIconElement, label: this.goFilterLabel },
+    ];
   }
 
   private setupInstructionButtons(): void {
@@ -236,11 +251,12 @@ export class StarterSelectInstructionsContainer extends Phaser.GameObjects.Conta
 
     let gamepadType: string;
     if (globalScene.inputMethod === "gamepad") {
-      gamepadType = globalScene.inputController.getConfig(
-        globalScene.inputController.selectedDevice[Device.GAMEPAD]!, // TODO: re-evaluate bang
-      ).padType;
+      const gamepadId = globalScene.inputController.selectedDevice[Device.GAMEPAD];
+      // Phaser 4 can report gamepad input before a device id exists.
+      gamepadType = gamepadId ? globalScene.inputController.getConfig(gamepadId).padType : "keyboard";
     } else {
-      gamepadType = globalScene.inputMethod;
+      // A mouse-only visit has no recorded keyboard/gamepad input yet.
+      gamepadType = globalScene.inputMethod || "keyboard";
     }
 
     if (!gamepadType) {

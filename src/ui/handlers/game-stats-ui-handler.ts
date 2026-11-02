@@ -9,6 +9,7 @@ import type { GameData } from "#system/game-data";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
+import { UiPointerTargets } from "#ui/utils/ui-pointer-targets";
 import { formatFancyLargeNumber, getPlayTimeString } from "#utils/common";
 import { toTitleCase } from "#utils/strings";
 import i18next from "i18next";
@@ -223,6 +224,7 @@ const displayStats: DisplayStats = {
 };
 
 export class GameStatsUiHandler extends UiHandler {
+  private pointerTargets: UiPointerTargets | undefined;
   private gameStatsContainer: Phaser.GameObjects.Container;
   private statsContainer: Phaser.GameObjects.Container;
 
@@ -448,6 +450,29 @@ export class GameStatsUiHandler extends UiHandler {
       .moveTo(this.gameStatsContainer, this.getUi().length - 1)
       .hideTooltip();
 
+    this.pointerTargets?.destroy();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    const wheel = (direction: number) => this.getUi().processInput(direction < 0 ? Button.UP : Button.DOWN);
+    targets.add(
+      this.gameStatsContainer,
+      "game-stats-page",
+      () => ({ x: 0, y: 0, width: 320, height: 180 }),
+      undefined,
+      wheel,
+    );
+    for (const [arrow, button, name] of [
+      [this.arrowUp, Button.UP, "up"],
+      [this.arrowDown, Button.DOWN, "down"],
+    ] as const) {
+      targets.add(
+        this.gameStatsContainer,
+        `game-stats-${name}`,
+        () => (arrow.visible ? { x: arrow.x - 8, y: arrow.y - 8, width: 16, height: 16 } : null),
+        () => this.getUi().processInput(button),
+        wheel,
+      );
+    }
     return true;
   }
 
@@ -538,7 +563,15 @@ export class GameStatsUiHandler extends UiHandler {
     return true;
   }
 
+  override destroy(): void {
+    this.clear();
+    this.gameStatsContainer.destroy();
+    super.destroy();
+  }
+
   clear() {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = undefined;
     super.clear();
     this.gameStatsContainer.setVisible(false).setActive(false);
 

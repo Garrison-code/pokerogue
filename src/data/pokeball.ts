@@ -5,6 +5,11 @@ import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
 
 export const MAX_PER_TYPE_POKEBALLS: number = 99;
+export const MAX_MASTER_BALLS = 9999;
+
+export function getPokeballCapacity(type: PokeballType): number {
+  return type === PokeballType.MASTER_BALL ? MAX_MASTER_BALLS : MAX_PER_TYPE_POKEBALLS;
+}
 
 export function getPokeballAtlasKey(type: PokeballType): string {
   switch (type) {

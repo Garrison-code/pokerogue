@@ -11,10 +11,12 @@ import type { CommandPhase } from "#phases/command-phase";
 import { PartyUiHandler } from "#ui/party-ui-handler";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
+import { UiPointerTargets } from "#ui/ui-pointer-targets";
 import { canTerastallize } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
 export class CommandUiHandler extends UiHandler {
+  private pointerTargets: UiPointerTargets | null = null;
   private commandsContainer: Phaser.GameObjects.Container;
   private cursorObj: Phaser.GameObjects.Image | null;
 
@@ -37,16 +39,18 @@ export class CommandUiHandler extends UiHandler {
     this.commandsContainer.setVisible(false);
     ui.add(this.commandsContainer);
 
-    this.teraButton = globalScene.add.sprite(-32, 15, "button_tera");
-    this.teraButton.setName("terastallize-button");
-    this.teraButton.setScale(1.3);
-    this.teraButton.setFrame("fire");
-    this.teraButton.setPipeline(globalScene.spritePipeline, {
-      tone: [0.0, 0.0, 0.0, 0.0],
-      ignoreTimeTint: true,
-      teraColor: getTypeRgb(PokemonType.FIRE),
-      isTerastallized: false,
-    });
+    this.teraButton = globalScene.add
+      .sprite(-32, 15, "button_tera")
+      .setName("terastallize-button")
+      .setScale(1.3)
+      .setFrame("fire")
+      .setRenderNodeRole("Submitter", globalScene.spriteSubmitter, {
+        tone: [0.0, 0.0, 0.0, 0.0],
+        ignoreTimeTint: true,
+        teraColor: getTypeRgb(PokemonType.FIRE),
+        isTerastallized: false,
+      })
+      .setRenderNodeRole("BatchHandler", globalScene.spriteBatchHandler);
     this.commandsContainer.add(this.teraButton);
 
     for (let c = 0; c < commands.length; c++) {
@@ -101,7 +105,49 @@ export class CommandUiHandler extends UiHandler {
       this.setCursor(this.getCursor());
     }
 
+    this.createPointerTargets();
     return true;
+  }
+
+  private createPointerTargets(): void {
+    this.pointerTargets?.destroy();
+    const targets = new UiPointerTargets(this);
+    this.pointerTargets = targets;
+    targets.add(this.commandsContainer, "command-panel", () => ({ x: -10, y: -5, width: 113, height: 40 }));
+    for (let command = 0; command < 4; command++) {
+      targets.add(
+        this.commandsContainer,
+        `command-${command}`,
+        () => ({
+          x: -10 + (command % 2) * 56,
+          y: -2 + Math.floor(command / 2) * 16,
+          width: 56,
+          height: 16,
+        }),
+        () => this.selectPointerCommand(command),
+      );
+    }
+    targets.add(
+      this.commandsContainer,
+      "command-tera",
+      () => (this.teraButton.visible && this.canTera() ? { x: -45, y: 2, width: 26, height: 26 } : null),
+      () => this.selectPointerCommand(Command.TERA),
+    );
+  }
+
+  private selectPointerCommand(command: Command): void {
+    if (this.getCursor() === command) {
+      this.getUi().processInput(Button.ACTION);
+    } else if (this.setCursor(command)) {
+      this.toggleTeraButton();
+      this.getUi().playSelect();
+    }
+  }
+
+  override destroy(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
+    super.destroy();
   }
 
   processInput(button: Button): boolean {
@@ -201,7 +247,7 @@ export class CommandUiHandler extends UiHandler {
   }
 
   toggleTeraButton() {
-    this.teraButton.setPipeline(globalScene.spritePipeline, {
+    this.teraButton.setRenderNodeRole("Submitter", globalScene.spriteSubmitter, {
       tone: [0.0, 0.0, 0.0, 0.0],
       ignoreTimeTint: true,
       teraColor: getTypeRgb(globalScene.getField()[this.fieldIndex].getTeraType()),
@@ -239,6 +285,8 @@ export class CommandUiHandler extends UiHandler {
   }
 
   clear(): void {
+    this.pointerTargets?.destroy();
+    this.pointerTargets = null;
     super.clear();
     this.getUi().getMessageHandler().commandWindow.setVisible(false);
     this.commandsContainer.setVisible(false);

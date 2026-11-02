@@ -5,6 +5,7 @@ import { addTextObject } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
 import { fixedInt } from "#utils/common";
 import i18next from "i18next";
+import Phaser from "phaser";
 
 export abstract class OAuthProvidersUiHandler extends LoginRegisterInfoContainerUiHandler {
   private discordImage: Phaser.GameObjects.Image;
@@ -22,6 +23,7 @@ export abstract class OAuthProvidersUiHandler extends LoginRegisterInfoContainer
   public override clear(): void {
     super.clear();
 
+    globalScene.tweens.killTweensOf(this.externalPartyContainer);
     this.externalPartyContainer //
       .setVisible(false)
       .setActive(false);
@@ -68,6 +70,9 @@ export abstract class OAuthProvidersUiHandler extends LoginRegisterInfoContainer
   }
 
   protected processExternalProvider(): void {
+    globalScene.tweens.killTweensOf(this.externalPartyContainer);
+    this.discordImage.off("pointerdown");
+    this.googleImage.off("pointerdown");
     const titleX = 22;
     this.externalPartyTitle
       .setText(i18next.t("menu:orUse"))

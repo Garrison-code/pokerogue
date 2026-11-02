@@ -42,6 +42,46 @@ export class ScrollableGridHelper {
     this.totalElements = rows * columns; // default value for the number of elements
   }
 
+  /** Pointer browsing preserves the selected absolute item instead of selecting a recycled cell. */
+  private pointerVisibility?: (visible: boolean) => void;
+
+  withPointerSelection(callback: (visible: boolean) => void): ScrollableGridHelper {
+    this.pointerVisibility = callback;
+    return this;
+  }
+
+  getSelectedIndex(): number {
+    return this.cursor + this.getItemOffset();
+  }
+
+  selectIndex(index: number): boolean {
+    if (index < 0 || index >= this.totalElements) {
+      return false;
+    }
+    const changed = this.setCursor(index - this.getItemOffset());
+    this.pointerVisibility?.(true);
+    return changed;
+  }
+
+  scrollByPointer(direction: number): boolean {
+    const maxScroll = Math.max(0, Math.ceil(this.totalElements / this.COLUMNS) - this.ROWS);
+    const next = Math.max(0, Math.min(maxScroll, this.scrollCursor + Math.sign(direction)));
+    if (next === this.scrollCursor) {
+      return false;
+    }
+    const selected = this.cursor + this.getItemOffset();
+    this.scrollCursor = next;
+    this.cursor = selected - this.getItemOffset();
+    this.scrollBar?.setScrollCursor(next);
+    this.updateGridCallback?.();
+    const visible = this.cursor >= 0 && this.cursor < this.ROWS * this.COLUMNS;
+    if (visible) {
+      this.handler.setCursor(this.cursor);
+    }
+    this.pointerVisibility?.(visible);
+    return true;
+  }
+
   /**
    * Set a scrollBar to get updated with the scrolling
    * @param scrollBar {@linkcode ScrollBar}
@@ -97,6 +137,20 @@ export class ScrollableGridHelper {
    * @returns `true` if either the cursor or scrollCursor was updated
    */
   processInput(button: Button): boolean {
+    if (!this.totalElements) {
+      return false;
+    }
+    if (this.pointerVisibility && [Button.UP, Button.DOWN, Button.LEFT, Button.RIGHT].includes(button)) {
+      const selected = this.cursor + this.getItemOffset();
+      if (this.cursor < 0 || this.cursor >= this.ROWS * this.COLUMNS) {
+        const scroll = Math.max(
+          0,
+          Math.min(Math.floor(selected / this.COLUMNS), Math.ceil(this.totalElements / this.COLUMNS) - this.ROWS),
+        );
+        this.setScrollCursor(scroll, selected - scroll * this.COLUMNS);
+      }
+      this.pointerVisibility(true);
+    }
     let success = false;
     const onScreenRows = Math.min(this.ROWS, Math.ceil(this.totalElements / this.COLUMNS));
     const maxScrollCursor = Math.max(0, Math.ceil(this.totalElements / this.COLUMNS) - onScreenRows);
@@ -155,13 +209,27 @@ export class ScrollableGridHelper {
    * Reset the scrolling
    */
   reset(): void {
+    this.cursor = 0;
     this.setScrollCursor(0);
     this.setCursor(0);
   }
 
   private setCursor(cursor: number): boolean {
+    const changed = this.cursor !== cursor;
     this.cursor = cursor;
-    return this.handler.setCursor(cursor);
+    const handlerChanged = this.handler.setCursor(cursor);
+    if (
+      changed
+      && !handlerChanged
+      && this.pointerVisibility
+      && cursor >= 0
+      && this.getSelectedIndex() >= 0
+      && this.getSelectedIndex() < this.totalElements
+    ) {
+      this.updateGridCallback?.();
+      this.updateDetailsCallback?.(this.getSelectedIndex());
+    }
+    return changed || handlerChanged;
   }
 
   private setScrollCursor(scrollCursor: number, cursor?: number): boolean {

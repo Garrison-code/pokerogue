@@ -7,6 +7,10 @@ import i18next from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import HttpBackend from "i18next-http-backend";
 import { KoreanPostpositionProcessor } from "i18next-korean-postposition-processor";
+import mergeImportEn from "./locales/merge-import-en.json";
+import mergeImportZhHant from "./locales/merge-import-zh-hant.json";
+import typeChartEn from "./locales/type-chart-en.json";
+import typeChartZhHant from "./locales/type-chart-zh-hant.json";
 
 // #region Interfaces/Types
 
@@ -163,6 +167,11 @@ await i18next
         default: ["en"],
       },
       supportedLngs: SUPPORTED_LANGUAGES,
+      partialBundledLanguages: true,
+      resources: {
+        en: { mergeImport: mergeImportEn, typeChart: typeChartEn },
+        "zh-Hant": { mergeImport: mergeImportZhHant, typeChart: typeChartZhHant },
+      },
       backend: {
         loadPath(lng: string, [ns]: string[]) {
           // Use namespace maps where required

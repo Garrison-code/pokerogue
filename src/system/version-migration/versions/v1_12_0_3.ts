@@ -9,7 +9,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { VoucherType } from "#enums/voucher-type";
 import { EggData } from "#system/egg-data";
-import type { DexData, DexEntry } from "#types/dex-data";
+import type { DexData, DexEntry } from "#types/save-data";
 import type { SystemSaveMigrator } from "#types/save-migrators";
 import type { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { fixedInt, randSeedItem } from "#utils/common";
@@ -43,7 +43,7 @@ function getStarters(
   return starters;
 }
 
-function pullEggs(pullCount: number, ownedStarters: SpeciesId[]): EggData[] {
+function pullEggs(pullCount: number, ownedStarters: SpeciesId[], silent = false): EggData[] {
   const eggs: EggData[] = [];
   const legendaryCount = Math.ceil(pullCount * LEGENDARY_RATIO);
   pullCount -= legendaryCount;
@@ -90,15 +90,17 @@ function pullEggs(pullCount: number, ownedStarters: SpeciesId[]): EggData[] {
     }
   }
 
-  globalScene.time.delayedCall(fixedInt(2000), async () => {
-    if (!globalScene.ui.getHandler<AwaitableUiHandler>().tutorialActive) {
-      await globalScene.ui.setOverlayMode(
-        UiMode.ALERT_MODAL,
-        i18next.t("migrators:eggCompensation", { eggCount: eggs.length }),
-        5000,
-      );
-    }
-  });
+  if (!silent) {
+    globalScene.time.delayedCall(fixedInt(2000), async () => {
+      if (!globalScene.ui.getHandler<AwaitableUiHandler>().tutorialActive) {
+        await globalScene.ui.setOverlayMode(
+          UiMode.ALERT_MODAL,
+          i18next.t("migrators:eggCompensation", { count: eggs.length, eggCount: eggs.length }),
+          5000,
+        );
+      }
+    });
+  }
 
   return eggs;
 }
@@ -106,7 +108,7 @@ function pullEggs(pullCount: number, ownedStarters: SpeciesId[]): EggData[] {
 const shinyCompensationMigrator: SystemSaveMigrator = {
   name: "shinyCompensationMigrator",
   version: "1.12.0.3",
-  migrate: (data): void => {
+  migrate: (data, options): void => {
     const defaultStarterCount = getStarters(
       data.dexData,
       d => d?.caughtAttr > 0n && d?.ivs?.every(iv => iv === 15) && d?.natureAttr === 1,
@@ -139,7 +141,7 @@ const shinyCompensationMigrator: SystemSaveMigrator = {
 
     globalScene.executeWithSeedOffset(
       () => {
-        const eggs = pullEggs(eggsToPull, ownedStarters);
+        const eggs = pullEggs(eggsToPull, ownedStarters, options?.silent);
         if (data.eggs == null) {
           data.eggs = [];
         }

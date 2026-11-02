@@ -17,7 +17,7 @@ import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import type { PartyUiHandler } from "#ui/party-ui-handler";
 import i18next from "i18next";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("UI - Party switch mode", () => {
   let phaserGame: Phaser.Game;
@@ -75,6 +75,8 @@ describe("UI - Party switch mode", () => {
   async function skipModifierSelect(target: PhaseString = "TurnInitPhase", runTarget = true) {
     await game.scene.ui.setMode(UiMode.MODIFIER_SELECT);
     const msHandler = game.scene.ui.getHandler() as ModifierSelectUiHandler;
+    // The real reward UI only accepts input after all reveal animations finish.
+    await vi.waitFor(() => expect(msHandler["awaitingActionInput"]).toBe(true));
     msHandler.processInput(Button.CANCEL);
     msHandler.processInput(Button.ACTION);
     const confirmHandler = game.scene.ui.getHandler() as ConfirmUiHandler;

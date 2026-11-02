@@ -8,6 +8,7 @@ import type { MessageUiHandler } from "#ui/message-ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { getAvailableRibbons, getRibbonKey, orderedRibbons } from "#utils/ribbon-utils";
 import i18next from "i18next";
+import Phaser from "phaser";
 
 export class RibbonTray extends Phaser.GameObjects.Container {
   private trayBg: Phaser.GameObjects.NineSlice;
@@ -38,6 +39,11 @@ export class RibbonTray extends Phaser.GameObjects.Container {
 
     this.trayCursorObj = globalScene.add.image(0, 0, "select_cursor").setOrigin(0);
     this.add(this.trayCursorObj);
+  }
+
+  /** Geometry is exposed only for the owning page's explicit mouse support. */
+  getPointerTargets() {
+    return { icons: this.trayIcons, width: this.trayBg.width, height: this.trayBg.height };
   }
 
   processInput(button: Button) {
