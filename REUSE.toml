@@ -67,3 +67,9 @@ SPDX-FileCopyrightText = "NONE"
 path = "favicon.ico"                        # Created by Gonstar (Paid Commission)
 SPDX-FileCopyrightText = "2024 Gonstar"
 SPDX-License-Identifier = "CC-BY-NC-SA-4.0"
+
+# Spectra planning artifacts added by the Garrison-code fork
+[[annotations]]
+path = "docs/spectra/**"
+SPDX-FileCopyrightText = "2026 Garrison-code"
+SPDX-License-Identifier = "CC-BY-NC-SA-4.0"
