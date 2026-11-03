@@ -882,9 +882,11 @@ export abstract class BattleAnim {
           .setScale(1)
           .setAlpha(1);
       }
-      targetSprite //
-        .setRenderNodeData(globalScene.spriteSubmitter, "tone", [0.0, 0.0, 0.0, 0.0])
-        .setAngle(0);
+      // Field sprites used for Substitute dolls have no spriteSubmitter data, and Phaser throws if it is written.
+      if (!targetSubstitute) {
+        targetSprite.setRenderNodeData(globalScene.spriteSubmitter, "tone", [0.0, 0.0, 0.0, 0.0]);
+      }
+      targetSprite.setAngle(0);
 
       // Remove animation event listeners to enable sprites to be freed.
       userSprite.off("animationupdate");
@@ -1086,10 +1088,12 @@ export abstract class BattleAnim {
               .setAngle(graphicFrameData.angle)
               .setScale(graphicFrameData.scaleX * spriteSourceScale, graphicFrameData.scaleY * spriteSourceScale)
               .setData("locked", frame.locked)
-              .setAlpha(frame.opacity / 255)
-              .setRenderNodeData(globalScene.spriteSubmitter, "tone", frame.tone)
-              .setVisible(frame.visible && (isUser ? user.visible : target.visible))
-              .setBlendMode(blendMode);
+              .setAlpha(frame.opacity / 255);
+            // Temporary doll copies come from addFieldSprite and have no spriteSubmitter data.
+            if (isUser || !targetSubstitute) {
+              pokemonSprite.setRenderNodeData(globalScene.spriteSubmitter, "tone", frame.tone);
+            }
+            pokemonSprite.setVisible(frame.visible && (isUser ? user.visible : target.visible)).setBlendMode(blendMode);
           }
         }
         if (anim?.frameTimedEvents.has(f)) {

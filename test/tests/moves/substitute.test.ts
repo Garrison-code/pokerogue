@@ -1,3 +1,6 @@
+import { settings } from "#app/global-settings-manager";
+import { MoveAnim } from "#data/battle-anims";
+import { SubstituteTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -6,15 +9,19 @@ import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BerryType } from "#enums/berry-type";
 import { Command } from "#enums/command";
+import { AnimBlendType, AnimFocus, AnimFrameTarget } from "#enums/move-anims-common";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
+import type { Pokemon } from "#field/pokemon";
 import { StealHeldItemChanceAttr } from "#moves/move";
 import type { CommandPhase } from "#phases/command-phase";
+import type { MoveEffectPhase } from "#phases/move-effect-phase";
 import { GameManager } from "#test/framework/game-manager";
+import type { MockSprite } from "#test/mocks/mocks-container/mock-sprite";
 import { toDmgValue } from "#utils/common";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -504,6 +511,34 @@ describe("Moves - Substitute", () => {
     expect(playerPokemon).not.toHaveBattlerTag(BattlerTagType.SEEDED);
   });
 
+  describe("MockSprite render node data", () => {
+    function createSprite(): MockSprite {
+      return game.scene.add.sprite(0, 0, "sub") as unknown as MockSprite;
+    }
+
+    it("should raise a TypeError when writing render data for a render node the sprite was not assigned", () => {
+      const sprite = createSprite();
+      const writeTone = () => sprite.setRenderNodeData("SpriteSubmitter", "tone", [1, 0, 0, 0]);
+
+      expect(writeTone).toThrow(TypeError);
+      expect(writeTone).toThrow(/Cannot set properties of undefined/);
+    });
+
+    it("should store render data assigned through setRenderNodeRole and delete the key when the value is undefined", () => {
+      const sprite = createSprite();
+      const renderNode = game.scene.spriteSubmitter;
+
+      sprite.setRenderNodeRole("Submitter", renderNode);
+      sprite.setRenderNodeData(renderNode, "tone", [1, 2, 3, 4]);
+
+      expect(sprite.renderNodeData[renderNode.name].tone).toEqual([1, 2, 3, 4]);
+
+      sprite.setRenderNodeData(renderNode, "tone", undefined);
+
+      expect(sprite.renderNodeData[renderNode.name]).not.toHaveProperty("tone");
+    });
+  });
+
   it("should fail if the user has 1 max HP", async () => {
     await game.classicMode.startBattle(SpeciesId.SHEDINJA);
 
@@ -516,5 +551,223 @@ describe("Moves - Substitute", () => {
     expect(player).not.toHaveBattlerTag(BattlerTagType.SUBSTITUTE);
     expect(player).toHaveFullHp();
     expect(player).toHaveHp(1);
+  });
+
+  describe("hitting a Substitute doll", () => {
+    /**
+     * The doll absorbed the hit when its HP dropped, or it broke and was removed.
+     * The protected Pokemon's HP must be the same as it was before that hit.
+     */
+    function expectDollAbsorbedHit(pokemon: Pokemon, hpBeforeHit: number, dollHpBeforeHit: number): void {
+      expect(pokemon.hp).toBe(hpBeforeHit);
+      const doll = pokemon.getTag(SubstituteTag);
+      if (doll) {
+        expect(doll.hp).toBeLessThan(dollHpBeforeHit);
+      } else {
+        expect(pokemon).not.toHaveBattlerTag(BattlerTagType.SUBSTITUTE);
+      }
+    }
+
+    it("should finish the turn when Heat Wave hits a Passimian Substitute and the other enemy has fainted", async () => {
+      vi.spyOn(allMoves[MoveId.HEAT_WAVE], "chance", "get").mockReturnValue(0);
+      game.override
+        .battleStyle("double")
+        .enemySpecies(SpeciesId.PASSIMIAN)
+        .enemyMoveset(MoveId.SPLASH)
+        .criticalHits(false);
+
+      await game.classicMode.startBattle(SpeciesId.CHARIZARD, SpeciesId.MAGIKARP);
+
+      const otherEnemy = game.scene.getEnemyField()[1];
+      otherEnemy.hp = 1;
+
+      game.move.use(MoveId.TACKLE, BattlerIndex.PLAYER, BattlerIndex.ENEMY_2);
+      game.move.use(MoveId.SPLASH, BattlerIndex.PLAYER_2);
+      await game.move.selectEnemyMove(MoveId.SPLASH);
+      await game.move.selectEnemyMove(MoveId.SPLASH);
+      game.setTurnOrder([BattlerIndex.PLAYER, BattlerIndex.PLAYER_2, BattlerIndex.ENEMY, BattlerIndex.ENEMY_2]);
+      await game.move.forceHit();
+      await game.toNextTurn();
+
+      expect(otherEnemy.isFainted()).toBe(true);
+
+      const passimian = game.field.getEnemyPokemon();
+      passimian.addTag(BattlerTagType.SUBSTITUTE, 0, MoveId.NONE, passimian.id);
+      const hpBeforeHit = passimian.hp;
+      const dollHpBeforeHit = passimian.getTag(SubstituteTag)!.hp;
+
+      game.move.use(MoveId.HEAT_WAVE, BattlerIndex.PLAYER);
+      game.move.use(MoveId.SPLASH, BattlerIndex.PLAYER_2);
+      await game.move.selectEnemyMove(MoveId.SPLASH);
+      game.setTurnOrder([BattlerIndex.PLAYER, BattlerIndex.PLAYER_2, BattlerIndex.ENEMY]);
+      await game.move.forceHit();
+      await game.toEndOfTurn();
+
+      expectDollAbsorbedHit(passimian, hpBeforeHit, dollHpBeforeHit);
+    });
+
+    it("should finish the turn when Heat Wave hits a Substitute while both enemies are alive", async () => {
+      vi.spyOn(allMoves[MoveId.HEAT_WAVE], "chance", "get").mockReturnValue(0);
+      game.override
+        .battleStyle("double")
+        .enemySpecies(SpeciesId.PASSIMIAN)
+        .enemyMoveset(MoveId.SPLASH)
+        .criticalHits(false);
+
+      await game.classicMode.startBattle(SpeciesId.CHARIZARD, SpeciesId.MAGIKARP);
+
+      const passimian = game.field.getEnemyPokemon();
+      passimian.addTag(BattlerTagType.SUBSTITUTE, 0, MoveId.NONE, passimian.id);
+      const hpBeforeHit = passimian.hp;
+      const dollHpBeforeHit = passimian.getTag(SubstituteTag)!.hp;
+
+      game.move.use(MoveId.HEAT_WAVE, BattlerIndex.PLAYER);
+      game.move.use(MoveId.SPLASH, BattlerIndex.PLAYER_2);
+      await game.move.selectEnemyMove(MoveId.SPLASH);
+      await game.move.selectEnemyMove(MoveId.SPLASH);
+      game.setTurnOrder([BattlerIndex.PLAYER, BattlerIndex.PLAYER_2, BattlerIndex.ENEMY, BattlerIndex.ENEMY_2]);
+      await game.move.forceHit();
+      await game.toEndOfTurn();
+
+      expectDollAbsorbedHit(passimian, hpBeforeHit, dollHpBeforeHit);
+    });
+
+    it("should finish the turn when Tackle hits an enemy Snorlax's Substitute", async () => {
+      game.override.criticalHits(false);
+
+      await game.classicMode.startBattle(SpeciesId.MACHAMP);
+
+      const snorlax = game.field.getEnemyPokemon();
+      snorlax.addTag(BattlerTagType.SUBSTITUTE, 0, MoveId.NONE, snorlax.id);
+      const hpBeforeHit = snorlax.hp;
+      const dollHpBeforeHit = snorlax.getTag(SubstituteTag)!.hp;
+
+      game.move.use(MoveId.TACKLE);
+      game.setTurnOrder([BattlerIndex.PLAYER, BattlerIndex.ENEMY]);
+      await game.move.forceHit();
+      await game.toEndOfTurn();
+
+      expectDollAbsorbedHit(snorlax, hpBeforeHit, dollHpBeforeHit);
+    });
+
+    it("should finish the turn when an enemy Tackle hits the player's Substitute", async () => {
+      game.override.enemyMoveset(MoveId.TACKLE).criticalHits(false);
+
+      await game.classicMode.startBattle(SpeciesId.SNORLAX);
+
+      const player = game.field.getPlayerPokemon();
+      player.addTag(BattlerTagType.SUBSTITUTE, 0, MoveId.NONE, player.id);
+      const hpBeforeHit = player.hp;
+      const dollHpBeforeHit = player.getTag(SubstituteTag)!.hp;
+
+      game.move.use(MoveId.SPLASH);
+      game.setTurnOrder([BattlerIndex.ENEMY, BattlerIndex.PLAYER]);
+      await game.move.forceHit();
+      await game.toEndOfTurn();
+
+      expectDollAbsorbedHit(player, hpBeforeHit, dollHpBeforeHit);
+    });
+
+    it("should play a target frame against a Substitute doll without writing spriteSubmitter data", async () => {
+      game.override.criticalHits(false);
+      await game.classicMode.startBattle(SpeciesId.MACHAMP);
+
+      const snorlax = game.field.getEnemyPokemon();
+      snorlax.addTag(BattlerTagType.SUBSTITUTE, 0, MoveId.NONE, snorlax.id);
+
+      game.move.use(MoveId.TACKLE);
+      game.setTurnOrder([BattlerIndex.PLAYER, BattlerIndex.ENEMY]);
+      await game.move.forceHit();
+
+      const doll = snorlax.getTag(SubstituteTag)?.sprite as MockSprite | undefined;
+      expect(doll).toBeDefined();
+
+      settings.update("display", "enableMoveAnimations", true);
+      vi.spyOn(MoveAnim.prototype, "getAnim").mockReturnValue({
+        frames: [
+          [
+            {
+              x: 0,
+              y: 0,
+              zoomX: 100,
+              zoomY: 100,
+              angle: 0,
+              mirror: false,
+              visible: true,
+              blendType: AnimBlendType.NORMAL,
+              target: AnimFrameTarget.TARGET,
+              opacity: 255,
+              tone: [1, 0, 0, 0],
+              locked: false,
+              priority: 0,
+              focus: AnimFocus.TARGET,
+            },
+          ],
+        ],
+        frameTimedEvents: new Map(),
+      } as unknown as ReturnType<MoveAnim["getAnim"]>);
+
+      const counters: Phaser.Types.Tweens.NumberTweenBuilderConfig[] = [];
+      const tween = undefined as unknown as Phaser.Tweens.Tween;
+      vi.spyOn(game.scene.tweens, "addCounter").mockImplementation(config => {
+        if (typeof config.onRepeat === "function" && (config.repeat ?? 0) > 0) {
+          counters.push(config);
+        } else {
+          config.onComplete?.(tween, []);
+        }
+        return { remove: vi.fn() } as unknown as Phaser.Tweens.Tween;
+      });
+
+      const copies: MockSprite[] = [];
+      const addFieldSprite = game.scene.addFieldSprite.bind(game.scene);
+      vi.spyOn(game.scene, "addFieldSprite").mockImplementation((...args) => {
+        const sprite = addFieldSprite(...args);
+        copies.push(sprite as unknown as MockSprite);
+        return sprite;
+      });
+
+      let completed = false;
+      const originalPlay = MoveAnim.prototype.play;
+      vi.spyOn(MoveAnim.prototype, "play").mockImplementation(function (
+        this: MoveAnim,
+        onSubstitute?: boolean,
+        callback?: () => void,
+      ) {
+        return originalPlay.call(this, onSubstitute, () => {
+          completed = true;
+          callback?.();
+        });
+      });
+
+      const phase = game.scene.phaseManager.getCurrentPhase() as MoveEffectPhase;
+      phase.start();
+
+      expect(counters).toHaveLength(1);
+      counters[0].onRepeat?.(tween, undefined, "", 0, 0);
+      counters[0].onComplete?.(tween, []);
+
+      expect(completed).toBe(true);
+      expect(doll!.renderNodeData[game.scene.spriteSubmitter.name]).toBeUndefined();
+      expect(copies.length).toBeGreaterThan(0);
+      for (const copy of copies) {
+        expect(copy.renderNodeData[game.scene.spriteSubmitter.name]).toBeUndefined();
+      }
+    });
+
+    it("should reset tone on a Pokemon sprite after a move animation when it has no Substitute", async () => {
+      game.override.criticalHits(false);
+      await game.classicMode.startBattle(SpeciesId.MACHAMP);
+
+      const snorlax = game.field.getEnemyPokemon();
+      const sprite = snorlax.getSprite() as unknown as MockSprite;
+      sprite.setRenderNodeData(game.scene.spriteSubmitter, "tone", [1, 2, 3, 4]);
+
+      game.move.use(MoveId.TACKLE);
+      game.setTurnOrder([BattlerIndex.PLAYER, BattlerIndex.ENEMY]);
+      await game.move.forceHit();
+      await game.toEndOfTurn();
+
+      expect(sprite.renderNodeData[game.scene.spriteSubmitter.name].tone).toEqual([0, 0, 0, 0]);
+    });
   });
 });
