@@ -36,3 +36,9 @@ ignore:
    - .devcontainer
    - "LICENSES"
    - .idea
+   # Local, gitignored tool folders (not part of the repository)
+   - .agent
+   - .agents
+   - .claude
+   - .cursor
+   - .spectra
