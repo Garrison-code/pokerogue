@@ -9,7 +9,8 @@ export class MockSprite implements MockGameObject {
   public renderNodeData: Record<string, Record<string, any>>;
   public texture;
   public key;
-  public frame;
+  /** Phaser's default frame name when a sprite is created without one. */
+  public frame: { name: string } = { name: "__BASE" };
   public textureManager;
   public scene;
   public anims;
