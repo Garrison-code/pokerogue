@@ -733,6 +733,9 @@ export class MenuUiHandler extends OptionSelectUiHandler {
             buttonActions: [],
             fadeOut: () =>
               globalScene.gameData.saveAll(true, true, true, true).then(() => {
+                // The command handler (and anything else chained beneath the menu) is still alive; clear it
+                // before the field is wiped so it doesn't keep updating against an empty field.
+                ui.resetModeChain();
                 globalScene.reset(true);
               }),
           });
