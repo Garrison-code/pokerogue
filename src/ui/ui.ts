@@ -664,7 +664,16 @@ export class UI extends Phaser.GameObjects.Container {
     return this.setModeInternal(mode, false, false, true, args);
   }
 
+  /**
+   * Discard the mode chain, clearing every chained handler first so they stop listening for
+   * per-frame updates (e.g. pointer targets) against state that no longer exists.
+   */
   public resetModeChain(): void {
+    for (const mode of this._modeChain) {
+      if (mode !== this._mode) {
+        this.handlers[mode]?.clear();
+      }
+    }
     this._modeChain = [];
     globalScene.updateGameInfo();
   }

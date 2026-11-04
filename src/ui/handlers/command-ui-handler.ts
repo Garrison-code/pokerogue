@@ -237,7 +237,12 @@ export class CommandUiHandler extends UiHandler {
   }
 
   canTera(): boolean {
+    // The field may already be cleared (e.g. save & quit resets the scene while this handler's
+    // pointer targets are still updating), so the active Pokemon can be missing.
     const activePokemon = globalScene.getField()[this.fieldIndex];
+    if (!activePokemon) {
+      return false;
+    }
     const currentTeras = globalScene.arena.playerTerasUsed;
     const canTera = activePokemon.isPlayer() && canTerastallize(activePokemon);
     const plannedTera = +(
@@ -247,10 +252,14 @@ export class CommandUiHandler extends UiHandler {
   }
 
   toggleTeraButton() {
+    const activePokemon = globalScene.getField()[this.fieldIndex];
+    if (!activePokemon) {
+      return;
+    }
     this.teraButton.setRenderNodeRole("Submitter", globalScene.spriteSubmitter, {
       tone: [0.0, 0.0, 0.0, 0.0],
       ignoreTimeTint: true,
-      teraColor: getTypeRgb(globalScene.getField()[this.fieldIndex].getTeraType()),
+      teraColor: getTypeRgb(activePokemon.getTeraType()),
       isTerastallized: this.getCursor() === Command.TERA,
     });
   }
