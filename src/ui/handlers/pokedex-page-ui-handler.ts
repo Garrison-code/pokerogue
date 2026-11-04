@@ -2587,7 +2587,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
         this.setSpeciesDetails(species, {
           shiny: props.shiny,
-          formIndex: props.formIndex,
+          formIndex: starterPreferences?.formIndex ?? props.formIndex,
           female: props.female,
           variant: props.variant,
         });
