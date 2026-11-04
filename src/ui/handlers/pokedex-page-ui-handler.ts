@@ -1377,13 +1377,13 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         });
         this.blockInput = false;
       } else {
-        ui.revertMode().then(() => {
-          if (displayId !== this.displayId || !this.active) {
+        const exitCallback = this.exitCallback;
+        ui.revertMode().then(reverted => {
+          if (!reverted) {
             return;
           }
-          if (this.exitCallback instanceof Function) {
-            const exitCallback = this.exitCallback;
-            this.exitCallback = null;
+          this.exitCallback = null;
+          if (exitCallback instanceof Function) {
             exitCallback();
           }
         });
@@ -2587,7 +2587,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
         this.setSpeciesDetails(species, {
           shiny: props.shiny,
-          formIndex: props.formIndex,
+          formIndex: starterPreferences?.formIndex ?? props.formIndex,
           female: props.female,
           variant: props.variant,
         });
@@ -3036,6 +3036,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
   public override clear(): void {
     this.displayId++;
+    this.exitCallback = null;
     this.stopPointerInput();
     if (this.assetLoadCancelled) {
       this.assetLoadCancelled.value = true;

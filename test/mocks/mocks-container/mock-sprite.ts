@@ -9,13 +9,15 @@ export class MockSprite implements MockGameObject {
   public renderNodeData: Record<string, Record<string, any>>;
   public texture;
   public key;
-  public frame;
+  /** Phaser's default frame name when a sprite is created without one. */
+  public frame: { name: string } = { name: "__BASE" };
   public textureManager;
   public scene;
   public anims;
   public list: MockGameObject[] = [];
   public name: string;
   public active = true;
+  private dataValues: Record<string, unknown> = {};
   constructor(textureManager, x, y, texture) {
     this.textureManager = textureManager;
     this.scene = textureManager.scene;
@@ -203,8 +205,15 @@ export class MockSprite implements MockGameObject {
   }
 
   setRenderNodeData(renderNode: string | Phaser.Renderer.WebGL.RenderNodes.RenderNode, key: string, value: any): this {
-    this.renderNodeData[typeof renderNode === "string" ? renderNode : renderNode.name] ??= {};
-    this.renderNodeData[typeof renderNode === "string" ? renderNode : renderNode.name][key] = value;
+    // Match Phaser: missing render-node data throws, and `undefined` removes the key.
+    // See Phaser.GameObjects.Components.RenderNodes#setRenderNodeData.
+    const name = typeof renderNode === "string" ? renderNode : renderNode.name;
+    const data = this.renderNodeData[name];
+    if (value === undefined) {
+      delete data[key];
+    } else {
+      data[key] = value;
+    }
     return this;
   }
 
@@ -220,6 +229,19 @@ export class MockSprite implements MockGameObject {
   setAngle(angle): this {
     this.phaserSprite.setAngle(angle);
     return this;
+  }
+
+  setBlendMode(_blendMode): this {
+    return this;
+  }
+
+  setData(key: string, value): this {
+    this.dataValues[key] = value;
+    return this;
+  }
+
+  getData(key: string) {
+    return this.dataValues[key];
   }
 
   setMask(): this {

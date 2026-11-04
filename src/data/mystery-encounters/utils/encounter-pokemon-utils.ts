@@ -747,7 +747,7 @@ export async function catchPokemon(
                     form: pokemon.formIndex,
                     female: pokemon.gender === Gender.FEMALE,
                   };
-                  ui.setOverlayMode(UiMode.POKEDEX_PAGE, pokemon.species, pokemon.formIndex, [attributes], null, () => {
+                  ui.setOverlayMode(UiMode.POKEDEX_PAGE, pokemon.species, attributes, null, null, () => {
                     ui.setMode(UiMode.MESSAGE).then(() => promptRelease());
                   });
                   return true;

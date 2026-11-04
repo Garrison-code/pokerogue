@@ -722,31 +722,35 @@ export abstract class PokemonSpeciesForm {
     }
     return new Promise<void>(resolve => {
       globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
-        const originalWarn = console.warn;
-        // Ignore warnings for missing frames, because there will be a lot
-        console.warn = () => {};
-        const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
-          zeroPad: 4,
-          suffix: ".png",
-          start: 1,
-          end: 400,
-        });
-        console.warn = originalWarn;
-        if (globalScene.anims.exists(spriteKey)) {
-          // Bang is safe since we just checked that the animation exists
-          globalScene.anims.get(spriteKey)!.frameRate = 10;
-        } else {
-          globalScene.anims.create({
-            key: this.getSpriteKey(female, formIndex, shiny, variant, back),
-            frames: frameNames,
-            frameRate: 10,
-            repeat: -1,
+        if (globalScene.textures.exists(spriteKey)) {
+          const originalWarn = console.warn;
+          // Ignore warnings for missing frames, because there will be a lot
+          console.warn = () => {};
+          const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
+            zeroPad: 4,
+            suffix: ".png",
+            start: 1,
+            end: 400,
           });
+          console.warn = originalWarn;
+          if (globalScene.anims.exists(spriteKey)) {
+            // Bang is safe since we just checked that the animation exists
+            globalScene.anims.get(spriteKey)!.frameRate = 10;
+          } else if (frameNames.length > 0) {
+            globalScene.anims.create({
+              key: this.getSpriteKey(female, formIndex, shiny, variant, back),
+              frames: frameNames,
+              frameRate: 10,
+              repeat: -1,
+            });
+          }
         }
         const spritePath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back)
           .replace("variant/", "")
           .replace(/_[1-3]$/, "");
-        if (variant != null) {
+        if (variant == null) {
+          resolve();
+        } else {
           loadPokemonVariantAssets(spriteKey, spritePath, variant).then(() => resolve());
         }
       });
