@@ -626,6 +626,7 @@ export function loadMoveAnimAssets(moveIds: MoveId[], startLoad?: boolean): Prom
 
 function loadAnimAssets(anims: AnimConfig[], startLoad?: boolean): Promise<void> {
   return new Promise(resolve => {
+    const graphics = new Set<string>();
     const backgrounds = new Set<string>();
     const sounds = new Set<string>();
     for (const a of anims) {
@@ -640,12 +641,15 @@ function loadAnimAssets(anims: AnimConfig[], startLoad?: boolean): Promise<void>
       for (const abg of animBackgrounds) {
         backgrounds.add(abg);
       }
-      if (a.graphic) {
+      if (a.graphic && !graphics.has(a.graphic)) {
+        graphics.add(a.graphic);
         globalScene.loadSpritesheet(a.graphic, "battle_anims", 96);
       }
     }
     for (const bg of backgrounds) {
-      globalScene.loadImage(bg, "battle_anims");
+      if (!graphics.has(bg)) {
+        globalScene.loadImage(bg, "battle_anims");
+      }
     }
     for (const s of sounds) {
       globalScene.loadSe(s, "battle_anims", s);
