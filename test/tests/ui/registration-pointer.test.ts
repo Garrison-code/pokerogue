@@ -82,10 +82,12 @@ describe("UI - registration form pointer input", () => {
     node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await vi.waitFor(() => expect(success).toHaveBeenCalledOnce());
   });
-  it.each(["touch", "middle", "upper", "transition", "tween"])("blocks %s", kind => {
-    if (kind === "touch") {
-      pointer.wasTouch = true;
-    }
+  it("submits from a tap on touch devices", async () => {
+    pointer.wasTouch = true;
+    click();
+    await vi.waitFor(() => expect(success).toHaveBeenCalledOnce());
+  });
+  it.each(["middle", "upper", "transition", "tween"])("blocks %s", kind => {
     if (kind === "middle") {
       pointer.buttons = 4;
     }

@@ -41,6 +41,16 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
     return true;
   }
 
+  /**
+   * Whether a tap on the form's buttons is accepted.
+   * @remarks
+   * The on-screen touch pad only has ACTION/CANCEL (no SUBMIT), so forms that must be completable
+   * on touch devices (e.g. the account login flow) opt in here.
+   */
+  protected get touchButtonsEnabled(): boolean {
+    return false;
+  }
+
   protected processFormButton(index: number): void {
     this.getUi().processInput(index === 0 ? Button.SUBMIT : Button.CANCEL);
   }
@@ -68,10 +78,12 @@ export abstract class PointerFormModalUiHandler extends FormModalUiHandler {
 
   private onButtonPointer(index: number, pointer: Phaser.Input.Pointer, event: Phaser.Types.Input.EventData): void {
     event.stopPropagation();
-    if (pointer.wasTouch || !this.getUi().canProcessPointerInput(this)) {
+    if (!this.getUi().canProcessPointerInput(this) || (pointer.wasTouch && !this.touchButtonsEnabled)) {
       return;
     }
-    if (pointer.rightButtonDown()) {
+    if (pointer.wasTouch) {
+      this.processFormButton(index);
+    } else if (pointer.rightButtonDown()) {
       this.getUi().processInput(Button.CANCEL);
     } else if (pointer.leftButtonDown()) {
       this.processFormButton(index);

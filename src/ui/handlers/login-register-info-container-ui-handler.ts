@@ -37,6 +37,10 @@ export abstract class LoginRegisterInfoContainerUiHandler extends PointerFormMod
     return false;
   }
 
+  protected override get touchButtonsEnabled(): boolean {
+    return true;
+  }
+
   private usernameInfoImage: Phaser.GameObjects.Image;
   private saveDownloadImage: Phaser.GameObjects.Image;
   private changeLanguageImage: Phaser.GameObjects.Image;

@@ -61,12 +61,16 @@ describe("UI - login entry pointer input", () => {
     expect(login).not.toHaveBeenCalled();
     expect(register).not.toHaveBeenCalled();
   });
-  it.each(["middle", "touch", "transition", "upper", "tween"])("blocks %s", kind => {
+  it.each([0, 1])("taps button %i once on touch devices", index => {
+    pointer.wasTouch = true;
+    click(index);
+    click(index);
+    expect(index ? register : login).toHaveBeenCalledOnce();
+    expect(index ? login : register).not.toHaveBeenCalled();
+  });
+  it.each(["middle", "transition", "upper", "tween"])("blocks %s", kind => {
     if (kind === "middle") {
       pointer.buttons = 4;
-    }
-    if (kind === "touch") {
-      pointer.wasTouch = true;
     }
     if (kind === "transition") {
       game.scene.ui["overlayActive"] = true;
