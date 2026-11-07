@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Garrison-code
+
+SPDX-License-Identifier: CC-BY-NC-SA-4.0
+-->
+
 # 觸控輸入調查報告(mouse 功能分支)
 
 - 調查日期:2026-11-05
