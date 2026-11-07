@@ -333,6 +333,48 @@ describe("System data merge", () => {
       "unsupported",
     );
   });
+  it("normalizes legacy egg gachaType before strict validation but still rejects unknown egg fields", () => {
+    const decoder = {
+      decrypt: (text: string) => text,
+      shortKeys: {},
+      parse: (text: string) => cloneSystemData(JSON.parse(text)),
+      migrate: vi.fn(),
+      version: options.version,
+      compareVersions: (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true }),
+    };
+    const base = save();
+    base.gameVersion = options.version;
+    base.eggs = [egg(1), egg(2), egg(3)];
+    const plain = JSON.parse(serializeSystemData(base));
+    const withGacha = JSON.parse(JSON.stringify(plain));
+    for (const e of withGacha.eggs) {
+      e.gachaType = 0;
+    }
+
+    // Same-version server export: every egg carries the retired gachaType.
+    const decoded = decodeSystemImport(JSON.stringify(withGacha), decoder);
+    for (const e of decoded.eggs) {
+      expect(e).not.toHaveProperty("gachaType");
+    }
+    expect(systemFingerprint(decoded)).toBe(systemFingerprint(decodeSystemImport(JSON.stringify(plain), decoder)));
+
+    // sourceType wins when both exist; gachaType fills a missing sourceType.
+    const precedence = JSON.parse(JSON.stringify(plain));
+    precedence.eggs[0].sourceType = 2;
+    precedence.eggs[0].gachaType = 0;
+    delete precedence.eggs[1].sourceType;
+    precedence.eggs[2].sourceType = 1;
+    precedence.eggs[1].gachaType = 3;
+    const resolved = decodeSystemImport(JSON.stringify(precedence), decoder);
+    expect(resolved.eggs[0].sourceType).toBe(2);
+    expect(resolved.eggs[1].sourceType).toBe(3);
+    expect(resolved.eggs[2].sourceType).toBe(1);
+
+    // Unknown fields stay rejected, even next to a legacy gachaType.
+    const unknown = JSON.parse(JSON.stringify(withGacha));
+    unknown.eggs[0].unknown = 1;
+    expect(() => decodeSystemImport(JSON.stringify(unknown), decoder)).toThrow("unsupported");
+  });
   it("requires another confirmation if current data or lineage changed", async () => {
     const base = save();
     const result = mergeSystemData(base, [source(save(2))], options);

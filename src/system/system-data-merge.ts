@@ -586,6 +586,15 @@ export function decodeSystemImport(text: string, decoder: ImportDecoder): System
         raw[field] = undefined;
       }
     }
+    // The server still exports the retired egg `gachaType`; keep it only as a fallback for a missing `sourceType`.
+    if (Array.isArray(raw.eggs)) {
+      for (const egg of raw.eggs) {
+        if (egg && typeof egg === "object" && Object.hasOwn(egg, "gachaType")) {
+          egg.sourceType ??= egg.gachaType;
+          egg.gachaType = undefined; // dropped by JSON.stringify below
+        }
+      }
+    }
     const normalizedJson = JSON.stringify(raw);
     if (decoder.compareVersions(raw.gameVersion, decoder.version) === 0) {
       validateSystemImportShape(JSON.parse(normalizedJson));
